@@ -3,6 +3,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 import { Separator } from '../ui/separator';
+<<<<<<< HEAD
 import { User, Mail, MapPin, CreditCard, Lock, Trash2, Save, Shield, AlertCircle } from 'lucide-react';
 import { ChangePasswordModal } from './ChangePasswordModal';
 import { DeleteAccountModal } from './DeleteAccountModal';
@@ -28,6 +29,16 @@ export function UserProfile({ onNavigateToAdminLogin, onPasswordChangeSuccess }:
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
   const [showAdminSwitchConfirm, setShowAdminSwitchConfirm] = useState(false);
+=======
+import { User, Mail, MapPin, CreditCard, Lock, Trash2, Save } from 'lucide-react';
+import { ChangePasswordModal } from './ChangePasswordModal';
+import { DeleteAccountModal } from './DeleteAccountModal';
+
+export function UserProfile() {
+  const [isEditing, setIsEditing] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
   const [profile, setProfile] = useState({
     name: 'John Doe',
     email: 'john@example.com',
@@ -42,6 +53,7 @@ export function UserProfile({ onNavigateToAdminLogin, onPasswordChangeSuccess }:
   const handleSave = () => {
     console.log('Saving profile:', profile);
     setIsEditing(false);
+<<<<<<< HEAD
     toast.success('Profile updated successfully!', {
       description: 'Your changes have been saved.',
     });
@@ -52,6 +64,9 @@ export function UserProfile({ onNavigateToAdminLogin, onPasswordChangeSuccess }:
     if (onNavigateToAdminLogin) {
       onNavigateToAdminLogin();
     }
+=======
+    alert('Profile updated successfully!');
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
   };
 
   return (
@@ -198,14 +213,22 @@ export function UserProfile({ onNavigateToAdminLogin, onPasswordChangeSuccess }:
       <div className="bg-white rounded-xl shadow-sm p-6">
         <h3 className="text-[#2C3E50] mb-6 flex items-center gap-2">
           <Lock className="w-5 h-5" />
+<<<<<<< HEAD
           Security & Access
+=======
+          Security
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
         </h3>
 
         <div className="space-y-4">
           <Button
             variant="outline"
             onClick={() => setShowChangePassword(true)}
+<<<<<<< HEAD
             className="w-full justify-start hover:bg-[#FAF8F3] transition-colors"
+=======
+            className="w-full justify-start"
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
           >
             <Lock className="w-4 h-4 mr-2" />
             Change Password
@@ -213,6 +236,7 @@ export function UserProfile({ onNavigateToAdminLogin, onPasswordChangeSuccess }:
           <Separator />
           <Button
             variant="outline"
+<<<<<<< HEAD
             onClick={() => setShowAdminSwitchConfirm(true)}
             className="w-full justify-start hover:bg-blue-50 border-blue-200 text-blue-700 transition-colors"
           >
@@ -224,6 +248,10 @@ export function UserProfile({ onNavigateToAdminLogin, onPasswordChangeSuccess }:
             variant="outline"
             onClick={() => setShowDeleteAccount(true)}
             className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors"
+=======
+            onClick={() => setShowDeleteAccount(true)}
+            className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
           >
             <Trash2 className="w-4 h-4 mr-2" />
             Delete Account
@@ -253,6 +281,7 @@ export function UserProfile({ onNavigateToAdminLogin, onPasswordChangeSuccess }:
 
       {/* Modals */}
       {showChangePassword && (
+<<<<<<< HEAD
         <ChangePasswordModal 
           onClose={() => setShowChangePassword(false)} 
           onSuccess={() => {
@@ -262,10 +291,14 @@ export function UserProfile({ onNavigateToAdminLogin, onPasswordChangeSuccess }:
             }
           }}
         />
+=======
+        <ChangePasswordModal onClose={() => setShowChangePassword(false)} />
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
       )}
       {showDeleteAccount && (
         <DeleteAccountModal onClose={() => setShowDeleteAccount(false)} />
       )}
+<<<<<<< HEAD
 
       {/* Admin Switch Confirmation Dialog */}
       <AlertDialog open={showAdminSwitchConfirm} onOpenChange={setShowAdminSwitchConfirm}>
@@ -291,6 +324,8 @@ export function UserProfile({ onNavigateToAdminLogin, onPasswordChangeSuccess }:
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+=======
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
     </div>
   );
 }

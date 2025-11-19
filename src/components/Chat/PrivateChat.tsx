@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+<<<<<<< HEAD
 import { ArrowLeft, Send, Image as ImageIcon, Paperclip, MoreVertical, Smile, X, Archive, Undo } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -9,6 +10,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
+=======
+import { ArrowLeft, Send, Image as ImageIcon, Paperclip, MoreVertical, Smile, X } from 'lucide-react';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { toast } from 'sonner@2.0.3';
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
 
 interface Message {
   id: string;
@@ -77,6 +84,7 @@ export function PrivateChat({ otherUser, bookContext, onBack, currentUserId }: P
   const [newMessage, setNewMessage] = useState('');
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [isTyping, setIsTyping] = useState(false);
+<<<<<<< HEAD
   const [isArchived, setIsArchived] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -95,6 +103,11 @@ export function PrivateChat({ otherUser, bookContext, onBack, currentUserId }: P
     });
   };
 
+=======
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
@@ -199,9 +212,15 @@ export function PrivateChat({ otherUser, bookContext, onBack, currentUserId }: P
   };
 
   return (
+<<<<<<< HEAD
     <div className="fixed inset-0 bg-gradient-to-b from-[#E0F7FA] to-white z-50 flex flex-col">
       {/* Header */}
       <div className="bg-gradient-to-r from-[#00ACC1] to-[#0097A7] text-white p-4 flex items-center justify-between shadow-lg">
+=======
+    <div className="fixed inset-0 bg-white z-50 flex flex-col">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-[#2C3E50] to-[#34495E] text-white p-4 flex items-center justify-between shadow-lg">
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
@@ -210,20 +229,33 @@ export function PrivateChat({ otherUser, bookContext, onBack, currentUserId }: P
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="relative">
+<<<<<<< HEAD
             <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white text-lg border-2 border-white/30">
               {otherUser.avatar}
             </div>
             {otherUser.online && (
               <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-400 border-2 border-white rounded-full" />
+=======
+            <div className="w-12 h-12 bg-[#C4A672] rounded-full flex items-center justify-center text-white text-lg">
+              {otherUser.avatar}
+            </div>
+            {otherUser.online && (
+              <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full" />
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
             )}
           </div>
           <div>
             <div className="text-lg">{otherUser.name}</div>
+<<<<<<< HEAD
             <div className="text-sm text-white/90">
+=======
+            <div className="text-sm text-white/80">
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
               {otherUser.online ? 'Online' : 'Offline'}
             </div>
           </div>
         </div>
+<<<<<<< HEAD
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="text-white hover:bg-white/10">
@@ -237,6 +269,11 @@ export function PrivateChat({ otherUser, bookContext, onBack, currentUserId }: P
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+=======
+        <Button variant="ghost" size="sm" className="text-white hover:bg-white/10">
+          <MoreVertical className="w-5 h-5" />
+        </Button>
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
       </div>
 
       {/* Book Context (if applicable) */}
@@ -263,7 +300,11 @@ export function PrivateChat({ otherUser, bookContext, onBack, currentUserId }: P
       )}
 
       {/* Messages */}
+<<<<<<< HEAD
       <div className="flex-1 overflow-y-auto p-4">
+=======
+      <div className="flex-1 overflow-y-auto p-4 bg-gradient-to-b from-[#FAF8F3] to-white">
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
         <div className="max-w-3xl mx-auto space-y-4">
           {messages.map((message) => (
             <div
@@ -272,16 +313,27 @@ export function PrivateChat({ otherUser, bookContext, onBack, currentUserId }: P
             >
               <div className={`flex gap-2 max-w-[70%] ${message.isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
                 {!message.isOwn && (
+<<<<<<< HEAD
                   <div className="w-8 h-8 bg-gradient-to-br from-[#00ACC1] to-[#0097A7] rounded-full flex items-center justify-center text-white text-sm flex-shrink-0 shadow-md">
+=======
+                  <div className="w-8 h-8 bg-[#C4A672] rounded-full flex items-center justify-center text-white text-sm flex-shrink-0">
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
                     {message.senderAvatar}
                   </div>
                 )}
                 <div>
                   <div
+<<<<<<< HEAD
                     className={`rounded-2xl p-3 shadow-sm ${
                       message.isOwn
                         ? 'bg-[#00ACC1] text-white rounded-br-md'
                         : 'bg-white text-gray-900 rounded-bl-md border border-gray-100'
+=======
+                    className={`rounded-2xl p-3 ${
+                      message.isOwn
+                        ? 'bg-[#2C3E50] text-white rounded-br-none'
+                        : 'bg-white border border-gray-200 text-gray-900 rounded-bl-none'
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
                     }`}
                   >
                     {message.content && (

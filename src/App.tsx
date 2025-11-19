@@ -96,7 +96,11 @@ export default function App() {
 
   const confirmLogout = () => {
     setUserRole(null);
+<<<<<<< HEAD
     setCurrentPage('login'); // Redirect to login page
+=======
+    setCurrentPage('home');
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
     setShowLogoutConfirm(false);
   };
 
@@ -145,7 +149,10 @@ export default function App() {
           onNavigateToRent={() => setCurrentPage('rent')}
           onNavigateToSell={() => setCurrentPage('sell')}
           onNavigateToCommunities={handleNavigateToCommunities}
+<<<<<<< HEAD
           onNavigateToAdminLogin={() => setCurrentPage('admin-login')}
+=======
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
         />
         {showLogoutConfirm && (
           <LogoutConfirmation onConfirm={confirmLogout} onCancel={cancelLogout} />
@@ -511,7 +518,11 @@ export default function App() {
       {showNotesViewer && (
         <NotesViewer
           title="Study Notes"
+<<<<<<< HEAD
           author="Book Bloom"
+=======
+          author="BookOra"
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
           onClose={() => setShowNotesViewer(false)}
           downloadable={true}
         />

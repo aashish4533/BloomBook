@@ -32,6 +32,7 @@ export function LoginForm({ onSwitchToSignUp, onLogin }: LoginFormProps) {
           <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-white/20 backdrop-blur-sm mb-4">
             <Home className="w-12 h-12 text-white" />
           </div>
+<<<<<<< HEAD
           <h2 className="text-white text-4xl">Welcome to Book Bloom</h2>
           <p className="text-white/90 text-lg">
             Your trusted platform for buying, selling, and renting books. 
@@ -49,6 +50,25 @@ export function LoginForm({ onSwitchToSignUp, onLogin }: LoginFormProps) {
             <div className="text-center">
               <div className="text-white text-3xl mb-1">100+</div>
               <div className="text-white/80 text-sm">Communities</div>
+=======
+          <h2 className="text-white text-4xl">Welcome to BookOra</h2>
+          <p className="text-white/90 text-lg">
+            Your trusted platform for buying, selling, and renting properties. 
+            Find your dream home today.
+          </p>
+          <div className="grid grid-cols-3 gap-4 pt-8">
+            <div className="text-center">
+              <div className="text-white text-3xl mb-1">10K+</div>
+              <div className="text-white/80 text-sm">Properties</div>
+            </div>
+            <div className="text-center">
+              <div className="text-white text-3xl mb-1">5K+</div>
+              <div className="text-white/80 text-sm">Happy Clients</div>
+            </div>
+            <div className="text-center">
+              <div className="text-white text-3xl mb-1">500+</div>
+              <div className="text-white/80 text-sm">Agents</div>
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
             </div>
           </div>
         </div>

@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Button } from '../ui/button';
+<<<<<<< HEAD
 import { Lock, Eye, EyeOff } from 'lucide-react';
 
 interface ChangePasswordModalProps {
@@ -11,12 +12,22 @@ interface ChangePasswordModalProps {
 }
 
 export function ChangePasswordModal({ onClose, onSuccess }: ChangePasswordModalProps) {
+=======
+import { Lock } from 'lucide-react';
+
+interface ChangePasswordModalProps {
+  onClose: () => void;
+}
+
+export function ChangePasswordModal({ onClose }: ChangePasswordModalProps) {
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
   const [passwords, setPasswords] = useState({
     current: '',
     new: '',
     confirm: ''
   });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+<<<<<<< HEAD
   const [showPasswords, setShowPasswords] = useState({
     current: false,
     new: false,
@@ -29,6 +40,8 @@ export function ChangePasswordModal({ onClose, onSuccess }: ChangePasswordModalP
       [field]: !prev[field]
     }));
   };
+=======
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,11 +60,16 @@ export function ChangePasswordModal({ onClose, onSuccess }: ChangePasswordModalP
 
     if (Object.keys(newErrors).length === 0) {
       console.log('Changing password');
+<<<<<<< HEAD
       if (onSuccess) {
         onSuccess();
       } else {
         onClose();
       }
+=======
+      alert('Password changed successfully!');
+      onClose();
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
     }
   };
 
@@ -69,6 +87,7 @@ export function ChangePasswordModal({ onClose, onSuccess }: ChangePasswordModalP
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           <div className="space-y-2">
             <Label htmlFor="current">Current Password</Label>
+<<<<<<< HEAD
             <div className="relative">
               <Input
                 id="current"
@@ -85,11 +104,21 @@ export function ChangePasswordModal({ onClose, onSuccess }: ChangePasswordModalP
                 {showPasswords.current ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+=======
+            <Input
+              id="current"
+              type="password"
+              value={passwords.current}
+              onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
+              className={errors.current ? 'border-red-500' : ''}
+            />
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
             {errors.current && <p className="text-sm text-red-500">{errors.current}</p>}
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="new">New Password</Label>
+<<<<<<< HEAD
             <div className="relative">
               <Input
                 id="new"
@@ -108,10 +137,21 @@ export function ChangePasswordModal({ onClose, onSuccess }: ChangePasswordModalP
             </div>
             {errors.new && <p className="text-sm text-red-500">{errors.new}</p>}
             <p className="text-xs text-gray-500">Must be at least 8 characters</p>
+=======
+            <Input
+              id="new"
+              type="password"
+              value={passwords.new}
+              onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
+              className={errors.new ? 'border-red-500' : ''}
+            />
+            {errors.new && <p className="text-sm text-red-500">{errors.new}</p>}
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="confirm">Confirm New Password</Label>
+<<<<<<< HEAD
             <div className="relative">
               <Input
                 id="confirm"
@@ -128,6 +168,15 @@ export function ChangePasswordModal({ onClose, onSuccess }: ChangePasswordModalP
                 {showPasswords.confirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+=======
+            <Input
+              id="confirm"
+              type="password"
+              value={passwords.confirm}
+              onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
+              className={errors.confirm ? 'border-red-500' : ''}
+            />
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
             {errors.confirm && <p className="text-sm text-red-500">{errors.confirm}</p>}
           </div>
 

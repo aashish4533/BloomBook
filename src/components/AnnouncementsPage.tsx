@@ -1,5 +1,10 @@
+<<<<<<< HEAD
 import { useState, useEffect } from 'react';
 import { Search, Filter, Bell, Plus, Edit2, Trash2, Eye, ArrowLeft } from 'lucide-react';
+=======
+import { useState } from 'react';
+import { Search, Filter, Bell, Plus, Edit2, Trash2, Eye } from 'lucide-react';
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -175,6 +180,7 @@ export function AnnouncementsPage({ isAdmin = false, onBack }: AnnouncementsPage
   };
 
   return (
+<<<<<<< HEAD
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white pb-20 md:pb-0">
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white py-12 shadow-card">
@@ -193,12 +199,26 @@ export function AnnouncementsPage({ isAdmin = false, onBack }: AnnouncementsPage
             <div>
               <h1 className="text-4xl mb-2">📢 Announcements</h1>
               <p className="text-white/90">Stay updated with the latest news and offers from Book Bloom</p>
+=======
+    <div className="min-h-screen bg-gradient-to-b from-[#FAF8F3] to-white pb-20 md:pb-0">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-[#2C3E50] to-[#34495E] text-white py-12">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-4xl mb-2">📢 Announcements</h1>
+              <p className="text-white/90">Stay updated with the latest news and offers</p>
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
             </div>
             {isAdmin && (
               <Button
                 onClick={handleCreate}
                 size="lg"
+<<<<<<< HEAD
                 className="bg-white text-blue-600 hover:bg-gray-100 transition-smooth btn-scale shadow-subtle"
+=======
+                className="bg-[#C4A672] hover:bg-[#8B7355] text-white"
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
               >
                 <Plus className="w-5 h-5 mr-2" />
                 Create Announcement
@@ -206,12 +226,17 @@ export function AnnouncementsPage({ isAdmin = false, onBack }: AnnouncementsPage
             )}
           </div>
 
+<<<<<<< HEAD
           {/* Enhanced Search & Filter */}
+=======
+          {/* Search & Filter */}
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
           <div className="flex gap-4 flex-wrap">
             <div className="relative flex-1 min-w-[300px]">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <Input
                 type="text"
+<<<<<<< HEAD
                 placeholder="Type to search announcements..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -225,6 +250,16 @@ export function AnnouncementsPage({ isAdmin = false, onBack }: AnnouncementsPage
             </div>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
               <SelectTrigger className="w-48 h-12 bg-white shadow-subtle">
+=======
+                placeholder="Search announcements..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-12 pr-4 h-12 bg-white text-gray-900"
+              />
+            </div>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-48 h-12 bg-white">
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

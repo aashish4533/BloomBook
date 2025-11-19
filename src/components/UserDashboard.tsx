@@ -6,7 +6,10 @@ import { RentalHistory } from './User/RentalHistory';
 import { Wishlist } from './User/Wishlist';
 import { UserCommunities } from './User/UserCommunities';
 import { UserChats } from './User/UserChats';
+<<<<<<< HEAD
 import { ChangePasswordSuccess } from './ChangePasswordSuccess';
+=======
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
 import { Button } from './ui/button';
 import { User, ShoppingBag, DollarSign, Calendar, Heart, BookOpen, LogOut, Users, MessageCircle } from 'lucide-react';
 
@@ -16,12 +19,19 @@ interface UserDashboardProps {
   onNavigateToRent: () => void;
   onNavigateToSell: () => void;
   onNavigateToCommunities?: () => void;
+<<<<<<< HEAD
   onNavigateToAdminLogin?: () => void;
 }
 
 export function UserDashboard({ onLogout, onNavigateToMarketplace, onNavigateToRent, onNavigateToSell, onNavigateToCommunities, onNavigateToAdminLogin }: UserDashboardProps) {
   const [activeTab, setActiveTab] = useState<'profile' | 'purchases' | 'sales' | 'rentals' | 'wishlist' | 'communities' | 'chats'>('profile');
   const [showPasswordSuccess, setShowPasswordSuccess] = useState(false);
+=======
+}
+
+export function UserDashboard({ onLogout, onNavigateToMarketplace, onNavigateToRent, onNavigateToSell, onNavigateToCommunities }: UserDashboardProps) {
+  const [activeTab, setActiveTab] = useState<'profile' | 'purchases' | 'sales' | 'rentals' | 'wishlist' | 'communities' | 'chats'>('profile');
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
 
   const tabs = [
     { id: 'profile' as const, label: 'Profile', icon: User },
@@ -40,9 +50,15 @@ export function UserDashboard({ onLogout, onNavigateToMarketplace, onNavigateToR
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 bg-[#C4A672] rounded-lg flex items-center justify-center text-white">
+<<<<<<< HEAD
               <span>BB</span>
             </div>
             <h1 className="text-[#2C3E50] text-2xl">Book Bloom</h1>
+=======
+              <span>BO</span>
+            </div>
+            <h1 className="text-[#2C3E50] text-2xl">BookOra</h1>
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
           </div>
           <div className="flex items-center gap-3">
             <Button
@@ -120,12 +136,16 @@ export function UserDashboard({ onLogout, onNavigateToMarketplace, onNavigateToR
 
         {/* Content */}
         <div>
+<<<<<<< HEAD
           {activeTab === 'profile' && (
             <UserProfile 
               onNavigateToAdminLogin={onNavigateToAdminLogin}
               onPasswordChangeSuccess={() => setShowPasswordSuccess(true)}
             />
           )}
+=======
+          {activeTab === 'profile' && <UserProfile />}
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
           {activeTab === 'purchases' && <PurchaseHistory />}
           {activeTab === 'sales' && <SalesHistory />}
           {activeTab === 'rentals' && <RentalHistory />}
@@ -134,11 +154,14 @@ export function UserDashboard({ onLogout, onNavigateToMarketplace, onNavigateToR
           {activeTab === 'chats' && <UserChats />}
         </div>
       </div>
+<<<<<<< HEAD
 
       {/* Password Change Success Modal */}
       {showPasswordSuccess && (
         <ChangePasswordSuccess onContinue={() => setShowPasswordSuccess(false)} />
       )}
+=======
+>>>>>>> 88a5271c495e1c8115c21cf85b9d6c3edee4b94b
     </div>
   );
 }
