@@ -1,0 +1,492 @@
+import { useState } from 'react';
+import { ArrowLeft, Users, MessageCircle, Settings, MoreVertical, Heart, MessageSquare, Share2, Plus, UserPlus, UserMinus, Edit2, Trash2 } from 'lucide-react';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { Avatar } from '../ui/avatar';
+import { CreatePost } from './CreatePost';
+import { PostDetail } from './PostDetail';
+import { toast } from 'sonner@2.0.3';
+
+interface Post {
+  id: string;
+  authorId: string;
+  authorName: string;
+  authorAvatar: string;
+  content: string;
+  images: string[];
+  createdAt: string;
+  reactions: {
+    like: number;
+    love: number;
+    insightful: number;
+  };
+  userReaction?: 'like' | 'love' | 'insightful';
+  commentCount: number;
+}
+
+interface Member {
+  id: string;
+  name: string;
+  avatar: string;
+  role: 'admin' | 'member';
+  joinedAt: string;
+  status?: 'pending';
+}
+
+interface CommunityDetailsProps {
+  communityId: string;
+  onBack: () => void;
+  onNavigateToChat: (communityId: string) => void;
+  isAdmin: boolean;
+  isMember: boolean;
+  userId: string;
+}
+
+export function CommunityDetails({
+  communityId,
+  onBack,
+  onNavigateToChat,
+  isAdmin,
+  isMember: initialIsMember,
+  userId
+}: CommunityDetailsProps) {
+  const [activeTab, setActiveTab] = useState('posts');
+  const [showCreatePost, setShowCreatePost] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [isMember, setIsMember] = useState(initialIsMember);
+
+  // Mock data
+  const community = {
+    id: communityId,
+    name: 'Science Fiction Lovers',
+    description: 'Discuss classic and modern sci-fi books, from Asimov to Liu Cixin. Share recommendations, theories, and fan art.',
+    coverImage: 'https://images.unsplash.com/photo-1516979187457-637abb4f9353?w=1200&h=300&fit=crop',
+    memberCount: 1234,
+    postsCount: 234,
+    admin: 'Sarah Johnson',
+    topic: ['Fiction', 'Science Fiction'],
+    privacy: 'public' as 'public' | 'private'
+  };
+
+  const [posts, setPosts] = useState<Post[]>([
+    {
+      id: '1',
+      authorId: 'user1',
+      authorName: 'John Doe',
+      authorAvatar: 'JD',
+      content: 'Just finished Dune for the third time and I still find new things to appreciate! The depth of worldbuilding is incredible. What\'s your favorite sci-fi universe?',
+      images: ['https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=600'],
+      createdAt: '2 hours ago',
+      reactions: { like: 12, love: 5, insightful: 3 },
+      userReaction: undefined,
+      commentCount: 8
+    },
+    {
+      id: '2',
+      authorId: 'user2',
+      authorName: 'Jane Smith',
+      authorAvatar: 'JS',
+      content: 'Looking for recommendations similar to Foundation series. I love hard sci-fi with big ideas about civilization and humanity\'s future. Any suggestions?',
+      images: [],
+      createdAt: '5 hours ago',
+      reactions: { like: 8, love: 2, insightful: 6 },
+      commentCount: 15
+    }
+  ]);
+
+  const [members, setMembers] = useState<Member[]>([
+    { id: 'user1', name: 'Sarah Johnson', avatar: 'SJ', role: 'admin', joinedAt: '2023-01-15' },
+    { id: 'user2', name: 'John Doe', avatar: 'JD', role: 'member', joinedAt: '2023-05-20' },
+    { id: 'user3', name: 'Jane Smith', avatar: 'JS', role: 'member', joinedAt: '2023-08-10' },
+    { id: 'user4', name: 'Mike Wilson', avatar: 'MW', role: 'member', joinedAt: '2023-09-01', status: 'pending' }
+  ]);
+
+  const handleJoin = () => {
+    if (community.privacy === 'private') {
+      toast.success('Join request sent! Waiting for admin approval.');
+    } else {
+      setIsMember(true);
+      toast.success('Successfully joined the community!');
+    }
+  };
+
+  const handleLeave = () => {
+    setIsMember(false);
+    toast.info('You left the community');
+  };
+
+  const handleReact = (postId: string, reaction: 'like' | 'love' | 'insightful') => {
+    setPosts(prev =>
+      prev.map(post => {
+        if (post.id !== postId) return post;
+        
+        const currentReaction = post.userReaction;
+        const reactions = { ...post.reactions };
+        
+        // Remove old reaction
+        if (currentReaction) {
+          reactions[currentReaction]--;
+        }
+        
+        // Add new reaction or toggle off
+        if (currentReaction === reaction) {
+          return { ...post, reactions, userReaction: undefined };
+        } else {
+          reactions[reaction]++;
+          return { ...post, reactions, userReaction: reaction };
+        }
+      })
+    );
+  };
+
+  const handleDeletePost = (postId: string) => {
+    if (confirm('Are you sure you want to delete this post?')) {
+      setPosts(prev => prev.filter(p => p.id !== postId));
+      toast.success('Post deleted');
+    }
+  };
+
+  const handleApproveMember = (memberId: string) => {
+    setMembers(prev =>
+      prev.map(m =>
+        m.id === memberId ? { ...m, status: undefined } : m
+      )
+    );
+    toast.success('Member approved');
+  };
+
+  const handleRejectMember = (memberId: string) => {
+    setMembers(prev => prev.filter(m => m.id !== memberId));
+    toast.info('Join request rejected');
+  };
+
+  const handleKickMember = (memberId: string) => {
+    if (confirm('Are you sure you want to remove this member?')) {
+      setMembers(prev => prev.filter(m => m.id !== memberId));
+      toast.success('Member removed');
+    }
+  };
+
+  const handleCreatePost = (content: string, images: string[]) => {
+    const newPost: Post = {
+      id: Date.now().toString(),
+      authorId: userId,
+      authorName: 'Current User',
+      authorAvatar: 'CU',
+      content,
+      images,
+      createdAt: 'Just now',
+      reactions: { like: 0, love: 0, insightful: 0 },
+      commentCount: 0
+    };
+    setPosts(prev => [newPost, ...prev]);
+    setShowCreatePost(false);
+    toast.success('Post published!');
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-[#FAF8F3] to-white pb-20 md:pb-0">
+      {/* Cover Image */}
+      <div className="relative h-64 bg-gradient-to-r from-[#2C3E50] to-[#34495E]">
+        <img
+          src={community.coverImage}
+          alt={community.name}
+          className="w-full h-full object-cover opacity-50"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+        
+        {/* Back Button */}
+        <button
+          onClick={onBack}
+          className="absolute top-4 left-4 flex items-center gap-2 text-white hover:text-white/80 transition-colors"
+        >
+          <div className="w-10 h-10 bg-black/30 rounded-full flex items-center justify-center backdrop-blur-sm">
+            <ArrowLeft className="w-5 h-5" />
+          </div>
+        </button>
+
+        {/* Community Info Overlay */}
+        <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+          <div className="max-w-7xl mx-auto">
+            <h1 className="text-4xl mb-2">{community.name}</h1>
+            <div className="flex items-center gap-4 text-sm">
+              <span className="flex items-center gap-1">
+                <Users className="w-4 h-4" />
+                {community.memberCount.toLocaleString()} members
+              </span>
+              <span className="flex items-center gap-1">
+                <MessageCircle className="w-4 h-4" />
+                {community.postsCount} posts
+              </span>
+              <span>Admin: {community.admin}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 -mt-6">
+        {/* Action Bar */}
+        <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4 mb-6 flex items-center justify-between">
+          <div className="flex gap-3">
+            {isMember ? (
+              <>
+                <Button
+                  onClick={() => onNavigateToChat(communityId)}
+                  className="bg-[#C4A672] hover:bg-[#8B7355] text-white"
+                >
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  Group Chat
+                </Button>
+                <Button
+                  onClick={handleLeave}
+                  variant="outline"
+                  className="text-red-600 hover:bg-red-50 border-red-200"
+                >
+                  <UserMinus className="w-4 h-4 mr-2" />
+                  Leave
+                </Button>
+              </>
+            ) : (
+              <Button
+                onClick={handleJoin}
+                className="bg-[#2C3E50] hover:bg-[#1a252f] text-white"
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                Join Community
+              </Button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {community.topic.map(topic => (
+              <Badge key={topic} variant="outline">{topic}</Badge>
+            ))}
+            {isAdmin && (
+              <Button variant="ghost" size="sm">
+                <Settings className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Description */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+          <h3 className="text-[#2C3E50] mb-2">About</h3>
+          <p className="text-gray-600">{community.description}</p>
+        </div>
+
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="bg-white border border-gray-200 p-1">
+            <TabsTrigger value="posts" className="data-[state=active]:bg-[#C4A672] data-[state=active]:text-white">
+              Posts
+            </TabsTrigger>
+            <TabsTrigger value="members" className="data-[state=active]:bg-[#C4A672] data-[state=active]:text-white">
+              Members ({members.length})
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Posts Tab */}
+          <TabsContent value="posts" className="space-y-4">
+            {isMember && (
+              <Button
+                onClick={() => setShowCreatePost(true)}
+                className="w-full bg-[#C4A672] hover:bg-[#8B7355] text-white"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Create Post
+              </Button>
+            )}
+
+            {posts.map(post => (
+              <div
+                key={post.id}
+                className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
+              >
+                {/* Post Header */}
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-[#C4A672] rounded-full flex items-center justify-center text-white">
+                      {post.authorAvatar}
+                    </div>
+                    <div>
+                      <div className="text-[#2C3E50]">{post.authorName}</div>
+                      <div className="text-sm text-gray-500">{post.createdAt}</div>
+                    </div>
+                  </div>
+                  {(isAdmin || post.authorId === userId) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeletePost(post.id)}
+                    >
+                      <Trash2 className="w-4 h-4 text-red-600" />
+                    </Button>
+                  )}
+                </div>
+
+                {/* Post Content */}
+                <p className="text-gray-700 mb-4 whitespace-pre-wrap">{post.content}</p>
+
+                {/* Post Images */}
+                {post.images.length > 0 && (
+                  <div className="grid grid-cols-2 gap-2 mb-4">
+                    {post.images.map((img, idx) => (
+                      <img
+                        key={idx}
+                        src={img}
+                        alt="Post"
+                        className="w-full h-48 object-cover rounded-lg"
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Reactions */}
+                <div className="flex items-center gap-6 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => handleReact(post.id, 'like')}
+                    className={`flex items-center gap-2 text-sm transition-colors ${
+                      post.userReaction === 'like'
+                        ? 'text-blue-600'
+                        : 'text-gray-600 hover:text-blue-600'
+                    }`}
+                  >
+                    👍 {post.reactions.like}
+                  </button>
+                  <button
+                    onClick={() => handleReact(post.id, 'love')}
+                    className={`flex items-center gap-2 text-sm transition-colors ${
+                      post.userReaction === 'love'
+                        ? 'text-red-600'
+                        : 'text-gray-600 hover:text-red-600'
+                    }`}
+                  >
+                    ❤️ {post.reactions.love}
+                  </button>
+                  <button
+                    onClick={() => handleReact(post.id, 'insightful')}
+                    className={`flex items-center gap-2 text-sm transition-colors ${
+                      post.userReaction === 'insightful'
+                        ? 'text-yellow-600'
+                        : 'text-gray-600 hover:text-yellow-600'
+                    }`}
+                  >
+                    💡 {post.reactions.insightful}
+                  </button>
+                  <button
+                    onClick={() => setSelectedPost(post)}
+                    className="flex items-center gap-2 text-sm text-gray-600 hover:text-[#C4A672] transition-colors ml-auto"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                    {post.commentCount} comments
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {posts.length === 0 && (
+              <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+                <MessageCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-xl text-gray-600 mb-2">No posts yet</h3>
+                <p className="text-gray-500">Be the first to start a discussion!</p>
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Members Tab */}
+          <TabsContent value="members" className="space-y-4">
+            {isAdmin && members.some(m => m.status === 'pending') && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-4">
+                <h3 className="text-[#2C3E50] mb-3">Pending Join Requests</h3>
+                {members
+                  .filter(m => m.status === 'pending')
+                  .map(member => (
+                    <div key={member.id} className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-[#C4A672] rounded-full flex items-center justify-center text-white">
+                          {member.avatar}
+                        </div>
+                        <span className="text-[#2C3E50]">{member.name}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => handleApproveMember(member.id)}
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleRejectMember(member.id)}
+                          className="text-red-600 border-red-200"
+                        >
+                          Reject
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 divide-y">
+              {members
+                .filter(m => !m.status)
+                .map(member => (
+                  <div key={member.id} className="p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-[#C4A672] rounded-full flex items-center justify-center text-white text-lg">
+                        {member.avatar}
+                      </div>
+                      <div>
+                        <div className="text-[#2C3E50] flex items-center gap-2">
+                          {member.name}
+                          {member.role === 'admin' && (
+                            <Badge className="bg-[#C4A672] text-white">Admin</Badge>
+                          )}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          Joined {new Date(member.joinedAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </div>
+                    {isAdmin && member.role !== 'admin' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleKickMember(member.id)}
+                        className="text-red-600 hover:bg-red-50"
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                ))}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* Create Post Modal */}
+      {showCreatePost && (
+        <CreatePost
+          onClose={() => setShowCreatePost(false)}
+          onSubmit={handleCreatePost}
+        />
+      )}
+
+      {/* Post Detail Modal */}
+      {selectedPost && (
+        <PostDetail
+          post={selectedPost}
+          onClose={() => setSelectedPost(null)}
+          isAdmin={isAdmin}
+          userId={userId}
+        />
+      )}
+    </div>
+  );
+}
