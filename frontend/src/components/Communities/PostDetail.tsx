@@ -1,8 +1,11 @@
-import { useState } from 'react';
+// Updated src/components/Communities/PostDetail.tsx
+import { useState, useEffect } from 'react';
 import { X, Heart, ThumbsUp, Lightbulb, MessageSquare, Send, Trash2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import { db, auth } from '../../firebase';
+import { collection, onSnapshot, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 
 interface Comment {
   id: string;
@@ -41,136 +44,89 @@ interface PostDetailProps {
 }
 
 export function PostDetail({ post, onClose, isAdmin, userId }: PostDetailProps) {
-  const [comments, setComments] = useState<Comment[]>([
-    {
-      id: '1',
-      authorId: 'user2',
-      authorName: 'Alice Reader',
-      authorAvatar: 'AR',
-      content: 'Great post! I absolutely love Dune too. Have you read the sequels?',
-      createdAt: '1 hour ago',
-      likes: 5,
-      userLiked: false,
-      replies: [
-        {
-          id: '1-1',
-          authorId: 'user1',
-          authorName: 'John Doe',
-          authorAvatar: 'JD',
-          content: 'Yes! Just started Dune Messiah. It\'s quite different but still amazing.',
-          createdAt: '45 minutes ago',
-          likes: 2,
-          userLiked: false,
-          replies: []
-        }
-      ]
-    },
-    {
-      id: '2',
-      authorId: 'user3',
-      authorName: 'Bob Scifi',
-      authorAvatar: 'BS',
-      content: 'The worldbuilding is definitely top tier. Frank Herbert was a genius!',
-      createdAt: '30 minutes ago',
-      likes: 3,
-      userLiked: true,
-      replies: []
-    }
-  ]);
-
+  const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState('');
 
-  const handleAddComment = () => {
+  useEffect(() => {
+    const q = query(
+      collection(db, 'posts', post.id, 'comments'),
+      orderBy('createdAt', 'asc')
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Comment));
+      setComments(data);
+    });
+    return () => unsubscribe();
+  }, [post.id]);
+
+  const handleAddComment = async () => {
     if (!newComment.trim()) return;
 
-    const comment: Comment = {
-      id: Date.now().toString(),
-      authorId: userId,
-      authorName: 'Current User',
-      authorAvatar: 'CU',
-      content: newComment,
-      createdAt: 'Just now',
-      likes: 0,
-      userLiked: false,
-      replies: []
-    };
-
-    setComments(prev => [...prev, comment]);
-    setNewComment('');
-    toast.success('Comment added');
-  };
-
-  const handleAddReply = (commentId: string) => {
-    if (!replyContent.trim()) return;
-
-    const reply: Comment = {
-      id: `${commentId}-${Date.now()}`,
-      authorId: userId,
-      authorName: 'Current User',
-      authorAvatar: 'CU',
-      content: replyContent,
-      createdAt: 'Just now',
-      likes: 0,
-      userLiked: false,
-      replies: []
-    };
-
-    setComments(prev =>
-      prev.map(comment => {
-        if (comment.id === commentId) {
-          return { ...comment, replies: [...comment.replies, reply] };
-        }
-        return comment;
-      })
-    );
-
-    setReplyContent('');
-    setReplyTo(null);
-    toast.success('Reply added');
-  };
-
-  const handleLikeComment = (commentId: string, isReply: boolean = false, parentId?: string) => {
-    if (isReply && parentId) {
-      setComments(prev =>
-        prev.map(comment => {
-          if (comment.id === parentId) {
-            return {
-              ...comment,
-              replies: comment.replies.map(reply =>
-                reply.id === commentId
-                  ? {
-                      ...reply,
-                      likes: reply.userLiked ? reply.likes - 1 : reply.likes + 1,
-                      userLiked: !reply.userLiked
-                    }
-                  : reply
-              )
-            };
-          }
-          return comment;
-        })
-      );
-    } else {
-      setComments(prev =>
-        prev.map(comment =>
-          comment.id === commentId
-            ? {
-                ...comment,
-                likes: comment.userLiked ? comment.likes - 1 : comment.likes + 1,
-                userLiked: !comment.userLiked
-              }
-            : comment
-        )
-      );
+    try {
+      await addDoc(collection(db, 'posts', post.id, 'comments'), {
+        authorId: userId,
+        authorName: 'Current User',
+        authorAvatar: 'CU',
+        content: newComment,
+        createdAt: serverTimestamp(),
+        likes: 0,
+        userLiked: false,
+        replies: []
+      });
+      setNewComment('');
+      toast.success('Comment added');
+    } catch (err) {
+      toast.error('Failed to add comment');
     }
   };
 
-  const handleDeleteComment = (commentId: string) => {
-    if (confirm('Are you sure you want to delete this comment?')) {
-      setComments(prev => prev.filter(c => c.id !== commentId));
-      toast.success('Comment deleted');
+  const handleAddReply = async (commentId: string) => {
+    if (!replyContent.trim()) return;
+
+    try {
+      await addDoc(collection(db, 'posts', post.id, 'comments', commentId, 'replies'), {
+        authorId: userId,
+        authorName: 'Current User',
+        authorAvatar: 'CU',
+        content: replyContent,
+        createdAt: serverTimestamp(),
+        likes: 0,
+        userLiked: false,
+        replies: []
+      });
+      setReplyContent('');
+      setReplyTo(null);
+      toast.success('Reply added');
+    } catch (err) {
+      toast.error('Failed to add reply');
+    }
+  };
+
+  const handleLikeComment = async (commentId: string, isReply: boolean = false, parentId?: string) => {
+    try {
+      const ref = isReply && parentId 
+        ? doc(db, 'posts', post.id, 'comments', parentId, 'replies', commentId)
+        : doc(db, 'posts', post.id, 'comments', commentId);
+      
+      await updateDoc(ref, {
+        likes: increment(1),
+        userLiked: true  // Or toggle logic
+      });
+    } catch (err) {
+      toast.error('Failed to like');
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (confirm('Are you sure?')) {
+      try {
+        await deleteDoc(doc(db, 'posts', post.id, 'comments', commentId));
+        toast.success('Comment deleted');
+      } catch (err) {
+        toast.error('Failed to delete');
+      }
     }
   };
 
@@ -263,7 +219,6 @@ export function PostDetail({ post, onClose, isAdmin, userId }: PostDetailProps) 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-2xl text-[#2C3E50]">Post & Comments</h2>
           <button
@@ -274,7 +229,6 @@ export function PostDetail({ post, onClose, isAdmin, userId }: PostDetailProps) 
           </button>
         </div>
 
-        {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           {/* Original Post */}
           <div className="mb-6 pb-6 border-b border-gray-200">

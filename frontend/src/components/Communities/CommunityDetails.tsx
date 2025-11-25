@@ -1,4 +1,5 @@
-import { useState } from 'react';
+// Updated src/components/Communities/CommunityDetails.tsx
+import { useState, useEffect } from 'react';
 import { ArrowLeft, Users, MessageCircle, Settings, MoreVertical, Heart, MessageSquare, Share2, Plus, UserPlus, UserMinus, Edit2, Trash2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -6,7 +7,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Avatar } from '../ui/avatar';
 import { CreatePost } from './CreatePost';
 import { PostDetail } from './PostDetail';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import { db, auth } from '../../firebase';
+import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, deleteDoc, onSnapshot } from 'firebase/firestore';
 
 interface Post {
   id: string;
@@ -47,7 +50,7 @@ export function CommunityDetails({
   communityId,
   onBack,
   onNavigateToChat,
-  isAdmin,
+  isAdmin: initialIsAdmin,
   isMember: initialIsMember,
   userId
 }: CommunityDetailsProps) {
@@ -55,135 +58,210 @@ export function CommunityDetails({
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [isMember, setIsMember] = useState(initialIsMember);
+  const [community, setCommunity] = useState<any>(null);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data
-  const community = {
-    id: communityId,
-    name: 'Science Fiction Lovers',
-    description: 'Discuss classic and modern sci-fi books, from Asimov to Liu Cixin. Share recommendations, theories, and fan art.',
-    coverImage: 'https://images.unsplash.com/photo-1516979187457-637abb4f9353?w=1200&h=300&fit=crop',
-    memberCount: 1234,
-    postsCount: 234,
-    admin: 'Sarah Johnson',
-    topic: ['Fiction', 'Science Fiction'],
-    privacy: 'public' as 'public' | 'private'
-  };
-
-  const [posts, setPosts] = useState<Post[]>([
-    {
-      id: '1',
-      authorId: 'user1',
-      authorName: 'John Doe',
-      authorAvatar: 'JD',
-      content: 'Just finished Dune for the third time and I still find new things to appreciate! The depth of worldbuilding is incredible. What\'s your favorite sci-fi universe?',
-      images: ['https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=600'],
-      createdAt: '2 hours ago',
-      reactions: { like: 12, love: 5, insightful: 3 },
-      userReaction: undefined,
-      commentCount: 8
-    },
-    {
-      id: '2',
-      authorId: 'user2',
-      authorName: 'Jane Smith',
-      authorAvatar: 'JS',
-      content: 'Looking for recommendations similar to Foundation series. I love hard sci-fi with big ideas about civilization and humanity\'s future. Any suggestions?',
-      images: [],
-      createdAt: '5 hours ago',
-      reactions: { like: 8, love: 2, insightful: 6 },
-      commentCount: 15
-    }
-  ]);
-
-  const [members, setMembers] = useState<Member[]>([
-    { id: 'user1', name: 'Sarah Johnson', avatar: 'SJ', role: 'admin', joinedAt: '2023-01-15' },
-    { id: 'user2', name: 'John Doe', avatar: 'JD', role: 'member', joinedAt: '2023-05-20' },
-    { id: 'user3', name: 'Jane Smith', avatar: 'JS', role: 'member', joinedAt: '2023-08-10' },
-    { id: 'user4', name: 'Mike Wilson', avatar: 'MW', role: 'member', joinedAt: '2023-09-01', status: 'pending' }
-  ]);
-
-  const handleJoin = () => {
-    if (community.privacy === 'private') {
-      toast.success('Join request sent! Waiting for admin approval.');
-    } else {
-      setIsMember(true);
-      toast.success('Successfully joined the community!');
-    }
-  };
-
-  const handleLeave = () => {
-    setIsMember(false);
-    toast.info('You left the community');
-  };
-
-  const handleReact = (postId: string, reaction: 'like' | 'love' | 'insightful') => {
-    setPosts(prev =>
-      prev.map(post => {
-        if (post.id !== postId) return post;
-        
-        const currentReaction = post.userReaction;
-        const reactions = { ...post.reactions };
-        
-        // Remove old reaction
-        if (currentReaction) {
-          reactions[currentReaction]--;
+  useEffect(() => {
+    const fetchCommunity = async () => {
+      setLoading(true);
+      try {
+        const commDoc = await getDoc(doc(db, 'communities', communityId));
+        if (commDoc.exists()) {
+          setCommunity({ id: commDoc.id, ...commDoc.data() });
         }
-        
-        // Add new reaction or toggle off
-        if (currentReaction === reaction) {
-          return { ...post, reactions, userReaction: undefined };
-        } else {
-          reactions[reaction]++;
-          return { ...post, reactions, userReaction: reaction };
-        }
-      })
-    );
-  };
 
-  const handleDeletePost = (postId: string) => {
-    if (confirm('Are you sure you want to delete this post?')) {
-      setPosts(prev => prev.filter(p => p.id !== postId));
-      toast.success('Post deleted');
-    }
-  };
+        // Real-time posts
+        const postsUnsub = onSnapshot(
+          query(collection(db, 'communities', communityId, 'posts'), orderBy('createdAt', 'desc')),
+          (snapshot) => {
+            setPosts(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Post)));
+          }
+        );
 
-  const handleApproveMember = (memberId: string) => {
-    setMembers(prev =>
-      prev.map(m =>
-        m.id === memberId ? { ...m, status: undefined } : m
-      )
-    );
-    toast.success('Member approved');
-  };
+        // Real-time members and pending
+        const membersUnsub = onSnapshot(
+          collection(db, 'communities', communityId, 'members'),
+          (snapshot) => {
+            const membersData = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Member));
+            setMembers(membersData);
+          }
+        );
 
-  const handleRejectMember = (memberId: string) => {
-    setMembers(prev => prev.filter(m => m.id !== memberId));
-    toast.info('Join request rejected');
-  };
+        const pendingUnsub = onSnapshot(
+          collection(db, 'communities', communityId, 'pending'),
+          (snapshot) => {
+            const pendingData = snapshot.docs.map(d => ({ id: d.id, ...d.data(), status: 'pending' } as Member));
+            setMembers(prev => [...prev.filter(m => !m.status), ...pendingData]);
+          }
+        );
 
-  const handleKickMember = (memberId: string) => {
-    if (confirm('Are you sure you want to remove this member?')) {
-      setMembers(prev => prev.filter(m => m.id !== memberId));
-      toast.success('Member removed');
-    }
-  };
-
-  const handleCreatePost = (content: string, images: string[]) => {
-    const newPost: Post = {
-      id: Date.now().toString(),
-      authorId: userId,
-      authorName: 'Current User',
-      authorAvatar: 'CU',
-      content,
-      images,
-      createdAt: 'Just now',
-      reactions: { like: 0, love: 0, insightful: 0 },
-      commentCount: 0
+        return () => {
+          postsUnsub();
+          membersUnsub();
+          pendingUnsub();
+        };
+      } catch (err) {
+        toast.error('Failed to load community');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
     };
-    setPosts(prev => [newPost, ...prev]);
-    setShowCreatePost(false);
-    toast.success('Post published!');
+    fetchCommunity();
+  }, [communityId]);
+
+  const handleJoin = async () => {
+    try {
+      const commRef = doc(db, 'communities', communityId);
+      if (community.privacy === 'private') {
+        await updateDoc(commRef, {
+          pending: arrayUnion(auth.currentUser?.uid)
+        });
+        toast.success('Join request sent! Waiting for admin approval.');
+      } else {
+        await updateDoc(commRef, {
+          members: arrayUnion(auth.currentUser?.uid),
+          memberCount: increment(1)
+        });
+        setIsMember(true);
+        toast.success('Successfully joined the community!');
+      }
+    } catch (err) {
+      toast.error('Failed to join');
+    }
   };
+
+  const handleLeave = async () => {
+    try {
+      const commRef = doc(db, 'communities', communityId);
+      await updateDoc(commRef, {
+        members: arrayRemove(auth.currentUser?.uid),
+        memberCount: increment(-1)
+      });
+      setIsMember(false);
+      toast.info('You left the community');
+    } catch (err) {
+      toast.error('Failed to leave');
+    }
+  };
+
+  const handleReact = async (postId: string, reaction: 'like' | 'love' | 'insightful') => {
+    try {
+      const postRef = doc(db, 'communities', communityId, 'posts', postId);
+      // Update reactions in DB - assuming reactions field is a map
+      await updateDoc(postRef, {
+        [`reactions.${reaction}`]: increment(1),
+        userReaction: reaction  // Or handle toggle
+      });
+      setPosts(prev =>
+        prev.map(post => {
+          if (post.id !== postId) return post;
+          
+          const currentReaction = post.userReaction;
+          const reactions = { ...post.reactions };
+          
+          // Remove old reaction
+          if (currentReaction) {
+            reactions[currentReaction]--;
+          }
+          
+          // Add new reaction or toggle off
+          if (currentReaction === reaction) {
+            return { ...post, reactions, userReaction: undefined };
+          } else {
+            reactions[reaction]++;
+            return { ...post, reactions, userReaction: reaction };
+          }
+        })
+      );
+    } catch (err) {
+      toast.error('Failed to react');
+    }
+  };
+
+  const handleDeletePost = async (postId: string) => {
+    if (confirm('Are you sure you want to delete this post?')) {
+      try {
+        await deleteDoc(doc(db, 'communities', communityId, 'posts', postId));
+        setPosts(prev => prev.filter(p => p.id !== postId));
+        toast.success('Post deleted');
+      } catch (err) {
+        toast.error('Failed to delete');
+      }
+    }
+  };
+
+  const handleApproveMember = async (memberId: string) => {
+    try {
+      const commRef = doc(db, 'communities', communityId);
+      await updateDoc(commRef, {
+        pending: arrayRemove(memberId),
+        members: arrayUnion(memberId),
+        memberCount: increment(1)
+      });
+      setMembers(prev =>
+        prev.map(m =>
+          m.id === memberId ? { ...m, status: undefined } : m
+        )
+      );
+      toast.success('Member approved');
+    } catch (err) {
+      toast.error('Failed to approve');
+    }
+  };
+
+  const handleRejectMember = async (memberId: string) => {
+    try {
+      const commRef = doc(db, 'communities', communityId);
+      await updateDoc(commRef, {
+        pending: arrayRemove(memberId)
+      });
+      setMembers(prev => prev.filter(m => m.id !== memberId));
+      toast.info('Join request rejected');
+    } catch (err) {
+      toast.error('Failed to reject');
+    }
+  };
+
+  const handleKickMember = async (memberId: string) => {
+    if (confirm('Are you sure you want to remove this member?')) {
+      try {
+        const commRef = doc(db, 'communities', communityId);
+        await updateDoc(commRef, {
+          members: arrayRemove(memberId),
+          memberCount: increment(-1)
+        });
+        setMembers(prev => prev.filter(m => m.id !== memberId));
+        toast.success('Member removed');
+      } catch (err) {
+        toast.error('Failed to remove');
+      }
+    }
+  };
+
+  const handleCreatePost = async (content: string, images: string[]) => {
+    try {
+      const postRef = await addDoc(collection(db, 'communities', communityId, 'posts'), {
+        authorId: userId,
+        authorName: 'Current User',  // Fetch real name
+        authorAvatar: 'CU',
+        content,
+        images,
+        createdAt: new Date(),
+        reactions: { like: 0, love: 0, insightful: 0 },
+        commentCount: 0
+      });
+      setPosts(prev => [{ id: postRef.id, ...newPost }, ...prev]);
+      setShowCreatePost(false);
+      toast.success('Post published!');
+    } catch (err) {
+      toast.error('Failed to post');
+    }
+  };
+
+  if (loading) return <div>Loading...</div>;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FAF8F3] to-white pb-20 md:pb-0">

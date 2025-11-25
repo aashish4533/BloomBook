@@ -1,8 +1,9 @@
+// Updated src/components/Communities/CreatePost.tsx
 import { useState } from 'react';
 import { X, Image as ImageIcon, Upload } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 interface CreatePostProps {
   onClose: () => void;
@@ -121,7 +122,7 @@ export function CreatePost({ onClose, onSubmit }: CreatePostProps) {
 
           {/* Upload Button */}
           {images.length < MAX_IMAGES && (
-            <label className="block w-full border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-[#C4A672] transition-colors cursor-pointer">
+            <label className="block w-full border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-[#C4A672] transition-colors cursor-pointer mb-4">
               <input
                 type="file"
                 accept="image/*"

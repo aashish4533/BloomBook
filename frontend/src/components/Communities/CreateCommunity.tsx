@@ -1,3 +1,4 @@
+// Updated src/components/Communities/CreateCommunity.tsx
 import { useState } from 'react';
 import { ArrowLeft, Upload, X, Globe, Lock, Check } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -5,7 +6,9 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import { db } from '../../firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 interface CreateCommunityProps {
   onBack: () => void;
@@ -87,7 +90,7 @@ export function CreateCommunity({ onBack, onSuccess, userId, userName }: CreateC
     setErrors(prev => ({ ...prev, topics: '' }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!validate()) {
@@ -97,24 +100,34 @@ export function CreateCommunity({ onBack, onSuccess, userId, userName }: CreateC
 
     setIsSubmitting(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      const newCommunityId = 'comm-' + Date.now();
-      
-      // In a real app, this would create the community in the backend
-      // and assign the current user as admin
-      console.log('Creating community:', {
-        ...formData,
+    try {
+      const newCommunity = await addDoc(collection(db, 'communities'), {
+        name: formData.name,
+        description: formData.description,
+        privacy: formData.privacy,
         topics: selectedTopics,
+        location: formData.location,
+        image: formData.image,
         adminId: userId,
         adminName: userName,
-        createdAt: new Date()
+        memberCount: 1,
+        postsCount: 0,
+        createdAt: serverTimestamp()
       });
 
-      setIsSubmitting(false);
+      // Add creator as member
+      await updateDoc(newCommunity, {
+        members: arrayUnion(userId)
+      });
+
       toast.success('Community created successfully! You are now the admin.');
-      onSuccess(newCommunityId);
-    }, 1500);
+      onSuccess(newCommunity.id);
+    } catch (err) {
+      toast.error('Failed to create community');
+      console.error(err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
