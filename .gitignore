@@ -1,1 +1,24 @@
+<<<<<<< HEAD
 node_modules
+=======
+# Dependencies
+node_modules/
+
+# Production build output
+dist/
+
+# Local env files
+.env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE and system files
+.vscode/
+.DS_Store
+Thumbs.db
+>>>>>>> 145c4cd (frontend and backend till 11/25 2025 from aashish)
