@@ -1,13 +1,21 @@
+<<<<<<< HEAD
 // Updated src/components/Communities/CommunitiesBrowse.tsx
 import { useState, useEffect } from 'react';
+=======
+import { useState } from 'react';
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
 import { Search, Filter, Grid, List, Plus, Users, Lock, Globe, MessageCircle, TrendingUp } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+<<<<<<< HEAD
 import { toast } from 'sonner';
 import { db } from '../../firebase';
 import { collection, getDocs, query, where, doc, updateDoc, arrayUnion, arrayRemove, onSnapshot } from 'firebase/firestore';
+=======
+import { toast } from 'sonner@2.0.3';
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
 
 interface Post {
   id: string;
@@ -32,6 +40,109 @@ interface Community {
   postsCount: number;
 }
 
+<<<<<<< HEAD
+=======
+const mockCommunities: Community[] = [
+  {
+    id: '1',
+    name: 'Science Fiction Lovers',
+    description: 'Discuss classic and modern sci-fi books, from Asimov to Liu Cixin. Share recommendations, theories, and fan art.',
+    memberCount: 1234,
+    admin: 'Sarah Johnson',
+    privacy: 'public',
+    topic: 'Fiction',
+    image: 'https://images.unsplash.com/photo-1516979187457-637abb4f9353?w=400',
+    location: 'San Francisco, CA',
+    isMember: false,
+    recentPosts: [
+      { id: '1', authorName: 'John Doe', content: 'Just finished Dune! What an epic...', timestamp: '2h ago' },
+      { id: '2', authorName: 'Jane Smith', content: 'Looking for recommendations similar to Foundation', timestamp: '5h ago' }
+    ],
+    postsCount: 234
+  },
+  {
+    id: '2',
+    name: 'Business Book Club',
+    description: 'Professional development through reading and discussion. Monthly book selections, expert discussions, and networking.',
+    memberCount: 856,
+    admin: 'Michael Chen',
+    privacy: 'public',
+    topic: 'Business',
+    image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
+    location: 'New York, NY',
+    isMember: true,
+    recentPosts: [
+      { id: '1', authorName: 'Alex Brown', content: 'This month: "Atomic Habits" - Who\'s in?', timestamp: '1h ago' },
+      { id: '2', authorName: 'Lisa Wang', content: 'Great discussion last week!', timestamp: '1d ago' }
+    ],
+    postsCount: 156
+  },
+  {
+    id: '3',
+    name: 'Fantasy Realm',
+    description: 'Epic tales, magical worlds, and dragon adventures await. From Tolkien to Sanderson and beyond.',
+    memberCount: 2103,
+    admin: 'Emma Williams',
+    privacy: 'private',
+    topic: 'Fantasy',
+    image: 'https://images.unsplash.com/photo-1532012197267-da84d127e765?w=400',
+    location: 'Online',
+    isMember: false,
+    recentPosts: [
+      { id: '1', authorName: 'Tom Green', content: 'Stormlight Archive book 5 hype!', timestamp: '30m ago' }
+    ],
+    postsCount: 567
+  },
+  {
+    id: '4',
+    name: 'Academic Exchange',
+    description: 'Share textbooks, notes, and study resources. Help each other succeed in academics.',
+    memberCount: 567,
+    admin: 'David Park',
+    privacy: 'public',
+    topic: 'Education',
+    image: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=400',
+    location: 'Boston, MA',
+    isMember: false,
+    recentPosts: [
+      { id: '1', authorName: 'Student A', content: 'Looking for Calculus III notes', timestamp: '3h ago' },
+      { id: '2', authorName: 'Student B', content: 'Selling my old chemistry textbook', timestamp: '6h ago' }
+    ],
+    postsCount: 89
+  },
+  {
+    id: '5',
+    name: 'Mystery & Thriller Enthusiasts',
+    description: 'Solve mysteries together, discuss plot twists, and find your next page-turner.',
+    memberCount: 945,
+    admin: 'Rachel Adams',
+    privacy: 'public',
+    topic: 'Mystery',
+    image: 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=400',
+    isMember: true,
+    recentPosts: [
+      { id: '1', authorName: 'Mike R', content: 'The Silent Patient - mind blown!', timestamp: '4h ago' }
+    ],
+    postsCount: 312
+  },
+  {
+    id: '6',
+    name: 'Poetry Corner',
+    description: 'Share, discuss, and create poetry. From classics to contemporary works.',
+    memberCount: 423,
+    admin: 'Olivia Martinez',
+    privacy: 'public',
+    topic: 'Poetry',
+    image: 'https://images.unsplash.com/photo-1503023345310-bd7c1de61c7d?w=400',
+    isMember: false,
+    recentPosts: [
+      { id: '1', authorName: 'Poet1', content: 'Just wrote a new piece, feedback welcome!', timestamp: '2h ago' }
+    ],
+    postsCount: 178
+  }
+];
+
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
 interface CommunitiesBrowseProps {
   onNavigateToDetail: (communityId: string) => void;
   onNavigateToCreate: () => void;
@@ -39,13 +150,18 @@ interface CommunitiesBrowseProps {
 }
 
 export function CommunitiesBrowse({ onNavigateToDetail, onNavigateToCreate, isLoggedIn }: CommunitiesBrowseProps) {
+<<<<<<< HEAD
   const [communities, setCommunities] = useState<Community[]>([]);
+=======
+  const [communities, setCommunities] = useState(mockCommunities);
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [topicFilter, setTopicFilter] = useState('all');
   const [privacyFilter, setPrivacyFilter] = useState('all');
   const [sortBy, setSortBy] = useState('members');
   const [showFilters, setShowFilters] = useState(false);
+<<<<<<< HEAD
   const [loading, setLoading] = useState(true);
   const user = auth.currentUser;
 
@@ -75,10 +191,18 @@ export function CommunitiesBrowse({ onNavigateToDetail, onNavigateToCreate, isLo
     e.stopPropagation();
     
     if (!isLoggedIn || !user) {
+=======
+
+  const handleJoin = (communityId: string, privacy: 'public' | 'private', e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!isLoggedIn) {
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
       toast.error('Please login to join communities');
       return;
     }
 
+<<<<<<< HEAD
     const commRef = doc(db, 'communities', communityId);
 
     try {
@@ -115,6 +239,37 @@ export function CommunitiesBrowse({ onNavigateToDetail, onNavigateToCreate, isLo
       toast.error('Failed to leave');
       console.error(err);
     }
+=======
+    if (privacy === 'private') {
+      setCommunities(prev =>
+        prev.map(c =>
+          c.id === communityId ? { ...c, isPending: true } : c
+        )
+      );
+      toast.success('Join request sent! Waiting for admin approval.');
+    } else {
+      setCommunities(prev =>
+        prev.map(c =>
+          c.id === communityId
+            ? { ...c, isMember: true, memberCount: c.memberCount + 1 }
+            : c
+        )
+      );
+      toast.success('Successfully joined the community!');
+    }
+  };
+
+  const handleLeave = (communityId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCommunities(prev =>
+      prev.map(c =>
+        c.id === communityId
+          ? { ...c, isMember: false, isPending: false, memberCount: c.memberCount - 1 }
+          : c
+      )
+    );
+    toast.info('You left the community');
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
   };
 
   // Filter and sort communities
@@ -133,10 +288,14 @@ export function CommunitiesBrowse({ onNavigateToDetail, onNavigateToCreate, isLo
       return 0;
     });
 
+<<<<<<< HEAD
   const topics = ['Fiction', 'Non-Fiction', 'Science Fiction', 'Fantasy', 'Mystery',
     'Romance', 'Thriller', 'Horror', 'Biography', 'History',
     'Science', 'Technology', 'Business', 'Self-Help', 'Art',
     'Poetry', 'Drama', 'Education', 'Religion', 'Philosophy'];
+=======
+  const topics = ['Fiction', 'Business', 'Fantasy', 'Education', 'Mystery', 'Poetry', 'Science', 'Art'];
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FAF8F3] to-white pb-20 md:pb-0">
@@ -494,4 +653,8 @@ export function CommunitiesBrowse({ onNavigateToDetail, onNavigateToCreate, isLo
       </div>
     </div>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249

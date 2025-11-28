@@ -1,9 +1,16 @@
+<<<<<<< HEAD
 // Updated src/components/Communities/CreatePost.tsx
+=======
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
 import { useState } from 'react';
 import { X, Image as ImageIcon, Upload } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
+<<<<<<< HEAD
 import { toast } from 'sonner';
+=======
+import { toast } from 'sonner@2.0.3';
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
 
 interface CreatePostProps {
   onClose: () => void;
@@ -122,7 +129,11 @@ export function CreatePost({ onClose, onSubmit }: CreatePostProps) {
 
           {/* Upload Button */}
           {images.length < MAX_IMAGES && (
+<<<<<<< HEAD
             <label className="block w-full border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-[#C4A672] transition-colors cursor-pointer mb-4">
+=======
+            <label className="block w-full border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-[#C4A672] transition-colors cursor-pointer">
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
               <input
                 type="file"
                 accept="image/*"
@@ -159,4 +170,8 @@ export function CreatePost({ onClose, onSubmit }: CreatePostProps) {
       </div>
     </div>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249

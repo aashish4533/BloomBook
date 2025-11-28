@@ -1,12 +1,19 @@
+<<<<<<< HEAD
 // Updated src/components/Communities/GroupChat.tsx
+=======
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
 import { useState, useRef, useEffect } from 'react';
 import { ArrowLeft, Send, Image as ImageIcon, Users, MoreVertical, Smile, X, UserPlus, Info } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { ChatMessage } from '../Chat/ChatMessage';
+<<<<<<< HEAD
 import { toast } from 'sonner';
 import { db } from '../../firebase';
 import { collection, addDoc, onSnapshot, query, orderBy, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+=======
+import { toast } from 'sonner@2.0.3';
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
 
 interface Message {
   id: string;
@@ -36,8 +43,59 @@ interface GroupChatProps {
 }
 
 export function GroupChat({ communityId, communityName, onBack, currentUserId }: GroupChatProps) {
+<<<<<<< HEAD
   const [messages, setMessages] = useState<Message[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+=======
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: '1',
+      senderId: 'user1',
+      senderName: 'Sarah Johnson',
+      senderAvatar: 'SJ',
+      content: 'Welcome everyone to the Science Fiction Lovers community chat! Feel free to discuss your favorite books here.',
+      timestamp: new Date(Date.now() - 7200000),
+      isOwn: false
+    },
+    {
+      id: '2',
+      senderId: 'user2',
+      senderName: 'John Doe',
+      senderAvatar: 'JD',
+      content: 'Thanks! Just finished Dune, anyone want to discuss?',
+      timestamp: new Date(Date.now() - 5400000),
+      isOwn: false
+    },
+    {
+      id: '3',
+      senderId: currentUserId,
+      senderName: 'You',
+      senderAvatar: 'ME',
+      content: 'I\'d love to! The worldbuilding is incredible.',
+      timestamp: new Date(Date.now() - 3600000),
+      isOwn: true
+    },
+    {
+      id: '4',
+      senderId: 'user3',
+      senderName: 'Jane Smith',
+      senderAvatar: 'JS',
+      content: 'Has anyone read the sequels? Worth it?',
+      images: ['https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=400'],
+      timestamp: new Date(Date.now() - 1800000),
+      isOwn: false
+    }
+  ]);
+
+  const [members, setMembers] = useState<Member[]>([
+    { id: 'user1', name: 'Sarah Johnson', avatar: 'SJ', online: true, role: 'admin' },
+    { id: 'user2', name: 'John Doe', avatar: 'JD', online: true, role: 'member' },
+    { id: 'user3', name: 'Jane Smith', avatar: 'JS', online: true, role: 'member' },
+    { id: 'user4', name: 'Mike Wilson', avatar: 'MW', online: false, role: 'member' },
+    { id: 'user5', name: 'Emma Davis', avatar: 'ED', online: true, role: 'member' }
+  ]);
+
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
   const [newMessage, setNewMessage] = useState('');
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [showMembers, setShowMembers] = useState(false);
@@ -46,6 +104,7 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+<<<<<<< HEAD
     // Fetch messages
     const q = query(
       collection(db, 'communities', communityId, 'messages'),
@@ -104,15 +163,22 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
       handleSend();
     }
   };
+=======
+    scrollToBottom();
+  }, [messages]);
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+<<<<<<< HEAD
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
+=======
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     
@@ -134,8 +200,48 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
     setSelectedImages(prev => prev.filter((_, i) => i !== index));
   };
 
+<<<<<<< HEAD
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FAF8F3] to-white flex flex-col">
+=======
+  const handleSend = () => {
+    if (!newMessage.trim() && selectedImages.length === 0) return;
+
+    const message: Message = {
+      id: Date.now().toString(),
+      senderId: currentUserId,
+      senderName: 'You',
+      senderAvatar: 'ME',
+      content: newMessage,
+      images: selectedImages.length > 0 ? selectedImages : undefined,
+      timestamp: new Date(),
+      isOwn: true
+    };
+
+    setMessages(prev => [...prev, message]);
+    setNewMessage('');
+    setSelectedImages([]);
+    toast.success('Message sent');
+
+    // Simulate someone typing
+    setTimeout(() => {
+      setTypingUsers(['John Doe']);
+      setTimeout(() => setTypingUsers([]), 2000);
+    }, 1500);
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const onlineCount = members.filter(m => m.online).length;
+
+  return (
+    <div className="fixed inset-0 bg-white z-50 flex flex-col">
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
       {/* Header */}
       <div className="bg-gradient-to-r from-[#2C3E50] to-[#34495E] text-white p-4 flex items-center justify-between shadow-lg">
         <div className="flex items-center gap-3 flex-1">
@@ -173,7 +279,11 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
         <div className="flex-1 flex flex-col">
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 bg-gradient-to-b from-[#FAF8F3] to-white">
+<<<<<<< HEAD
             <div className="max-w-3xl mx-auto space-y-2">
+=======
+            <div className="max-w-4xl mx-auto space-y-2">
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
               {/* Date Divider */}
               <div className="flex items-center justify-center my-4">
                 <div className="bg-gray-200 text-gray-600 text-xs px-3 py-1 rounded-full">
@@ -210,7 +320,11 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
           {/* Image Previews */}
           {selectedImages.length > 0 && (
             <div className="border-t border-gray-200 p-4 bg-white">
+<<<<<<< HEAD
               <div className="max-w-3xl mx-auto flex gap-2 overflow-x-auto">
+=======
+              <div className="max-w-4xl mx-auto flex gap-2 overflow-x-auto">
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
                 {selectedImages.map((img, index) => (
                   <div key={index} className="relative flex-shrink-0">
                     <img src={img} alt="Preview" className="w-20 h-20 object-cover rounded-lg" />
@@ -228,7 +342,11 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
 
           {/* Input Area */}
           <div className="border-t border-gray-200 p-4 bg-white">
+<<<<<<< HEAD
             <div className="max-w-3xl mx-auto flex items-end gap-3">
+=======
+            <div className="max-w-4xl mx-auto flex items-end gap-3">
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
               <input
                 ref={fileInputRef}
                 type="file"
@@ -300,7 +418,11 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
                           <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full" />
                         )}
                       </div>
+<<<<<<< HEAD
                       <div className="flex-1">
+=======
+                      <div className="flex-1 min-w-0">
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
                         <div className="text-[#2C3E50] truncate">{member.name}</div>
                         <div className="text-xs text-gray-500">
                           {member.role === 'admin' ? '👑 Admin' : member.online ? 'Online' : 'Offline'}
@@ -342,7 +464,11 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
                           )}
                         </div>
                         <div className="flex-1">
+<<<<<<< HEAD
                           <div className="text-[#2C3E50] truncate">{member.name}</div>
+=======
+                          <div className="text-[#2C3E50]">{member.name}</div>
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
                           <div className="text-xs text-gray-500">
                             {member.role === 'admin' ? '👑 Admin' : member.online ? 'Online' : 'Offline'}
                           </div>
@@ -358,4 +484,8 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
       </div>
     </div>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249

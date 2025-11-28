@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 // Updated src/components/Communities/CreateCommunity.tsx
+=======
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
 import { useState } from 'react';
 import { ArrowLeft, Upload, X, Globe, Lock, Check } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -6,9 +9,13 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+<<<<<<< HEAD
 import { toast } from 'sonner';
 import { db } from '../../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+=======
+import { toast } from 'sonner@2.0.3';
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
 
 interface CreateCommunityProps {
   onBack: () => void;
@@ -90,7 +97,11 @@ export function CreateCommunity({ onBack, onSuccess, userId, userName }: CreateC
     setErrors(prev => ({ ...prev, topics: '' }));
   };
 
+<<<<<<< HEAD
   const handleSubmit = async (e: React.FormEvent) => {
+=======
+  const handleSubmit = (e: React.FormEvent) => {
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
     e.preventDefault();
 
     if (!validate()) {
@@ -100,6 +111,7 @@ export function CreateCommunity({ onBack, onSuccess, userId, userName }: CreateC
 
     setIsSubmitting(true);
 
+<<<<<<< HEAD
     try {
       const newCommunity = await addDoc(collection(db, 'communities'), {
         name: formData.name,
@@ -128,6 +140,26 @@ export function CreateCommunity({ onBack, onSuccess, userId, userName }: CreateC
     } finally {
       setIsSubmitting(false);
     }
+=======
+    // Simulate API call
+    setTimeout(() => {
+      const newCommunityId = 'comm-' + Date.now();
+      
+      // In a real app, this would create the community in the backend
+      // and assign the current user as admin
+      console.log('Creating community:', {
+        ...formData,
+        topics: selectedTopics,
+        adminId: userId,
+        adminName: userName,
+        createdAt: new Date()
+      });
+
+      setIsSubmitting(false);
+      toast.success('Community created successfully! You are now the admin.');
+      onSuccess(newCommunityId);
+    }, 1500);
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
   };
 
   return (
@@ -376,4 +408,8 @@ export function CreateCommunity({ onBack, onSuccess, userId, userName }: CreateC
       </div>
     </div>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249

@@ -5,7 +5,7 @@ import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 import { toast } from 'sonner';
 import { db, auth } from '../../firebase';
-import { collection, onSnapshot, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc, updateDoc, increment } from 'firebase/firestore';
 
 interface Comment {
   id: string;
@@ -45,6 +45,7 @@ interface PostDetailProps {
 
 export function PostDetail({ post, onClose, isAdmin, userId }: PostDetailProps) {
   const [comments, setComments] = useState<Comment[]>([]);
+
   const [newComment, setNewComment] = useState('');
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState('');
@@ -106,10 +107,10 @@ export function PostDetail({ post, onClose, isAdmin, userId }: PostDetailProps) 
 
   const handleLikeComment = async (commentId: string, isReply: boolean = false, parentId?: string) => {
     try {
-      const ref = isReply && parentId 
+      const ref = isReply && parentId
         ? doc(db, 'posts', post.id, 'comments', parentId, 'replies', commentId)
         : doc(db, 'posts', post.id, 'comments', commentId);
-      
+
       await updateDoc(ref, {
         likes: increment(1),
         userLiked: true  // Or toggle logic
@@ -278,7 +279,7 @@ export function PostDetail({ post, onClose, isAdmin, userId }: PostDetailProps) 
           {/* Comments */}
           <div className="space-y-6">
             <h3 className="text-[#2C3E50] text-lg">Comments</h3>
-            
+
             {comments.map(comment => renderComment(comment))}
 
             {comments.length === 0 && (

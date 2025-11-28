@@ -1,6 +1,9 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 node_modules
 =======
+=======
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
 # Dependencies
 node_modules/
 
@@ -21,4 +24,7 @@ yarn-error.log*
 .vscode/
 .DS_Store
 Thumbs.db
+<<<<<<< HEAD
 >>>>>>> 145c4cd (frontend and backend till 11/25 2025 from aashish)
+=======
+>>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
