@@ -1,9 +1,9 @@
-// Updated src/components/SellBook/ReviewStep.tsx
+// src/components/SellBook/ReviewStep.tsx
 import { BookFormData, LocationData } from '../SellBookFlow';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
-import { BookOpen, MapPin, DollarSign, Edit2, CheckCircle } from 'lucide-react';
+import { BookOpen, MapPin, Edit2, CheckCircle, Loader2 } from 'lucide-react'; // Import Loader2
 
 interface ReviewStepProps {
   bookData: BookFormData;
@@ -11,9 +11,10 @@ interface ReviewStepProps {
   onSubmit: () => void;
   onBack: () => void;
   onEdit: (step: number) => void;
+  isSubmitting: boolean; // New prop
 }
 
-export function ReviewStep({ bookData, locationData, onSubmit, onBack, onEdit }: ReviewStepProps) {
+export function ReviewStep({ bookData, locationData, onSubmit, onBack, onEdit, isSubmitting }: ReviewStepProps) {
   const getConditionColor = (condition: string) => {
     switch (condition) {
       case 'New':
@@ -67,6 +68,7 @@ export function ReviewStep({ bookData, locationData, onSubmit, onBack, onEdit }:
             variant="ghost"
             size="sm"
             onClick={() => onEdit(1)}
+            disabled={isSubmitting}
             className="text-[#C4A672] hover:text-[#8B7355]"
           >
             <Edit2 className="w-4 h-4 mr-1" />
@@ -152,6 +154,7 @@ export function ReviewStep({ bookData, locationData, onSubmit, onBack, onEdit }:
             variant="ghost"
             size="sm"
             onClick={() => onEdit(2)}
+            disabled={isSubmitting}
             className="text-[#C4A672] hover:text-[#8B7355]"
           >
             <Edit2 className="w-4 h-4 mr-1" />
@@ -212,15 +215,24 @@ export function ReviewStep({ bookData, locationData, onSubmit, onBack, onEdit }:
           variant="outline"
           onClick={onBack}
           className="px-6"
+          disabled={isSubmitting}
         >
           Back
         </Button>
         <Button
           type="button"
           onClick={onSubmit}
-          className="bg-[#C4A672] hover:bg-[#8B7355] text-white px-8"
+          disabled={isSubmitting}
+          className="bg-[#C4A672] hover:bg-[#8B7355] text-white px-8 min-w-[150px]"
         >
-          Submit Listing
+          {isSubmitting ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Submitting...
+            </>
+          ) : (
+            'Submit Listing'
+          )}
         </Button>
       </div>
     </div>

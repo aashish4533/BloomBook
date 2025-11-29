@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "concurrently \"cd backend && firebase emulators:start --only auth,firestore\" \"cd frontend && npm run dev\""
+    "start": "concurrently --kill-others-on-fail --names \"EMULATORS,FRONTEND\" \"cd backend && firebase emulators:start\" \"cd frontend && npm run dev\"",
+    "start:delayed": "concurrently --kill-others-on-fail --names \"EMULATORS,FRONTEND\" \"cd backend && firebase emulators:start\" \"node delay.js\"",
+    "start:emulators": "cd backend && firebase emulators:start",
+    "start:frontend": "cd frontend && npm run dev"
   },
   "keywords": [],
   "author": "",

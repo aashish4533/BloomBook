@@ -1,9 +1,4 @@
-<<<<<<< HEAD
-// Updated src/components/Communities/CommunityDetails.tsx
 import { useState, useEffect } from 'react';
-=======
-import { useState } from 'react';
->>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
 import { ArrowLeft, Users, MessageCircle, Settings, MoreVertical, Heart, MessageSquare, Share2, Plus, UserPlus, UserMinus, Edit2, Trash2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -11,13 +6,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Avatar } from '../ui/avatar';
 import { CreatePost } from './CreatePost';
 import { PostDetail } from './PostDetail';
-<<<<<<< HEAD
 import { toast } from 'sonner';
 import { db, auth } from '../../firebase';
-import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, deleteDoc, onSnapshot } from 'firebase/firestore';
-=======
-import { toast } from 'sonner@2.0.3';
->>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
+import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, deleteDoc, onSnapshot, collection, query, orderBy, increment, addDoc, serverTimestamp } from 'firebase/firestore';
 
 interface Post {
   id: string;
@@ -58,11 +49,7 @@ export function CommunityDetails({
   communityId,
   onBack,
   onNavigateToChat,
-<<<<<<< HEAD
   isAdmin: initialIsAdmin,
-=======
-  isAdmin,
->>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
   isMember: initialIsMember,
   userId
 }: CommunityDetailsProps) {
@@ -70,7 +57,6 @@ export function CommunityDetails({
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [isMember, setIsMember] = useState(initialIsMember);
-<<<<<<< HEAD
   const [community, setCommunity] = useState<any>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
@@ -276,138 +262,7 @@ export function CommunityDetails({
 
   if (loading) return <div>Loading...</div>;
 
-=======
-
-  // Mock data
-  const community = {
-    id: communityId,
-    name: 'Science Fiction Lovers',
-    description: 'Discuss classic and modern sci-fi books, from Asimov to Liu Cixin. Share recommendations, theories, and fan art.',
-    coverImage: 'https://images.unsplash.com/photo-1516979187457-637abb4f9353?w=1200&h=300&fit=crop',
-    memberCount: 1234,
-    postsCount: 234,
-    admin: 'Sarah Johnson',
-    topic: ['Fiction', 'Science Fiction'],
-    privacy: 'public' as 'public' | 'private'
-  };
-
-  const [posts, setPosts] = useState<Post[]>([
-    {
-      id: '1',
-      authorId: 'user1',
-      authorName: 'John Doe',
-      authorAvatar: 'JD',
-      content: 'Just finished Dune for the third time and I still find new things to appreciate! The depth of worldbuilding is incredible. What\'s your favorite sci-fi universe?',
-      images: ['https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=600'],
-      createdAt: '2 hours ago',
-      reactions: { like: 12, love: 5, insightful: 3 },
-      userReaction: undefined,
-      commentCount: 8
-    },
-    {
-      id: '2',
-      authorId: 'user2',
-      authorName: 'Jane Smith',
-      authorAvatar: 'JS',
-      content: 'Looking for recommendations similar to Foundation series. I love hard sci-fi with big ideas about civilization and humanity\'s future. Any suggestions?',
-      images: [],
-      createdAt: '5 hours ago',
-      reactions: { like: 8, love: 2, insightful: 6 },
-      commentCount: 15
-    }
-  ]);
-
-  const [members, setMembers] = useState<Member[]>([
-    { id: 'user1', name: 'Sarah Johnson', avatar: 'SJ', role: 'admin', joinedAt: '2023-01-15' },
-    { id: 'user2', name: 'John Doe', avatar: 'JD', role: 'member', joinedAt: '2023-05-20' },
-    { id: 'user3', name: 'Jane Smith', avatar: 'JS', role: 'member', joinedAt: '2023-08-10' },
-    { id: 'user4', name: 'Mike Wilson', avatar: 'MW', role: 'member', joinedAt: '2023-09-01', status: 'pending' }
-  ]);
-
-  const handleJoin = () => {
-    if (community.privacy === 'private') {
-      toast.success('Join request sent! Waiting for admin approval.');
-    } else {
-      setIsMember(true);
-      toast.success('Successfully joined the community!');
-    }
-  };
-
-  const handleLeave = () => {
-    setIsMember(false);
-    toast.info('You left the community');
-  };
-
-  const handleReact = (postId: string, reaction: 'like' | 'love' | 'insightful') => {
-    setPosts(prev =>
-      prev.map(post => {
-        if (post.id !== postId) return post;
-        
-        const currentReaction = post.userReaction;
-        const reactions = { ...post.reactions };
-        
-        // Remove old reaction
-        if (currentReaction) {
-          reactions[currentReaction]--;
-        }
-        
-        // Add new reaction or toggle off
-        if (currentReaction === reaction) {
-          return { ...post, reactions, userReaction: undefined };
-        } else {
-          reactions[reaction]++;
-          return { ...post, reactions, userReaction: reaction };
-        }
-      })
-    );
-  };
-
-  const handleDeletePost = (postId: string) => {
-    if (confirm('Are you sure you want to delete this post?')) {
-      setPosts(prev => prev.filter(p => p.id !== postId));
-      toast.success('Post deleted');
-    }
-  };
-
-  const handleApproveMember = (memberId: string) => {
-    setMembers(prev =>
-      prev.map(m =>
-        m.id === memberId ? { ...m, status: undefined } : m
-      )
-    );
-    toast.success('Member approved');
-  };
-
-  const handleRejectMember = (memberId: string) => {
-    setMembers(prev => prev.filter(m => m.id !== memberId));
-    toast.info('Join request rejected');
-  };
-
-  const handleKickMember = (memberId: string) => {
-    if (confirm('Are you sure you want to remove this member?')) {
-      setMembers(prev => prev.filter(m => m.id !== memberId));
-      toast.success('Member removed');
-    }
-  };
-
-  const handleCreatePost = (content: string, images: string[]) => {
-    const newPost: Post = {
-      id: Date.now().toString(),
-      authorId: userId,
-      authorName: 'Current User',
-      authorAvatar: 'CU',
-      content,
-      images,
-      createdAt: 'Just now',
-      reactions: { like: 0, love: 0, insightful: 0 },
-      commentCount: 0
-    };
-    setPosts(prev => [newPost, ...prev]);
-    setShowCreatePost(false);
-    toast.success('Post published!');
-  };
-
->>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249
+  if (!community) return <div>Community not found</div>;
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FAF8F3] to-white pb-20 md:pb-0">
       {/* Cover Image */}
@@ -712,8 +567,4 @@ export function CommunityDetails({
       )}
     </div>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 145c4cd5555d05ec1f1443f321d633c589c8e249

@@ -18,9 +18,14 @@ const db = getFirestore(app);
 
 // Connect to local emulators if running locally
 if (import.meta.env.DEV || window.location.hostname === 'localhost') {
-  connectAuthEmulator(auth, 'http://127.0.0.1:9099'); 
-  connectFirestoreEmulator(db, '127.0.0.1', 8080); // Use 127.0.0.1 to avoid warnings
-  console.log('Connected to Firebase Auth Emulator');
+  try {
+    connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true }); 
+    connectFirestoreEmulator(db, '127.0.0.1', 8080); // Use 127.0.0.1 to avoid warnings
+    console.log('Connected to Firebase Emulators (Auth & Firestore)');
+  } catch (error) {
+    // Emulator already connected or connection failed
+    console.warn('Firebase emulator connection:', error);
+  }
 }
 
 // Providers for social login

@@ -5,7 +5,7 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { AnnouncementForm } from './Admin/AnnouncementForm';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 interface Announcement {
   id: string;

@@ -1,4 +1,4 @@
-// Updated src/components/SellBookFlow.tsx
+// src/components/SellBookFlow.tsx
 import { useState } from 'react';
 import { BookDetailsStep } from './SellBook/BookDetailsStep';
 import { LocationStep } from './SellBook/LocationStep';
@@ -7,7 +7,7 @@ import { SuccessStep } from './SellBook/SuccessStep';
 import { X } from 'lucide-react';
 import { db, auth } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { toast } from 'sonner';  // Assume sonner is installed for feedback
+import { toast } from 'sonner';
 
 export interface BookFormData {
   isbn: string;
@@ -41,6 +41,8 @@ interface SellBookFlowProps {
 
 export function SellBookFlow({ onClose }: SellBookFlowProps) {
   const [currentStep, setCurrentStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false); // New loading state
+
   const [bookData, setBookData] = useState<BookFormData>({
     isbn: '',
     bookName: '',
@@ -54,6 +56,7 @@ export function SellBookFlow({ onClose }: SellBookFlowProps) {
     pages: '',
     images: []
   });
+  
   const [locationData, setLocationData] = useState<LocationData>({
     method: 'both',
     address: '',
@@ -83,26 +86,45 @@ export function SellBookFlow({ onClose }: SellBookFlowProps) {
       return;
     }
 
+    setIsSubmitting(true); // Start loading
+
     try {
+      // 1. Sanitize Location Data (remove undefined fields)
+      const cleanLocation = { ...locationData };
+      if (!cleanLocation.coordinates) {
+        delete cleanLocation.coordinates;
+      }
+
+      // 2. Validate Numeric Data
+      const price = parseFloat(bookData.price);
+      if (isNaN(price)) {
+        throw new Error("Invalid price. Please enter a valid number.");
+      }
+
       const listingData = {
         ...bookData,
-        price: parseFloat(bookData.price),
+        price: price,
         pages: parseInt(bookData.pages) || 0,
         publishedYear: parseInt(bookData.publishedYear) || 0,
-        location: locationData,
+        location: cleanLocation,
         userId: user.uid,
-        type: 'sell',  // Since it's sell flow
+        sellerName: user.displayName || 'Anonymous', 
+        type: 'sell',
         status: 'active',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
 
+      // 3. Submit to Firestore
       await addDoc(collection(db, 'books'), listingData);
+      
       toast.success('Listing created successfully!');
       setCurrentStep(4);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to submit listing:', err);
-      toast.error('Failed to create listing. Please try again.');
+      toast.error(err.message || 'Failed to create listing. Please try again.');
+    } finally {
+      setIsSubmitting(false); // Stop loading
     }
   };
 
@@ -174,6 +196,7 @@ export function SellBookFlow({ onClose }: SellBookFlowProps) {
               onSubmit={handleSubmit}
               onBack={handleBack}
               onEdit={handleEdit}
+              isSubmitting={isSubmitting} // Pass loading state
             />
           )}
           {currentStep === 4 && (
