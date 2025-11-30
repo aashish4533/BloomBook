@@ -32,12 +32,12 @@ import { LoadingState } from './components/LoadingState';
 import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
-type PageType = 
+type PageType =
   | 'home'
-  | 'marketplace' 
-  | 'login' 
-  | 'signup' 
-  | 'admin-login' 
+  | 'marketplace'
+  | 'login'
+  | 'signup'
+  | 'admin-login'
   | 'admin-dashboard'
   | 'user-dashboard'
   | 'rent'
@@ -70,7 +70,7 @@ export default function App() {
     otherUser: { id: string; name: string; avatar: string; online: boolean };
     bookContext?: { id: string; title: string; price: number; image: string };
   } | null>(null);
-  
+
   // New modal states
   const [showPaymentGateway, setShowPaymentGateway] = useState(false);
   const [paymentContext, setPaymentContext] = useState<PaymentContext | null>(null);
@@ -168,20 +168,6 @@ export default function App() {
     );
   }
 
-  if (currentPage === 'rent') {
-    return <RentBookFlow onClose={() => setCurrentPage('home')} />;
-  }
-
-  if (currentPage === 'communities-browse') {
-    return (
-      <CommunitiesBrowse
-        onNavigateToDetail={handleNavigateToCommunityDetail}
-        onNavigateToCreate={handleNavigateToCreateCommunity}
-        isLoggedIn={userRole === 'user'}
-      />
-    );
-  }
-
   if (currentPage === 'communities-create') {
     return (
       <CreateCommunity
@@ -246,16 +232,21 @@ export default function App() {
           onNavigateRent={() => setCurrentPage('rent')}
           onNavigateSell={() => setCurrentPage('sell')}
           onNavigateCommunities={handleNavigateToCommunities}
+          onNavigateSearch={() => setCurrentPage('advanced-search')}
+          onNavigateWishlist={() => setCurrentPage('wishlist')}
+          onNavigateTuition={() => setCurrentPage('tuition')}
+          onNavigateAnnouncements={() => setCurrentPage('announcements')}
+          onNavigateAbout={() => setCurrentPage('about')}
           onNavigateLogin={() => setCurrentPage('login')}
           onNavigateRegister={() => setCurrentPage('signup')}
           onNavigateProfile={() => setCurrentPage('user-dashboard')}
           onLogout={handleLogout}
         />
-        <AboutPage 
-          onBack={() => setCurrentPage('home')} 
+        <AboutPage
+          onBack={() => setCurrentPage('home')}
           onNavigateToCommunities={handleNavigateToCommunities}
         />
-        <Footer 
+        <Footer
           onNavigateToAbout={() => setCurrentPage('about')}
           onNavigateToBuy={() => setCurrentPage('marketplace')}
           onNavigateToRent={() => setCurrentPage('rent')}
@@ -287,14 +278,14 @@ export default function App() {
           onNavigateProfile={() => setCurrentPage('user-dashboard')}
           onLogout={handleLogout}
         />
-        <AdvancedSearch 
-          onBack={() => setCurrentPage('home')} 
+        <AdvancedSearch
+          onBack={() => setCurrentPage('home')}
           onNavigateToBook={(bookId) => {
             setSelectedBookId(bookId);
             setCurrentPage('marketplace');
           }}
         />
-        <Footer 
+        <Footer
           onNavigateToAbout={() => setCurrentPage('about')}
           onNavigateToBuy={() => setCurrentPage('marketplace')}
           onNavigateToRent={() => setCurrentPage('rent')}
@@ -326,15 +317,15 @@ export default function App() {
           onNavigateProfile={() => setCurrentPage('user-dashboard')}
           onLogout={handleLogout}
         />
-        <WishlistPage 
-          onBack={() => setCurrentPage('home')} 
+        <WishlistPage
+          onBack={() => setCurrentPage('home')}
           onNavigateToMarketplace={() => setCurrentPage('marketplace')}
           onNavigateToBook={(bookId) => {
             setSelectedBookId(bookId);
             setCurrentPage('marketplace');
           }}
         />
-        <Footer 
+        <Footer
           onNavigateToAbout={() => setCurrentPage('about')}
           onNavigateToBuy={() => setCurrentPage('marketplace')}
           onNavigateToRent={() => setCurrentPage('rent')}
@@ -366,11 +357,11 @@ export default function App() {
           onNavigateProfile={() => setCurrentPage('user-dashboard')}
           onLogout={handleLogout}
         />
-        <TuitionHub 
-          onBack={() => setCurrentPage('home')} 
+        <TuitionHub
+          onBack={() => setCurrentPage('home')}
           isLoggedIn={userRole === 'user'}
         />
-        <Footer 
+        <Footer
           onNavigateToAbout={() => setCurrentPage('about')}
           onNavigateToBuy={() => setCurrentPage('marketplace')}
           onNavigateToRent={() => setCurrentPage('rent')}
@@ -402,11 +393,11 @@ export default function App() {
           onNavigateProfile={() => setCurrentPage('user-dashboard')}
           onLogout={handleLogout}
         />
-        <DeliveryTracking 
-          onBack={() => setCurrentPage('home')} 
+        <DeliveryTracking
+          onBack={() => setCurrentPage('home')}
           orderId={currentOrderId}
         />
-        <Footer 
+        <Footer
           onNavigateToAbout={() => setCurrentPage('about')}
           onNavigateToBuy={() => setCurrentPage('marketplace')}
           onNavigateToRent={() => setCurrentPage('rent')}
@@ -451,98 +442,112 @@ export default function App() {
             isLoggedIn={userRole === 'user'}
           />
         )}
+        {currentPage === 'marketplace' && (
+          <BookMarketplace
+            onBack={() => setCurrentPage('home')}
+          />
+        )}
+        {currentPage === 'communities-browse' && (
+          <CommunitiesBrowse
+            onNavigateToDetail={handleNavigateToCommunityDetail}
+            onNavigateToCreate={handleNavigateToCreateCommunity}
+            onBack={() => setCurrentPage('home')}
+            isLoggedIn={userRole === 'user'}
+          />
+        )}
+        {currentPage === 'rent' && (
+          <RentBookFlow onClose={() => setCurrentPage('home')} />
+        )}
+        {currentPage === 'sell' && (
+          <SellBookFlow onClose={() => setCurrentPage('home')} />
+        )}
         {currentPage === 'login' && (
-          <LoginForm 
+          <LoginForm
             onSwitchToSignUp={() => setCurrentPage('signup')}
             onLogin={handleUserLogin}
           />
         )}
         {currentPage === 'signup' && (
-          <SignUpForm 
+          <SignUpForm
             onSwitchToLogin={() => setCurrentPage('login')}
-            onSignUp={handleUserLogin}
+            onSignUp={() => {
+              handleUserLogin();
+              setCurrentPage('home');
+            }}
           />
         )}
-        {currentPage === 'marketplace' && (
-          <BookMarketplace />
+        <ChatButton />
+
+        {showLogoutConfirm && (
+          <LogoutConfirmation onConfirm={confirmLogout} onCancel={cancelLogout} />
         )}
-        {currentPage === 'sell' && (
-          <div className="fixed inset-0 z-50">
-            <SellBookFlow onClose={() => setCurrentPage('home')} />
-          </div>
+
+        {/* Payment Gateway Modal */}
+        {showPaymentGateway && paymentContext && (
+          <PaymentGateway
+            amount={paymentContext.amount}
+            type={paymentContext.type}
+            itemTitle={paymentContext.itemTitle}
+            onSuccess={(transactionId) => {
+              setShowPaymentGateway(false);
+              setCurrentOrderId(transactionId);
+              setCurrentPage('delivery-tracking');
+            }}
+            onCancel={() => setShowPaymentGateway(false)}
+          />
+        )}
+
+        {/* Barcode Scanner Modal */}
+        {showBarcodeScanner && (
+          <BarcodeScanner
+            onScanComplete={(isbn) => {
+              setShowBarcodeScanner(false);
+              // Use scanned ISBN
+            }}
+            onCancel={() => setShowBarcodeScanner(false)}
+          />
+        )}
+
+        {/* Video Player Modal */}
+        {showVideoPlayer && (
+          <VideoPlayer
+            title="Lecture Video"
+            description="Educational content"
+            onClose={() => setShowVideoPlayer(false)}
+            downloadable={true}
+          />
+        )}
+
+        {/* Notes Viewer Modal */}
+        {showNotesViewer && (
+          <NotesViewer
+            title="Study Notes"
+            author="Book Bloom"
+            onClose={() => setShowNotesViewer(false)}
+            downloadable={true}
+          />
+        )}
+
+        {/* Error Modal */}
+        {showErrorModal && (
+          <ErrorModal
+            message={errorMessage}
+            onClose={() => setShowErrorModal(false)}
+          />
+        )}
+
+        {/* Loading State */}
+        {isLoading && (
+          <LoadingState fullScreen={true} message="Please wait..." />
         )}
       </main>
-      <Footer 
+      <Footer
         onNavigateToAbout={() => setCurrentPage('about')}
         onNavigateToBuy={() => setCurrentPage('marketplace')}
         onNavigateToRent={() => setCurrentPage('rent')}
         onNavigateToSell={() => setCurrentPage('sell')}
         onNavigateToAnnouncements={() => setCurrentPage('announcements')}
       />
-      <ChatButton />
-      
-      {showLogoutConfirm && (
-        <LogoutConfirmation onConfirm={confirmLogout} onCancel={cancelLogout} />
-      )}
-      
-      {/* Payment Gateway Modal */}
-      {showPaymentGateway && paymentContext && (
-        <PaymentGateway
-          amount={paymentContext.amount}
-          type={paymentContext.type}
-          itemTitle={paymentContext.itemTitle}
-          onSuccess={(transactionId) => {
-            setShowPaymentGateway(false);
-            setCurrentOrderId(transactionId);
-            setCurrentPage('delivery-tracking');
-          }}
-          onCancel={() => setShowPaymentGateway(false)}
-        />
-      )}
-      
-      {/* Barcode Scanner Modal */}
-      {showBarcodeScanner && (
-        <BarcodeScanner
-          onScanComplete={(isbn) => {
-            setShowBarcodeScanner(false);
-            // Use scanned ISBN
-          }}
-          onCancel={() => setShowBarcodeScanner(false)}
-        />
-      )}
-      
-      {/* Video Player Modal */}
-      {showVideoPlayer && (
-        <VideoPlayer
-          title="Lecture Video"
-          description="Educational content"
-          onClose={() => setShowVideoPlayer(false)}
-          downloadable={true}
-        />
-      )}
-      
-      {/* Notes Viewer Modal */}
-      {showNotesViewer && (
-        <NotesViewer
-          title="Study Notes"
-          author="Book Bloom"
-          onClose={() => setShowNotesViewer(false)}
-          downloadable={true}
-        />
-      )}
-      
-      {/* Error Modal */}
-      {showErrorModal && (
-        <ErrorModal
-          message={errorMessage}
-          onClose={() => setShowErrorModal(false)}
-        />
-      )}
-      
-      {/* Loading State */}
-      {isLoading && (
-        <LoadingState fullScreen={true} message="Please wait..." />
-      )}
     </div>
   );
 }

@@ -1,10 +1,10 @@
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
-import { 
-  User, 
-  ShoppingBag, 
-  DollarSign, 
-  Calendar, 
+import {
+  User,
+  ShoppingBag,
+  DollarSign,
+  Calendar,
   Heart,
   Lock,
   Trash2,
@@ -47,7 +47,7 @@ export function UserPortalCompleteDemo() {
                 <div className="w-10 h-10 bg-[#C4A672] rounded-lg flex items-center justify-center text-white">
                   <span>BO</span>
                 </div>
-                <h1 className="text-[#2C3E50] text-2xl">BookOra</h1>
+                <h1 className="text-[#2C3E50] text-2xl">BookBloom</h1>
               </div>
               <div className="flex items-center gap-3">
                 <Button variant="outline" size="sm">
@@ -520,7 +520,7 @@ export function UserPortalCompleteDemo() {
         {/* Integration Features */}
         <div className="bg-gradient-to-r from-[#C4A672] to-[#8B7355] rounded-2xl p-8 text-white">
           <h2 className="text-3xl mb-6 text-center">Quick Links - Integration Features</h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
               <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -600,7 +600,7 @@ export function UserPortalCompleteDemo() {
             <span className="text-green-900 text-lg">All Features 100% Complete & Production Ready</span>
           </div>
           <p className="text-gray-600 text-lg max-w-3xl mx-auto">
-            Complete user portal with history tabs (Purchases, Sales, Rentals, Wishlist), 
+            Complete user portal with history tabs (Purchases, Sales, Rentals, Wishlist),
             quick links for seamless integration, and secure password change & account deletion with confirmation modals.
           </p>
         </div>

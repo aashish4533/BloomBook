@@ -60,14 +60,14 @@ export function Navbar({
     { id: 'buy', label: 'Buy', icon: ShoppingBag, onClick: onNavigateBuy, page: 'marketplace' },
     { id: 'rent', label: 'Rent', icon: Calendar, onClick: onNavigateRent, page: 'rent' },
     { id: 'sell', label: 'Sell', icon: DollarSign, onClick: onNavigateSell, page: 'sell' },
-    { id: 'communities', label: 'Communities', icon: Users, onClick: onNavigateCommunities || (() => {}), page: 'communities-browse' },
+    { id: 'communities', label: 'Communities', icon: Users, onClick: onNavigateCommunities || (() => { }), page: 'communities-browse' },
   ];
 
   // Mobile navigation items (more comprehensive)
   const mobileNavItems = [
     { id: 'home', label: 'Home', icon: Home, onClick: onNavigateHome, page: 'home', showAlways: true },
-    { id: 'search', label: 'Search', icon: Search, onClick: onNavigateSearch || (() => {}), page: 'advanced-search', showAlways: true },
-    { id: 'wishlist', label: 'Wishlist', icon: Heart, onClick: onNavigateWishlist || (() => {}), page: 'wishlist', showAlways: false, requireLogin: true },
+    { id: 'search', label: 'Search', icon: Search, onClick: onNavigateSearch || (() => { }), page: 'advanced-search', showAlways: true },
+    { id: 'wishlist', label: 'Wishlist', icon: Heart, onClick: onNavigateWishlist || (() => { }), page: 'wishlist', showAlways: false, requireLogin: true },
     { id: 'sell', label: 'Sell', icon: DollarSign, onClick: onNavigateSell, page: 'sell', showAlways: true },
     { id: 'profile', label: 'Profile', icon: User, onClick: isLoggedIn ? onNavigateProfile : onNavigateLogin, page: 'user-dashboard', showAlways: true },
   ];
@@ -83,7 +83,7 @@ export function Navbar({
               <div className="w-10 h-10 bg-[#2C3E50] rounded-lg flex items-center justify-center">
                 <span className="text-white">BO</span>
               </div>
-              <span className="text-[#2C3E50] text-xl">BookOra</span>
+              <span className="text-[#2C3E50] text-xl">BookBloom</span>
             </div>
 
             {/* Navigation Items */}
@@ -95,11 +95,10 @@ export function Navbar({
                   <button
                     key={item.id}
                     onClick={item.onClick}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                      isActive
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${isActive
                         ? 'bg-[#2C3E50] text-white'
                         : 'text-[#2C3E50] hover:bg-[#8B7355] hover:text-white'
-                    }`}
+                      }`}
                   >
                     <Icon className="w-5 h-5" />
                     <span>{item.label}</span>
@@ -114,7 +113,7 @@ export function Navbar({
                 <>
                   {/* Notification Bell */}
                   <NotificationBell />
-                  
+
                   {/* Profile Dropdown */}
                   <div className="relative" ref={dropdownRef}>
                     <button
@@ -252,11 +251,10 @@ export function Navbar({
                 <button
                   key={item.id}
                   onClick={item.onClick}
-                  className={`flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-colors ${
-                    isActive
+                  className={`flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-colors ${isActive
                       ? 'text-[#2C3E50]'
                       : 'text-[#2C3E50]/60'
-                  }`}
+                    }`}
                 >
                   <Icon className={`w-6 h-6 ${isActive ? 'fill-[#2C3E50]' : ''}`} />
                   <span className="text-xs">{item.label}</span>

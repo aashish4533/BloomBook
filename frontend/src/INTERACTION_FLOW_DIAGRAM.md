@@ -1,4 +1,4 @@
-# BookOra - Complete Interaction Flow Diagram
+# BookBloom - Complete Interaction Flow Diagram
 
 ## 🗺️ Visual Navigation Map
 

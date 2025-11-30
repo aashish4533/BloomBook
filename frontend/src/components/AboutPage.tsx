@@ -1,7 +1,7 @@
 // Updated src/components/AboutPage.tsx
 import { BookOpen, Users, Heart, Shield, TrendingUp, Award, Mail, MapPin, Phone } from 'lucide-react';
 import { Button } from './ui/button';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CallSupport } from './CallSupport';
 import { db } from '../firebase';  // No backend needed, but import if future stats from DB
 import { collection, getDocs } from 'firebase/firestore';  // Example for stats if dynamic
@@ -73,7 +73,7 @@ export function AboutPage({ onBack, onNavigateToCommunities }: AboutPageProps) {
           >
             ← Back
           </button>
-          <h1 className="text-5xl md:text-6xl mb-6">About BookOra</h1>
+          <h1 className="text-5xl md:text-6xl mb-6">About BookBloom</h1>
           <p className="text-xl text-white/90 max-w-3xl mb-8">
             Connecting readers, building communities, and making books accessible to everyone through our innovative marketplace platform.
           </p>
@@ -120,13 +120,13 @@ export function AboutPage({ onBack, onNavigateToCommunities }: AboutPageProps) {
           <h2 className="text-4xl text-[#2C3E50] mb-8 text-center">Our Story</h2>
           <div className="space-y-6 text-gray-700 leading-relaxed">
             <p className="text-lg">
-              BookOra was born from a simple idea: books should be accessible to everyone, and readers should be able to connect with each other. In 2023, our founder Sarah Johnson recognized that many people had books sitting on shelves, while others were searching for affordable ways to access literature.
+              BookBloom was born from a simple idea: books should be accessible to everyone, and readers should be able to connect with each other. In 2023, our founder Sarah Johnson recognized that many people had books sitting on shelves, while others were searching for affordable ways to access literature.
             </p>
             <p className="text-lg">
-              We created BookOra to solve this problem. Our platform enables users to buy, sell, and rent books while fostering vibrant communities where readers can discuss their favorite titles, share recommendations, and build lasting connections.
+              We created BookBloom to solve this problem. Our platform enables users to buy, sell, and rent books while fostering vibrant communities where readers can discuss their favorite titles, share recommendations, and build lasting connections.
             </p>
             <p className="text-lg">
-              Today, BookOra has grown into a thriving marketplace with a large user base, numerous books listed, and active communities dedicated to every genre and interest imaginable. We're proud to have facilitated many transactions, making literature more accessible one book at a time.
+              Today, BookBloom has grown into a thriving marketplace with a large user base, numerous books listed, and active communities dedicated to every genre and interest imaginable. We're proud to have facilitated many transactions, making literature more accessible one book at a time.
             </p>
           </div>
         </div>
@@ -137,7 +137,7 @@ export function AboutPage({ onBack, onNavigateToCommunities }: AboutPageProps) {
         <div className="max-w-7xl mx-auto">
           <h2 className="text-4xl text-[#2C3E50] mb-4 text-center">Our Values</h2>
           <p className="text-center text-gray-600 mb-12 max-w-2xl mx-auto">
-            The principles that guide everything we do at BookOra
+            The principles that guide everything we do at BookBloom
           </p>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
             {values.map((value, index) => {
@@ -214,7 +214,7 @@ export function AboutPage({ onBack, onNavigateToCommunities }: AboutPageProps) {
               <p className="text-gray-600">San Francisco, CA</p>
             </div>
           </div>
-          
+
           {/* Call Support Button */}
           <div className="text-center">
             <Button
@@ -252,7 +252,7 @@ export function AboutPage({ onBack, onNavigateToCommunities }: AboutPageProps) {
           </div>
         </div>
       </section>
-      
+
       {/* Call Support Modal */}
       {showCallSupport && <CallSupport onClose={() => setShowCallSupport(false)} />}
     </div>

@@ -1,7 +1,7 @@
-# BookOra Users Portal - Complete Feature List
+# BookBloom Users Portal - Complete Feature List
 
 ## Overview
-The Users Portal is a comprehensive, personalized dashboard for regular BookOra users to manage their accounts, view transaction history, and interact with the platform.
+The Users Portal is a comprehensive, personalized dashboard for regular BookBloom users to manage their accounts, view transaction history, and interact with the platform.
 
 ---
 

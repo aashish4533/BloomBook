@@ -1,7 +1,7 @@
-# BookOra - Complete Prototype Guide
+# BookBloom - Complete Prototype Guide
 
 ## 🎯 Overview
-This is the complete, fully interconnected prototype for BookOra - a comprehensive book marketplace platform with 60+ components, full routing, modal management, and responsive design.
+This is the complete, fully interconnected prototype for BookBloom - a comprehensive book marketplace platform with 60+ components, full routing, modal management, and responsive design.
 
 ---
 

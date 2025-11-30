@@ -13,7 +13,7 @@ This guide provides a detailed description of what each new component looks like
 ╔══════════════════════════════════════════════════════════════╗
 ║  [← Back]                                                     ║
 ║                                                               ║
-║           About BookOra                                       ║
+║           About BookBloom                                       ║
 ║           (Large heading, white text)                         ║
 ║                                                               ║
 ║  Connecting readers, building communities, and making books   ║
@@ -43,7 +43,7 @@ This guide provides a detailed description of what each new component looks like
 ┌─────────────────────────────────────────────────────────────┐
 │                        Our Story                             │
 │                                                              │
-│  BookOra was born from a simple idea: books should be       │
+│  BookBloom was born from a simple idea: books should be       │
 │  accessible to everyone, and readers should be able to      │
 │  connect with each other...                                 │
 │                                                              │
@@ -344,7 +344,7 @@ Visual Changes:
 │        [Buy]  [Rent]  [Resell]  [Announcements]  [About]   │
 │                                           ^^^^^^^^^ NEW!     │
 │                                                              │
-│              © 2025 BookOra. All rights reserved.           │
+│              © 2025 BookBloom. All rights reserved.           │
 │                                                              │
 │        [Subscribe to our newsletter ___________] [Subscribe]│
 │                                                              │

@@ -1,8 +1,8 @@
-# 🗺️ BookOra - Complete System Flow Diagram
+# 🗺️ BookBloom - Complete System Flow Diagram
 
 ## 📋 NAVIGATION MAP
 
-This document shows the complete navigation flow of the entire BookOra platform.
+This document shows the complete navigation flow of the entire BookBloom platform.
 
 ---
 
@@ -61,7 +61,7 @@ This document shows the complete navigation flow of the entire BookOra platform.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  [BO] BookOra    [Home] [Buy] [Rent] [Sell]    [Auth/Profile]  │
+│  [BO] BookBloom    [Home] [Buy] [Rent] [Sell]    [Auth/Profile]  │
 └─────────────────────────────────────────────────────────────────┘
                        │       │      │      │            │
                        │       │      │      │            │
@@ -216,7 +216,7 @@ This document shows the complete navigation flow of the entire BookOra platform.
 │                   ✅ Listing Created!                           │
 │                 Listing ID: LST-ABC123                          │
 │                                                                  │
-│  Your book is now live on BookOra marketplace                   │
+│  Your book is now live on BookBloom marketplace                   │
 │  You'll receive notifications when buyers show interest         │
 │                                                                  │
 │  [View My Listings] [List Another Book] [Back to Home]         │
@@ -438,7 +438,7 @@ This document shows the complete navigation flow of the entire BookOra platform.
 │  [← Back to Home]                                               │
 │                                                                  │
 │         🛡️ Admin Portal                                         │
-│    Secure access for BookOra administrators                     │
+│    Secure access for BookBloom administrators                     │
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────┐    │
 │  │ Sign In                                                 │    │

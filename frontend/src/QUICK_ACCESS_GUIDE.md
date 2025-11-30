@@ -1,4 +1,4 @@
-# 🚀 BookOra - Quick Access Guide
+# 🚀 BookBloom - Quick Access Guide
 
 ## One-Page Reference for All Features
 
@@ -112,9 +112,9 @@
 
 **Desktop (Top):**
 ```
-[BO BookOra]  [Home] [Buy] [Rent] [Sell]  [Login] [Register]
+[BO BookBloom]  [Home] [Buy] [Rent] [Sell]  [Login] [Register]
                                               or
-[BO BookOra]  [Home] [Buy] [Rent] [Sell]     [Profile ▼]
+[BO BookBloom]  [Home] [Buy] [Rent] [Sell]     [Profile ▼]
 ```
 
 **Mobile (Bottom):**

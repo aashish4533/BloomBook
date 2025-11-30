@@ -12,12 +12,12 @@ interface NotesViewerProps {
   downloadable?: boolean;
 }
 
-export function NotesViewer({ 
-  title, 
-  author = 'BookOra',
-  pages = 12, 
+export function NotesViewer({
+  title,
+  author = 'BookBloom',
+  pages = 12,
   onClose,
-  downloadable = true 
+  downloadable = true
 }: NotesViewerProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [zoom, setZoom] = useState(100);
@@ -149,9 +149,9 @@ export function NotesViewer({
       {/* Document Viewer */}
       <div className="flex-1 overflow-auto bg-gray-800 p-8">
         <div className="max-w-4xl mx-auto">
-          <Card 
+          <Card
             className="bg-white shadow-2xl"
-            style={{ 
+            style={{
               transform: `scale(${zoom / 100})`,
               transformOrigin: 'top center',
               transition: 'transform 0.2s'
@@ -169,23 +169,23 @@ export function NotesViewer({
                 {/* Mock Content */}
                 <div className="space-y-4">
                   <h2 className="text-2xl text-[#2C3E50]">Chapter {currentPage}: Introduction</h2>
-                  
+
                   <p className="text-gray-700 leading-relaxed">
-                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor 
-                    incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud 
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor
+                    incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud
                     exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
                   </p>
 
                   <p className="text-gray-700 leading-relaxed">
-                    Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu 
-                    fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in 
+                    Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu
+                    fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in
                     culpa qui officia deserunt mollit anim id est laborum.
                   </p>
 
                   {/* Code block example */}
                   <div className="bg-gray-100 rounded-lg p-4 my-6">
                     <pre className="text-sm text-gray-800 overflow-x-auto">
-{`function example() {
+                      {`function example() {
   console.log("Sample code block");
   return true;
 }`}
@@ -201,8 +201,8 @@ export function NotesViewer({
                   </ul>
 
                   <p className="text-gray-700 leading-relaxed mt-6">
-                    Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque 
-                    laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi 
+                    Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque
+                    laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi
                     architecto beatae vitae dicta sunt explicabo.
                   </p>
 
@@ -215,7 +215,7 @@ export function NotesViewer({
                   </div>
 
                   <p className="text-gray-700 leading-relaxed">
-                    Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia 
+                    Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia
                     consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.
                   </p>
                 </div>

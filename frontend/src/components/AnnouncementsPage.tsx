@@ -22,7 +22,7 @@ const mockAnnouncements: Announcement[] = [
   {
     id: '1',
     title: '🎉 New Feature: Book Communities!',
-    content: 'We\'re excited to announce our new Communities feature! Join communities, discuss your favorite books, and connect with fellow readers. You can now create or join public and private communities, share posts, and engage in group chats. This is a major step forward in making BookOra the ultimate platform for book lovers.',
+    content: 'We\'re excited to announce our new Communities feature! Join communities, discuss your favorite books, and connect with fellow readers. You can now create or join public and private communities, share posts, and engage in group chats. This is a major step forward in making BookBloom the ultimate platform for book lovers.',
     type: 'update',
     image: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=1200&h=400&fit=crop',
     date: new Date('2024-11-14'),
@@ -62,7 +62,7 @@ const mockAnnouncements: Announcement[] = [
   {
     id: '5',
     title: '🎁 Referral Program Launch',
-    content: 'Invite your friends to BookOra and earn rewards! For every friend who signs up and makes a purchase, you\'ll both receive a $10 credit. The more friends you refer, the more you save. Start sharing the love of reading today!',
+    content: 'Invite your friends to BookBloom and earn rewards! For every friend who signs up and makes a purchase, you\'ll both receive a $10 credit. The more friends you refer, the more you save. Start sharing the love of reading today!',
     type: 'promo',
     date: new Date('2024-11-08'),
     published: true,
@@ -94,7 +94,7 @@ export function AnnouncementsPage({ isAdmin = false, onBack }: AnnouncementsPage
   const filteredAnnouncements = announcements
     .filter(a => {
       const matchesSearch = a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          a.content.toLowerCase().includes(searchQuery.toLowerCase());
+        a.content.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesType = typeFilter === 'all' || a.type === typeFilter;
       return matchesSearch && matchesType;
     })
@@ -275,10 +275,10 @@ export function AnnouncementsPage({ isAdmin = false, onBack }: AnnouncementsPage
                         {getTypeIcon(announcement.type)} {announcement.type.charAt(0).toUpperCase() + announcement.type.slice(1)}
                       </Badge>
                       <span className="text-sm text-gray-500">
-                        {announcement.date.toLocaleDateString('en-US', { 
-                          month: 'long', 
-                          day: 'numeric', 
-                          year: 'numeric' 
+                        {announcement.date.toLocaleDateString('en-US', {
+                          month: 'long',
+                          day: 'numeric',
+                          year: 'numeric'
                         })}
                       </span>
                       {isAdmin && (

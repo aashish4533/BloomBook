@@ -1,7 +1,7 @@
 # Navigation & Advanced Features Update
 
 ## Overview
-Successfully implemented comprehensive navigation enhancements, Advanced Search with AI capabilities, Wishlist page, and Online Tuition Hub for the BookOra platform.
+Successfully implemented comprehensive navigation enhancements, Advanced Search with AI capabilities, Wishlist page, and Online Tuition Hub for the BookBloom platform.
 
 ## New Features Implemented
 

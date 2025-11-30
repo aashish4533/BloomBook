@@ -1,7 +1,7 @@
 # Advanced Features Implementation Summary
 
 ## Overview
-This document details the comprehensive implementation of advanced features for the BookOra platform, including payment gateway, UX improvements, optional features, helping materials, and global elements.
+This document details the comprehensive implementation of advanced features for the BookBloom platform, including payment gateway, UX improvements, optional features, helping materials, and global elements.
 
 ---
 

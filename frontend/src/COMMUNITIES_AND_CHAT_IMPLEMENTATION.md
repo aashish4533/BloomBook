@@ -1,8 +1,8 @@
-# 🌐 BookOra - Communities & Chat System Implementation
+# 🌐 BookBloom - Communities & Chat System Implementation
 
 ## ✅ STATUS: INITIAL COMPONENTS CREATED
 
-This document tracks the implementation of the major expansion to BookOra including Communities, Chat Systems, Announcements, and About pages.
+This document tracks the implementation of the major expansion to BookBloom including Communities, Chat Systems, Announcements, and About pages.
 
 ---
 
@@ -298,7 +298,7 @@ This document tracks the implementation of the major expansion to BookOra includ
 
 **Required Features:**
 - [ ] Hero section:
-  - [ ] Page title "About BookOra"
+  - [ ] Page title "About BookBloom"
   - [ ] Subtitle/tagline
   - [ ] Hero image
 - [ ] Mission section:

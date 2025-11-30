@@ -6,7 +6,7 @@ import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Slider } from './ui/slider';
-import { Search, SlidersHorizontal, Plus, MapPin, X } from 'lucide-react';
+import { Search, SlidersHorizontal, Plus, MapPin, X, ArrowLeft } from 'lucide-react';
 
 export interface Book {
   id: string;
@@ -186,37 +186,40 @@ const mockBooks: Book[] = [
     },
     images: ['https://images.unsplash.com/photo-1589998059171-988d887df646?w=400'],
     publishedYear: 1988,
-    isbn: '978-0-06-112241-5',
+    isbn: '978-0-06-231500-7',
     language: 'English',
-    pages: 197
+    pages: 163
   }
 ];
 
-export function BookMarketplace() {
-  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
-  const [showSellFlow, setShowSellFlow] = useState(false);
+interface BookMarketplaceProps {
+  onBack?: () => void;
+}
+
+export function BookMarketplace({ onBack }: BookMarketplaceProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [conditionFilter, setConditionFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('recent');
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 50]);
-  const [locationFilter, setLocationFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [isbnFilter, setIsbnFilter] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 50]);
+  const [sortBy, setSortBy] = useState('recent');
+  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+  const [showSellFlow, setShowSellFlow] = useState(false);
 
-  const categories = ['all', ...Array.from(new Set(mockBooks.map(book => book.category)))];
+  const categories = ['all', 'Classic Literature', 'Science Fiction', 'Romance', 'Fantasy', 'Philosophy', 'Textbooks', 'Mystery', 'Biography'];
   const conditions = ['all', 'New', 'Like New', 'Good', 'Fair', 'Poor'];
 
   const filteredBooks = mockBooks.filter(book => {
     const matchesSearch = book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         book.author.toLowerCase().includes(searchQuery.toLowerCase());
+      book.author.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = categoryFilter === 'all' || book.category === categoryFilter;
     const matchesCondition = conditionFilter === 'all' || book.condition === conditionFilter;
+    const matchesIsbn = !isbnFilter || book.isbn.includes(isbnFilter);
     const matchesPrice = book.price >= priceRange[0] && book.price <= priceRange[1];
-    const matchesIsbn = !isbnFilter || book.isbn.toLowerCase().includes(isbnFilter.toLowerCase());
-    const matchesLocation = !locationFilter || 
-                           book.seller.name.toLowerCase().includes(locationFilter.toLowerCase());
-    return matchesSearch && matchesCategory && matchesCondition && matchesPrice && matchesIsbn && matchesLocation;
+
+    return matchesSearch && matchesCategory && matchesCondition && matchesIsbn && matchesPrice;
   });
 
   const sortedBooks = [...filteredBooks].sort((a, b) => {
@@ -227,53 +230,58 @@ export function BookMarketplace() {
         return b.price - a.price;
       case 'rating':
         return b.seller.rating - a.seller.rating;
+      case 'recent':
       default:
-        return 0;
+        return 0; // In a real app, we'd sort by date
     }
   });
 
-  const clearAllFilters = () => {
-    setSearchQuery('');
-    setCategoryFilter('all');
-    setConditionFilter('all');
-    setPriceRange([0, 50]);
-    setLocationFilter('');
-    setIsbnFilter('');
-  };
-
   const activeFiltersCount = [
-    searchQuery,
     categoryFilter !== 'all',
     conditionFilter !== 'all',
-    priceRange[0] !== 0 || priceRange[1] !== 50,
-    locationFilter,
-    isbnFilter
+    isbnFilter !== '',
+    locationFilter !== '',
+    priceRange[0] > 0 || priceRange[1] < 50
   ].filter(Boolean).length;
 
+  const clearAllFilters = () => {
+    setCategoryFilter('all');
+    setConditionFilter('all');
+    setIsbnFilter('');
+    setLocationFilter('');
+    setPriceRange([0, 50]);
+    setSearchQuery('');
+  };
+
   return (
-    <div className="bg-[#F5F5F5] min-h-screen py-8">
-      <div className="max-w-7xl mx-auto px-6">
-        {/* Header Section */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-[#2C3E50] mb-2">Book Marketplace</h1>
-              <p className="text-gray-600">Buy and sell books from fellow readers</p>
+    <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <div className="flex items-center gap-4 mb-2">
+              {onBack && (
+                <Button variant="ghost" size="icon" onClick={onBack} className="-ml-2">
+                  <ArrowLeft className="w-6 h-6" />
+                </Button>
+              )}
+              <h1 className="text-3xl font-bold text-[#2C3E50]">Book Marketplace</h1>
             </div>
-            <Button
-              onClick={() => setShowSellFlow(true)}
-              className="bg-[#C4A672] hover:bg-[#8B7355] text-white"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              Sell a Book
-            </Button>
+            <p className="text-gray-600">Buy and sell textbooks and literature within your community</p>
           </div>
+          <Button
+            onClick={() => setShowSellFlow(true)}
+            className="bg-[#C4A672] hover:bg-[#8B7355] text-white"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Sell a Book
+          </Button>
         </div>
 
         {/* Search and Filters */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
+        <div className="bg-white rounded-xl shadow-sm p-4 mb-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {/* Search */}
+            {/* Search Bar */}
             <div className="md:col-span-2">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />

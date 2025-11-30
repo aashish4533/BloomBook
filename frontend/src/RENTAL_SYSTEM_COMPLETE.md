@@ -1,4 +1,4 @@
-# 📚 BookOra Rental System - Complete Implementation
+# 📚 BookBloom Rental System - Complete Implementation
 
 ## ✅ STATUS: 100% COMPLETE
 
@@ -253,7 +253,7 @@ Note: Map view noted as future enhancement
 - ✅ Responsive grid (1/2/3 columns)
 - ✅ Color-coded condition badges
 - ✅ Icon-based UI (Search, Map, Calendar, Image)
-- ✅ Gradient accents (BookOra theme)
+- ✅ Gradient accents (BookBloom theme)
 - ✅ Smooth hover effects
 - ✅ Loading states
 - ✅ Empty states

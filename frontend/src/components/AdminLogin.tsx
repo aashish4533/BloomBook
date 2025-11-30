@@ -105,7 +105,7 @@ export function AdminLogin({ onLogin, onBack }: AdminLoginProps) {
             <Shield className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-white text-3xl mb-2">Admin Portal</h1>
-          <p className="text-white/80">Secure access for BookOra administrators</p>
+          <p className="text-white/80">Secure access for BookBloom administrators</p>
         </div>
 
         {/* Login Card */}
@@ -166,7 +166,7 @@ export function AdminLogin({ onLogin, onBack }: AdminLoginProps) {
                 <Checkbox
                   id="remember"
                   checked={rememberMe}
-                  onCheckedChange={(checked) => setRememberMe(checked === true)}
+                  onCheckedChange={(checked: boolean | 'indeterminate') => setRememberMe(checked === true)}
                 />
                 <Label htmlFor="remember" className="text-sm cursor-pointer">
                   Remember me for 30 days

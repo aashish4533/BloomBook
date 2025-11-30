@@ -37,7 +37,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
               <Shield className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl">BookOra</h1>
+              <h1 className="text-xl">BookBloom</h1>
               <p className="text-xs text-white/70">Admin Portal</p>
             </div>
           </div>
@@ -51,11 +51,10 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                  activeTab === tab.id
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === tab.id
                     ? 'bg-[#C4A672] text-white'
                     : 'text-white/70 hover:bg-white/10 hover:text-white'
-                }`}
+                  }`}
               >
                 <Icon className="w-5 h-5" />
                 <span className="text-sm">{tab.label}</span>
@@ -96,7 +95,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                 {tabs.find(t => t.id === activeTab)?.label}
               </h2>
               <p className="text-gray-600 text-sm">
-                Manage and monitor your BookOra platform
+                Manage and monitor your BookBloom platform
               </p>
             </div>
             <div className="flex items-center gap-4">

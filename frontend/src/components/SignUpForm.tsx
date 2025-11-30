@@ -93,7 +93,7 @@ export function SignUpForm({ onSwitchToLogin, onSignUp }: SignUpFormProps) {
           <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-white/20 backdrop-blur-sm mb-4">
             <Home className="w-12 h-12 text-white" />
           </div>
-          <h2 className="text-white text-4xl">Join BookOra Today</h2>
+          <h2 className="text-white text-4xl">Join BookBloom Today</h2>
           <p className="text-white/90 text-lg">
             Create your account and start your journey to finding the perfect property.
           </p>
@@ -151,9 +151,8 @@ export function SignUpForm({ onSwitchToLogin, onSignUp }: SignUpFormProps) {
                       setEmail(e.target.value);
                       setErrors({ ...errors, email: '' });
                     }}
-                    className={`pl-10 h-12 bg-gray-50 border-gray-200 focus:border-[#C4A672] focus:ring-[#C4A672] ${
-                      errors.email ? 'border-red-500' : ''
-                    }`}
+                    className={`pl-10 h-12 bg-gray-50 border-gray-200 focus:border-[#C4A672] focus:ring-[#C4A672] ${errors.email ? 'border-red-500' : ''
+                      }`}
                   />
                 </div>
                 {errors.email && (
@@ -177,9 +176,8 @@ export function SignUpForm({ onSwitchToLogin, onSignUp }: SignUpFormProps) {
                       setPassword(e.target.value);
                       setErrors({ ...errors, password: '' });
                     }}
-                    className={`pl-10 pr-10 h-12 bg-gray-50 border-gray-200 focus:border-[#C4A672] focus:ring-[#C4A672] ${
-                      errors.password ? 'border-red-500' : ''
-                    }`}
+                    className={`pl-10 pr-10 h-12 bg-gray-50 border-gray-200 focus:border-[#C4A672] focus:ring-[#C4A672] ${errors.password ? 'border-red-500' : ''
+                      }`}
                   />
                   <button
                     type="button"
@@ -219,9 +217,8 @@ export function SignUpForm({ onSwitchToLogin, onSignUp }: SignUpFormProps) {
                       setConfirmPassword(e.target.value);
                       setErrors({ ...errors, confirmPassword: '' });
                     }}
-                    className={`pl-10 pr-10 h-12 bg-gray-50 border-gray-200 focus:border-[#C4A672] focus:ring-[#C4A672] ${
-                      errors.confirmPassword ? 'border-red-500' : ''
-                    }`}
+                    className={`pl-10 pr-10 h-12 bg-gray-50 border-gray-200 focus:border-[#C4A672] focus:ring-[#C4A672] ${errors.confirmPassword ? 'border-red-500' : ''
+                      }`}
                   />
                   <button
                     type="button"
@@ -246,7 +243,7 @@ export function SignUpForm({ onSwitchToLogin, onSignUp }: SignUpFormProps) {
                   <Checkbox
                     id="terms"
                     checked={agreeToTerms}
-                    onCheckedChange={(checked) => {
+                    onCheckedChange={(checked: boolean | 'indeterminate') => {
                       setAgreeToTerms(checked === true);
                       setErrors({ ...errors, terms: '' });
                     }}

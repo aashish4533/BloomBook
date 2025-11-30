@@ -1,4 +1,4 @@
-# 📚 BookOra - Rent a Book Feature Documentation
+# 📚 BookBloom - Rent a Book Feature Documentation
 
 ## ✅ FULLY IMPLEMENTED - Complete Search/Browse Screen
 

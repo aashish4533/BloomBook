@@ -1,4 +1,4 @@
-# 📚 BookOra User Portal - Quick Reference Card
+# 📚 BookBloom User Portal - Quick Reference Card
 
 ## 🎯 Access Points
 

@@ -20,15 +20,15 @@ export function Footer({ onNavigateToAbout, onNavigateToBuy, onNavigateToRent, o
           <button onClick={onNavigateToAnnouncements} className="hover:opacity-80 transition-opacity">Announcements</button>
           <button onClick={onNavigateToAbout} className="hover:opacity-80 transition-opacity">About</button>
         </nav>
-        
+
         <p className="text-center text-sm mb-6">
-          © 2025 BookOra. All rights reserved.
+          © 2025 BookBloom. All rights reserved.
         </p>
-        
+
         <div className="flex items-center justify-center gap-3 max-w-md mx-auto">
-          <Input 
-            type="email" 
-            placeholder="Subscribe to our newsletter" 
+          <Input
+            type="email"
+            placeholder="Subscribe to our newsletter"
             className="flex-1 bg-white text-black border-none"
           />
           <Button className="bg-[#F5A623] hover:bg-[#E69610] text-white px-6">

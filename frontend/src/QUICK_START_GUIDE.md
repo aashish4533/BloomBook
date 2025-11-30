@@ -1,10 +1,10 @@
-# BookOra Platform - Quick Start Guide
+# BookBloom Platform - Quick Start Guide
 
 ## 🚀 Getting Started
 
 ### Accessing the Platform
 
-The BookOra platform is now fully functional with all features implemented. Here's how to navigate and test each feature:
+The BookBloom platform is now fully functional with all features implemented. Here's how to navigate and test each feature:
 
 ---
 

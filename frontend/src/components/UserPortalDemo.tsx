@@ -10,7 +10,7 @@ export function UserPortalDemo({ onAccessUserDashboard }: UserPortalDemoProps) {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-8">
       <div className="max-w-4xl w-full">
         <div className="text-center mb-12">
-          <h1 className="text-[#2C3E50] text-4xl mb-4">BookOra User Portal</h1>
+          <h1 className="text-[#2C3E50] text-4xl mb-4">BookBloom User Portal</h1>
           <p className="text-gray-600 text-lg">Your personalized dashboard to manage everything</p>
         </div>
 

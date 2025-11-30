@@ -1,4 +1,4 @@
-# 👤 BookOra User Portal - Complete Feature Documentation
+# 👤 BookBloom User Portal - Complete Feature Documentation
 
 ## ✅ FULLY IMPLEMENTED - All Features Ready
 

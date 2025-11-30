@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Filter, Grid, List, Plus, Users, Lock, Globe, MessageCircle, TrendingUp } from 'lucide-react';
+import { Search, Filter, Grid, List, Plus, Users, Lock, Globe, MessageCircle, TrendingUp, ArrowLeft } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -37,7 +37,7 @@ interface CommunitiesBrowseProps {
   isLoggedIn: boolean;
 }
 
-export function CommunitiesBrowse({ onNavigateToDetail, onNavigateToCreate, isLoggedIn }: CommunitiesBrowseProps) {
+export function CommunitiesBrowse({ onNavigateToDetail, onNavigateToCreate, isLoggedIn, onBack }: CommunitiesBrowseProps & { onBack?: () => void }) {
   const [communities, setCommunities] = useState<Community[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -72,7 +72,7 @@ export function CommunitiesBrowse({ onNavigateToDetail, onNavigateToCreate, isLo
 
   const handleJoin = async (communityId: string, privacy: 'public' | 'private', e: React.MouseEvent) => {
     e.stopPropagation();
-    
+
     if (!isLoggedIn || !user) {
       toast.error('Please login to join communities');
       return;
@@ -122,7 +122,7 @@ export function CommunitiesBrowse({ onNavigateToDetail, onNavigateToCreate, isLo
   const filteredCommunities = communities
     .filter(c => {
       const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          c.description.toLowerCase().includes(searchQuery.toLowerCase());
+        c.description.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesTopic = topicFilter === 'all' || c.topic === topicFilter;
       const matchesPrivacy = privacyFilter === 'all' || c.privacy === privacyFilter;
       return matchesSearch && matchesTopic && matchesPrivacy;
@@ -144,6 +144,16 @@ export function CommunitiesBrowse({ onNavigateToDetail, onNavigateToCreate, isLo
       {/* Header */}
       <div className="bg-gradient-to-r from-[#2C3E50] to-[#34495E] text-white py-12">
         <div className="max-w-7xl mx-auto px-4">
+          {onBack && (
+            <Button
+              variant="ghost"
+              onClick={onBack}
+              className="text-white hover:bg-white/10 mb-4 -ml-2"
+            >
+              <ArrowLeft className="w-5 h-5 mr-2" />
+              Back to Home
+            </Button>
+          )}
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-4xl mb-2">Book Communities</h1>
@@ -354,7 +364,7 @@ export function CommunitiesBrowse({ onNavigateToDetail, onNavigateToCreate, isLo
                   ) : community.isMember ? (
                     <div className="grid grid-cols-2 gap-2">
                       <Button
-                        onClick={(e) => {
+                        onClick={(e: React.MouseEvent) => {
                           e.stopPropagation();
                           onNavigateToDetail(community.id);
                         }}
@@ -364,7 +374,7 @@ export function CommunitiesBrowse({ onNavigateToDetail, onNavigateToCreate, isLo
                         View
                       </Button>
                       <Button
-                        onClick={(e) => handleLeave(community.id, e)}
+                        onClick={(e: React.MouseEvent) => handleLeave(community.id, e)}
                         variant="outline"
                         className="text-red-600 hover:bg-red-50 border-red-200"
                         size="sm"
@@ -374,7 +384,7 @@ export function CommunitiesBrowse({ onNavigateToDetail, onNavigateToCreate, isLo
                     </div>
                   ) : (
                     <Button
-                      onClick={(e) => handleJoin(community.id, community.privacy, e)}
+                      onClick={(e: React.MouseEvent) => handleJoin(community.id, community.privacy, e)}
                       className="w-full bg-[#2C3E50] hover:bg-[#1a252f] text-white"
                       size="sm"
                     >
@@ -443,7 +453,7 @@ export function CommunitiesBrowse({ onNavigateToDetail, onNavigateToCreate, isLo
                           </Button>
                         ) : community.isMember ? (
                           <Button
-                            onClick={(e) => handleLeave(community.id, e)}
+                            onClick={(e: React.MouseEvent) => handleLeave(community.id, e)}
                             variant="outline"
                             className="text-red-600 hover:bg-red-50 border-red-200"
                             size="sm"
@@ -452,7 +462,7 @@ export function CommunitiesBrowse({ onNavigateToDetail, onNavigateToCreate, isLo
                           </Button>
                         ) : (
                           <Button
-                            onClick={(e) => handleJoin(community.id, community.privacy, e)}
+                            onClick={(e: React.MouseEvent) => handleJoin(community.id, community.privacy, e)}
                             className="bg-[#2C3E50] hover:bg-[#1a252f] text-white"
                             size="sm"
                           >
