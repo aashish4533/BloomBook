@@ -49,7 +49,7 @@ Phase 3 focused on completing the BookBloom platform with the About page, User P
 - Gradient circular avatars matching brand
 
 #### Contact Section
-- Email: support@bookora.com
+- Email: support@bookbloom.com
 - Phone: +1 (555) 123-4567
 - Location: San Francisco, CA
 - Icon-based presentation in cards

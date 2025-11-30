@@ -10,7 +10,7 @@ This document shows the complete navigation flow of the entire BookBloom platfor
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     BOOKORA ENTRY POINTS                        │
+│                     BOOKBLOOM ENTRY POINTS                        │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  1. [Home/Marketplace] ← Default landing (not logged in)       │
@@ -443,7 +443,7 @@ This document shows the complete navigation flow of the entire BookBloom platfor
 │  ┌────────────────────────────────────────────────────────┐    │
 │  │ Sign In                                                 │    │
 │  │                                                          │    │
-│  │ Email:    [admin@bookora.com]                           │    │
+│  │ Email:    [admin@bookbloom.com]                           │    │
 │  │ Password: [••••••••]                                    │    │
 │  │ ☑ Remember me for 30 days                              │    │
 │  │                                                          │    │
@@ -563,7 +563,7 @@ This document shows the complete navigation flow of the entire BookBloom platfor
 ## 📊 COMPLETE SITE MAP
 
 ```
-BookOra Application
+BookBloom Application
 │
 ├── Public (Not Logged In)
 │   ├── Home/Marketplace

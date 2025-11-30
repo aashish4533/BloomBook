@@ -153,10 +153,10 @@ export function CallSupport({ onClose }: CallSupportProps) {
                   For non-urgent inquiries or detailed questions
                 </p>
                 <a
-                  href="mailto:support@bookora.com"
+                  href="mailto:support@bookbloom.com"
                   className="text-[#C4A672] hover:underline text-sm"
                 >
-                  support@bookora.com
+                  support@bookbloom.com
                 </a>
                 <p className="text-xs text-gray-500 mt-2">Response within 24 hours</p>
               </div>

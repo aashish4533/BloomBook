@@ -197,7 +197,7 @@ export function AboutPage({ onBack, onNavigateToCommunities }: AboutPageProps) {
                 <Mail className="w-7 h-7 text-white" />
               </div>
               <h3 className="text-lg text-[#2C3E50] mb-2">Email</h3>
-              <p className="text-gray-600">support@bookora.com</p>
+              <p className="text-gray-600">support@bookbloom.com</p>
             </div>
             <div className="text-center p-6 bg-[#F5F1E8] rounded-2xl">
               <div className="w-14 h-14 bg-gradient-to-br from-[#C4A672] to-[#8B7355] rounded-xl flex items-center justify-center mx-auto mb-4">

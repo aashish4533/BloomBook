@@ -456,7 +456,7 @@ MOBILE BOTTOM TAB (5 Tabs)
   - **In-App VoIP**: Placeholder for WebRTC
   - **Video Support**: Scheduling
   - **Live Chat**: Instant messaging
-  - **Email**: support@bookora.com
+  - **Email**: support@bookbloom.com
   - Emergency hotline
 
 ---
@@ -585,7 +585,7 @@ MOBILE BOTTOM TAB (5 Tabs)
 ## 🎨 Global Elements
 
 ### **Navigation Bar (Fixed Top)**
-- **Logo**: BookOra (click → Home)
+- **Logo**: BookBloom (click → Home)
 - **Search**: Quick search (→ Advanced Search)
 - **Desktop Menu**:
   - Home, Buy, Rent, Sell
@@ -609,7 +609,7 @@ MOBILE BOTTOM TAB (5 Tabs)
 - **Links**: About, Buy, Rent, Sell, Announcements
 - **Social**: Facebook, Twitter, Instagram (icons)
 - **Legal**: Privacy, Terms, Contact
-- **Copyright**: © 2024 BookOra
+- **Copyright**: © 2024 BookBloom
 
 ### **Chat Button (Floating)**
 - Bottom-right corner

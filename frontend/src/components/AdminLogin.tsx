@@ -125,7 +125,7 @@ export function AdminLogin({ onLogin, onBack }: AdminLoginProps) {
                   <Input
                     id="admin-email"
                     type="email"
-                    placeholder="admin@bookora.com"
+                    placeholder="admin@bookbloom.com"
                     value={email}
                     onChange={(e) => {
                       setEmail(e.target.value);

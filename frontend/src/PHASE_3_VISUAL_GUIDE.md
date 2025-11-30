@@ -103,7 +103,7 @@ This guide provides a detailed description of what each new component looks like
 │     │  Email   │      │  Phone   │      │ Location │       │
 │     │          │      │          │      │          │       │
 │     │ support@ │      │+1 (555)  │      │San Fran- │       │
-│     │bookora.  │      │123-4567  │      │cisco, CA │       │
+│     │bookbloom.│      │123-4567  │      │cisco, CA │       │
 │     │  com     │      │          │      │          │       │
 │     └──────────┘      └──────────┘      └──────────┘       │
 │                                                              │
@@ -583,7 +583,7 @@ Book Context:  [💬 The Great Gatsby - $12]
 
 ---
 
-This visual guide helps developers and designers understand the exact layout and styling of each new Phase 3 component. All components follow the established BookOra design system with consistent colors, spacing, and interaction patterns.
+This visual guide helps developers and designers understand the exact layout and styling of each new Phase 3 component. All components follow the established BookBloom design system with consistent colors, spacing, and interaction patterns.
 
 **Last Updated**: November 14, 2025  
 **Components Documented**: 3 new + 2 updated  

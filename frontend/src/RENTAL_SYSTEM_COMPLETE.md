@@ -512,4 +512,4 @@ User Dashboard
 
 **Last Updated:** November 13, 2024  
 **Version:** 1.0.0  
-**System:** BookOra Rental System
+**System:** BookBloom Rental System

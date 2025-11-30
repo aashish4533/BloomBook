@@ -52,8 +52,8 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === tab.id
-                    ? 'bg-[#C4A672] text-white'
-                    : 'text-white/70 hover:bg-white/10 hover:text-white'
+                  ? 'bg-[#C4A672] text-white'
+                  : 'text-white/70 hover:bg-white/10 hover:text-white'
                   }`}
               >
                 <Icon className="w-5 h-5" />
@@ -71,7 +71,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
             </div>
             <div>
               <p className="text-sm">Admin User</p>
-              <p className="text-xs text-white/70">admin@bookora.com</p>
+              <p className="text-xs text-white/70">admin@bookbloom.com</p>
             </div>
           </div>
           <Button
