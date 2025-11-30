@@ -1,36 +1,33 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, connectAuthEmulator, GoogleAuthProvider, FacebookAuthProvider } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getAuth, GoogleAuthProvider, FacebookAuthProvider } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage'; // Added getStorage for completeness
 
-// Dummy config for emulator (replace with real Firebase config for live)
+// ----------------------------------------------------
+// PASTE YOUR REAL CONFIGURATION OBJECT HERE:
+// Replace the contents of this object with the config you copied from the Firebase Console.
 const firebaseConfig = {
-  apiKey: "dummy-key",  // Real: from Firebase console
-  authDomain: "localhost",
-  projectId: "book-bloom-emulator",
-  storageBucket: "default-bucket",
-  messagingSenderId: "123456",
-  appId: "1:123456:web:abcdef"
+  apiKey: "AIzaSyDFRufOWCuGDKfKffacZXgQWdGG7RJzIQI",
+  authDomain: "bookbloom-5429e.firebaseapp.com",
+  databaseURL: "https://bookbloom-5429e-default-rtdb.firebaseio.com",
+  projectId: "bookbloom-5429e",
+  storageBucket: "bookbloom-5429e.firebasestorage.app",
+  messagingSenderId: "322581834006",
+  appId: "1:322581834006:web:979f691da2d0a2cd7d0837",
+  measurementId: "G-93D0YZERSQ"
 };
+// ----------------------------------------------------
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const storage = getStorage(app); // Initialize Storage
 
-// Connect to local emulators if running locally
-if (import.meta.env.DEV || window.location.hostname === 'localhost') {
-  try {
-    connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true }); 
-    connectFirestoreEmulator(db, '127.0.0.1', 8080); // Use 127.0.0.1 to avoid warnings
-    console.log('Connected to Firebase Emulators (Auth & Firestore)');
-  } catch (error) {
-    // Emulator already connected or connection failed
-    console.warn('Firebase emulator connection:', error);
-  }
-}
+// REMOVED: Emulator connection code. The app will now connect to the live project.
 
 // Providers for social login
 const googleProvider = new GoogleAuthProvider();
 const facebookProvider = new FacebookAuthProvider();
 
-export { auth, db, googleProvider, facebookProvider };
-// Export more later, e.g., export const db = getFirestore(app);
+// Export all necessary services
+export { auth, db, storage, googleProvider, facebookProvider };
