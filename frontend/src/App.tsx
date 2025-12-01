@@ -31,6 +31,7 @@ import { ErrorModal } from './components/ErrorModal';
 import { LoadingState } from './components/LoadingState';
 import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import { Toaster } from './components/ui/sonner';
 
 type PageType =
   | 'home'
@@ -64,6 +65,7 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState<PageType>('home');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [userRole, setUserRole] = useState<'user' | 'admin' | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [selectedCommunityId, setSelectedCommunityId] = useState<string | null>(null);
   const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
   const [chatContext, setChatContext] = useState<{
@@ -85,10 +87,11 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        // TODO: Fetch role from Firestore or user metadata if needed
-        setUserRole('user');  // Default to 'user'; adjust for 'admin' logic
+        setUserRole('user');
+        setCurrentUser(user);
       } else {
         setUserRole(null);
+        setCurrentUser(null);
       }
     });
     return () => unsubscribe();
@@ -110,7 +113,7 @@ export default function App() {
 
   const confirmLogout = () => {
     setUserRole(null);
-    setCurrentPage('login'); // Redirect to login page
+    setCurrentPage('login');
     setShowLogoutConfirm(false);
   };
 
@@ -173,8 +176,8 @@ export default function App() {
       <CreateCommunity
         onBack={() => setCurrentPage('communities-browse')}
         onSuccess={handleCommunityCreated}
-        userId="current-user-id"
-        userName="Current User"
+        userId={currentUser?.uid || ''}
+        userName={currentUser?.displayName || 'Anonymous'}
       />
     );
   }
@@ -190,7 +193,7 @@ export default function App() {
         }}
         isAdmin={false} // TODO: Check if user is admin
         isMember={true} // TODO: Check if user is member
-        userId="current-user-id"
+        userId={currentUser?.uid || ''}
       />
     );
   }
@@ -201,7 +204,7 @@ export default function App() {
         communityId={selectedCommunityId}
         communityName="Science Fiction Lovers" // TODO: Get from state
         onBack={() => setCurrentPage('community-detail')}
-        currentUserId="current-user-id"
+        currentUserId={currentUser?.uid || ''}
       />
     );
   }
@@ -212,7 +215,7 @@ export default function App() {
         otherUser={chatContext.otherUser}
         bookContext={chatContext.bookContext}
         onBack={() => setCurrentPage('marketplace')}
-        currentUserId="current-user-id"
+        currentUserId={currentUser?.uid || ''}
       />
     );
   }
@@ -548,6 +551,7 @@ export default function App() {
         onNavigateToSell={() => setCurrentPage('sell')}
         onNavigateToAnnouncements={() => setCurrentPage('announcements')}
       />
+      <Toaster />
     </div>
   );
 }

@@ -29,7 +29,18 @@ export function TransactionHistory() {
       setLoading(true);
       try {
         const snapshot = await getDocs(collection(db, 'transactions'));
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
+        const data = snapshot.docs.map(doc => {
+          const d = doc.data();
+          return {
+            id: doc.id,
+            type: d.type || 'buy',
+            bookTitle: d.bookTitle || 'Unknown Book',
+            user: d.user || d.userName || 'Unknown User',
+            amount: d.amount || d.price || 0,
+            date: d.date || d.createdAt?.toDate?.().toISOString() || new Date().toISOString(),
+            status: d.status || 'completed'
+          } as Transaction;
+        });
         setTransactions(data);
       } catch (err) {
         toast.error('Failed to fetch transactions');
@@ -43,7 +54,7 @@ export function TransactionHistory() {
 
   const filteredTransactions = transactions.filter(txn => {
     const matchesSearch = txn.bookTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         txn.user.toLowerCase().includes(searchQuery.toLowerCase());
+      txn.user.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesType = typeFilter === 'all' || txn.type === typeFilter;
     return matchesSearch && matchesType;
   });

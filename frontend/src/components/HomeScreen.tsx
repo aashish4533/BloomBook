@@ -7,15 +7,15 @@ import { AIRecommendations } from './AIRecommendations';
 import { Search, Bell } from 'lucide-react';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
-import { db, auth } from '../firebase';  // Adjust path
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { db, auth } from '../firebase';
+import { collection, query, where, orderBy, getDocs, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 
 interface Notification {
   id: string;
   title: string;
   message: string;
   timestamp: string;
-  type: 'info' | 'success';  // Add more types if needed
+  type: 'info' | 'success' | 'warning' | 'error';
   read: boolean;
 }
 
@@ -27,12 +27,12 @@ interface HomeScreenProps {
   isLoggedIn: boolean;
 }
 
-export function HomeScreen({ 
-  onNavigateToCommunities, 
+export function HomeScreen({
+  onNavigateToCommunities,
   onNavigateToBook,
   onNavigateToAnnouncements,
   onNavigateToSearch,
-  isLoggedIn 
+  isLoggedIn
 }: HomeScreenProps) {
   const [activeTab, setActiveTab] = useState<'buy' | 'sell' | 'rent'>('buy');
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,7 +41,7 @@ export function HomeScreen({
 
   useEffect(() => {
     if (!isLoggedIn || !user) return;
-    
+
     const fetchNotifications = async () => {
       const q = query(
         collection(db, 'notifications'),
@@ -49,7 +49,14 @@ export function HomeScreen({
         orderBy('timestamp', 'desc')
       );
       const snapshot = await getDocs(q);
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+      const data = snapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          ...d,
+          timestamp: d.timestamp?.toDate ? d.timestamp.toDate().toLocaleDateString() : d.timestamp
+        } as Notification;
+      });
       setNotifications(data);
     };
     fetchNotifications();
@@ -67,7 +74,7 @@ export function HomeScreen({
 
   const handleMarkAsRead = async (id: string) => {
     try {
-      await setDoc(doc(db, 'notifications', id), { read: true }, { merge: true });
+      await updateDoc(doc(db, 'notifications', id), { read: true });
       setNotifications(notifications.map(n => n.id === id ? { ...n, read: true } : n));
     } catch (err) {
       console.error('Failed to mark as read');
@@ -78,10 +85,10 @@ export function HomeScreen({
     <div className="min-h-screen bg-gradient-to-b from-[#FAF8F3] to-white pb-20 md:pb-0">
       {/* Announcement Carousel - Top */}
       <AnnouncementCarousel onViewAll={onNavigateToAnnouncements} />
-      
+
       {/* Notification Carousel */}
       <div className="max-w-7xl mx-auto px-4 pt-4">
-        <NotificationCarousel 
+        <NotificationCarousel
           notifications={notifications}
           onDismiss={handleDismissNotification}
           onMarkAsRead={handleMarkAsRead}
@@ -90,7 +97,7 @@ export function HomeScreen({
 
       {/* Search Section */}
       <div className="max-w-7xl mx-auto px-4 py-6">
-        <div 
+        <div
           className="relative cursor-pointer shadow-subtle rounded-lg transition-smooth hover:shadow-card"
           onClick={onNavigateToSearch}
         >
@@ -125,7 +132,7 @@ export function HomeScreen({
           </Button>
         </div>
       </div>
-      
+
       {/* AI Recommendations */}
       <div className="max-w-7xl mx-auto px-4">
         <AIRecommendations context="home" onBookClick={onNavigateToBook} />

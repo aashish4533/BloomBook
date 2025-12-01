@@ -1,4 +1,3 @@
-// Updated src/components/User/DeleteAccountModal.tsx
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { Input } from '../ui/input';
@@ -6,8 +5,9 @@ import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 import { Checkbox } from '../ui/checkbox';
 import { AlertCircle } from 'lucide-react';
-import { auth } from '../../firebase';
+import { auth, db } from '../../firebase';
 import { deleteUser } from 'firebase/auth';
+import { doc, deleteDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
 
 interface DeleteAccountModalProps {
@@ -26,10 +26,15 @@ export function DeleteAccountModal({ onClose }: DeleteAccountModalProps) {
         const user = auth.currentUser;
         if (!user) throw new Error('No user logged in');
 
+        // Delete user data from Firestore
+        await deleteDoc(doc(db, 'users', user.uid));
+
+        // Delete Auth user
         await deleteUser(user);
+
         toast.success('Account deleted successfully');
         onClose();
-        // Redirect to login or home
+        // Redirect to login or home handled by auth state change in App.tsx
       } catch (err: any) {
         if (err.code === 'auth/requires-recent-login') {
           toast.error('Please log out and log in again to delete account');

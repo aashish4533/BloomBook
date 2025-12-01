@@ -4,63 +4,47 @@ import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
+import { db, auth } from '../firebase';
+import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, deleteDoc, writeBatch, Timestamp } from 'firebase/firestore';
+import { toast } from 'sonner';
 
 interface Notification {
   id: string;
   type: 'order' | 'message' | 'community' | 'system';
   title: string;
   message: string;
-  timestamp: string;
+  timestamp: any;
   read: boolean;
   icon?: string;
 }
 
 export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: '1',
-      type: 'order',
-      title: 'Order Shipped',
-      message: 'Your order #TXN123456 has been shipped and is on the way!',
-      timestamp: '5 minutes ago',
-      read: false
-    },
-    {
-      id: '2',
-      type: 'message',
-      title: 'New Message',
-      message: 'Sarah Johnson sent you a message about "Dune"',
-      timestamp: '1 hour ago',
-      read: false
-    },
-    {
-      id: '3',
-      type: 'community',
-      title: 'New Post in Science Fiction Lovers',
-      message: 'John posted: "Just finished reading Foundation..."',
-      timestamp: '2 hours ago',
-      read: false
-    },
-    {
-      id: '4',
-      type: 'system',
-      title: 'Price Drop Alert',
-      message: 'A book in your wishlist is now 20% off!',
-      timestamp: '1 day ago',
-      read: true
-    },
-    {
-      id: '5',
-      type: 'order',
-      title: 'Rental Reminder',
-      message: 'Your rental of "The Hobbit" is due in 3 days',
-      timestamp: '1 day ago',
-      read: true
-    }
-  ]);
-
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const user = auth.currentUser;
+
+  useEffect(() => {
+    if (!user) return;
+
+    const q = query(
+      collection(db, 'notifications'),
+      where('userId', '==', user.uid),
+      orderBy('timestamp', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Notification[];
+      setNotifications(data);
+    }, (error) => {
+      console.error("Error fetching notifications:", error);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -75,22 +59,71 @@ export function NotificationBell() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const markAsRead = (id: string) => {
-    setNotifications(notifications.map(n => 
-      n.id === id ? { ...n, read: true } : n
-    ));
+  const formatTimestamp = (timestamp: any) => {
+    if (!timestamp) return '';
+
+    const date = timestamp instanceof Timestamp ? timestamp.toDate() : new Date(timestamp);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (diffInSeconds < 60) return 'Just now';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
+    return date.toLocaleDateString();
   };
 
-  const markAllAsRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, read: true })));
+  const markAsRead = async (id: string) => {
+    try {
+      const notificationRef = doc(db, 'notifications', id);
+      await updateDoc(notificationRef, { read: true });
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      toast.error('Failed to update notification');
+    }
   };
 
-  const deleteNotification = (id: string) => {
-    setNotifications(notifications.filter(n => n.id !== id));
+  const markAllAsRead = async () => {
+    try {
+      const batch = writeBatch(db);
+      const unreadNotifications = notifications.filter(n => !n.read);
+
+      unreadNotifications.forEach(n => {
+        const ref = doc(db, 'notifications', n.id);
+        batch.update(ref, { read: true });
+      });
+
+      await batch.commit();
+      toast.success('All notifications marked as read');
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+      toast.error('Failed to update notifications');
+    }
   };
 
-  const clearAll = () => {
-    setNotifications([]);
+  const deleteNotification = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'notifications', id));
+      toast.success('Notification removed');
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      toast.error('Failed to delete notification');
+    }
+  };
+
+  const clearAll = async () => {
+    try {
+      const batch = writeBatch(db);
+      notifications.forEach(n => {
+        const ref = doc(db, 'notifications', n.id);
+        batch.delete(ref);
+      });
+      await batch.commit();
+      toast.success('All notifications cleared');
+    } catch (error) {
+      console.error('Error clearing notifications:', error);
+      toast.error('Failed to clear notifications');
+    }
   };
 
   const getNotificationColor = (type: string) => {
@@ -162,9 +195,8 @@ export function NotificationBell() {
                   {notifications.map((notification) => (
                     <div
                       key={notification.id}
-                      className={`p-4 hover:bg-gray-50 transition-colors ${
-                        !notification.read ? 'bg-blue-50/50' : ''
-                      }`}
+                      className={`p-4 hover:bg-gray-50 transition-colors ${!notification.read ? 'bg-blue-50/50' : ''
+                        }`}
                     >
                       <div className="flex gap-3">
                         {/* Icon */}
@@ -183,11 +215,11 @@ export function NotificationBell() {
                               <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-1" />
                             )}
                           </div>
-                          <p className="text-sm text-gray-600 mb-2 line-clamp-2">
+                          <p className="text-sm text-gray-600 mb-2">
                             {notification.message}
                           </p>
                           <div className="flex items-center justify-between">
-                            <p className="text-xs text-gray-500">{notification.timestamp}</p>
+                            <p className="text-xs text-gray-500">{formatTimestamp(notification.timestamp)}</p>
                             <div className="flex items-center gap-1">
                               {!notification.read && (
                                 <button

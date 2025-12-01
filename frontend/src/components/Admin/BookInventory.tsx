@@ -32,7 +32,20 @@ export function BookInventory() {
       setLoading(true);
       try {
         const snapshot = await getDocs(collection(db, 'books'));
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BookItem));
+        const data = snapshot.docs.map(doc => {
+          const d = doc.data();
+          return {
+            id: doc.id,
+            isbn: d.isbn || 'N/A',
+            title: d.title || 'Untitled',
+            author: d.author || 'Unknown',
+            condition: d.condition || 'Good',
+            category: d.category || 'Uncategorized',
+            price: d.price || 0,
+            status: d.status || 'available',
+            listedDate: d.listedDate || new Date().toISOString()
+          } as BookItem;
+        });
         setBooks(data);
       } catch (err) {
         toast.error('Failed to fetch books');

@@ -1,13 +1,36 @@
 import { useState } from 'react';
-import { Book } from './BookMarketplace';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { Avatar, AvatarFallback } from './ui/avatar';
-import { ImageWithFallback } from './figma/ImageWithFallback';
-import { Star, ShoppingCart, MessageCircle, MapPin, Package, Book as BookIcon, Calendar, Languages, FileText, Navigation, AlertCircle } from 'lucide-react';
 import { Separator } from './ui/separator';
+import { Avatar, AvatarFallback } from './ui/avatar';
+import { Book as BookIcon, Calendar, FileText, Languages, Package, Star, MapPin, Navigation, ShoppingCart, MessageCircle } from 'lucide-react';
+import { ImageWithFallback } from './ImageWithFallback';
 import { PurchaseConfirmation } from './PurchaseConfirmation';
+import { db, auth } from '../firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { toast } from 'sonner';
+
+interface Book {
+  id: string;
+  title: string;
+  author: string;
+  price: number;
+  condition: 'New' | 'Like New' | 'Good' | 'Fair' | 'Poor';
+  images: string[];
+  category: string;
+  publishedYear: number;
+  pages: number;
+  language: string;
+  isbn: string;
+  description: string;
+  seller: {
+    name: string;
+    avatar: string;
+    rating: number;
+    totalSales: number;
+  };
+}
 
 interface BookDetailModalProps {
   book: Book;
@@ -57,9 +80,6 @@ export function BookDetailModal({ book, onClose }: BookDetailModalProps) {
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl text-[#2C3E50]">{book.title}</DialogTitle>
-          <DialogDescription className="text-sm text-gray-500">
-            Explore the details of the book and make your purchase decision.
-          </DialogDescription>
           <DialogDescription className="text-sm text-gray-500">
             Explore the details of the book and make your purchase decision.
           </DialogDescription>
@@ -224,56 +244,105 @@ export function BookDetailModal({ book, onClose }: BookDetailModalProps) {
 
         {/* Negotiate Price Dialog */}
         {showNegotiate && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center p-4 z-10">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full">
-              <h3 className="text-[#2C3E50] mb-4">Negotiate Price</h3>
-              <p className="text-gray-600 text-sm mb-4">
-                Current asking price: ${book.price.toFixed(2)}
-              </p>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm text-gray-700 block mb-2">Your Offer</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      className="w-full pl-7 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#C4A672] focus:border-[#C4A672]"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm text-gray-700 block mb-2">Message (Optional)</label>
-                  <textarea
-                    rows={3}
-                    placeholder="Add a message to the seller..."
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#C4A672] focus:border-[#C4A672]"
-                  />
-                </div>
-                <div className="flex gap-3">
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowNegotiate(false)}
-                    className="flex-1"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      alert('Offer sent to seller!');
-                      setShowNegotiate(false);
-                    }}
-                    className="flex-1 bg-[#C4A672] hover:bg-[#8B7355] text-white"
-                  >
-                    Send Offer
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
+          <NegotiateDialog
+            book={book}
+            onClose={() => setShowNegotiate(false)}
+          />
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function NegotiateDialog({ book, onClose }: { book: Book; onClose: () => void }) {
+  const [offerPrice, setOfferPrice] = useState('');
+  const [message, setMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!offerPrice) return;
+
+    setIsSubmitting(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        toast.error('Please log in to negotiate');
+        return;
+      }
+
+      await addDoc(collection(db, 'negotiations'), {
+        buyerId: user.uid,
+        buyerName: user.displayName || 'Anonymous',
+        bookId: book.id,
+        bookTitle: book.title,
+        sellerName: book.seller.name, // In real app, use sellerId
+        offerPrice: parseFloat(offerPrice),
+        message: message,
+        status: 'pending',
+        createdAt: serverTimestamp()
+      });
+
+      toast.success('Offer sent to seller!');
+      onClose();
+    } catch (error) {
+      console.error('Error sending offer:', error);
+      toast.error('Failed to send offer');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full">
+        <h3 className="text-[#2C3E50] mb-4">Negotiate Price</h3>
+        <p className="text-gray-600 text-sm mb-4">
+          Current asking price: ${book.price.toFixed(2)}
+        </p>
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm text-gray-700 block mb-2">Your Offer</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+              <input
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={offerPrice}
+                onChange={(e) => setOfferPrice(e.target.value)}
+                className="w-full pl-7 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#C4A672] focus:border-[#C4A672]"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-sm text-gray-700 block mb-2">Message (Optional)</label>
+            <textarea
+              rows={3}
+              placeholder="Add a message to the seller..."
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#C4A672] focus:border-[#C4A672]"
+            />
+          </div>
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={onClose}
+              className="flex-1"
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={!offerPrice || isSubmitting}
+              className="flex-1 bg-[#C4A672] hover:bg-[#8B7355] text-white"
+            >
+              {isSubmitting ? 'Sending...' : 'Send Offer'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

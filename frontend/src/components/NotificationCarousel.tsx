@@ -7,7 +7,7 @@ interface Notification {
   title: string;
   message: string;
   timestamp: string;
-  type: 'info' | 'success' | 'warning' | 'error';
+  type: 'info' | 'success' | 'warning' | 'error' | 'order' | 'message' | 'community' | 'system';
   read: boolean;
 }
 
@@ -40,6 +40,14 @@ export function NotificationCarousel({ notifications, onDismiss, onMarkAsRead }:
         return 'bg-yellow-50 border-yellow-200';
       case 'error':
         return 'bg-red-50 border-red-200';
+      case 'order':
+        return 'bg-green-50 border-green-200';
+      case 'message':
+        return 'bg-blue-50 border-blue-200';
+      case 'community':
+        return 'bg-purple-50 border-purple-200';
+      case 'system':
+        return 'bg-orange-50 border-orange-200';
       default:
         return 'bg-blue-50 border-blue-200';
     }
@@ -121,11 +129,10 @@ export function NotificationCarousel({ notifications, onDismiss, onMarkAsRead }:
               <button
                 key={index}
                 onClick={() => setCurrentIndex(index)}
-                className={`h-2 rounded-full transition-all ${
-                  index === currentIndex
+                className={`h-2 rounded-full transition-all ${index === currentIndex
                     ? 'w-6 bg-blue-600'
                     : 'w-2 bg-gray-300 hover:bg-gray-400'
-                }`}
+                  }`}
                 aria-label={`Go to notification ${index + 1}`}
               />
             ))}

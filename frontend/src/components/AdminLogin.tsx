@@ -1,4 +1,3 @@
-// Updated src/components/AdminLogin.tsx
 import { useState } from 'react';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
@@ -22,6 +21,7 @@ export function AdminLogin({ onLogin, onBack }: AdminLoginProps) {
   const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [generatedOTP, setGeneratedOTP] = useState('');
 
   const handleInitialLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,24 +44,48 @@ export function AdminLogin({ onLogin, onBack }: AdminLoginProps) {
     if (Object.keys(newErrors).length === 0) {
       setIsLoading(true);
       try {
-        await signInWithEmailAndPassword(auth, email, password);
-        // Assume admin check here (e.g., custom claim)
-        setShowTwoFactor(true);
-      } catch (err: any) {
-        if (err.code === 'auth/wrong-password') {
-          setErrors({ password: 'Incorrect password' });
-        } else if (err.code === 'auth/user-not-found') {
-          setErrors({ email: 'User not found' });
-        } else {
-          toast.error('Login failed');
+        // Simulate backend validation against credentials.json
+        // In a real app, this would be a secure API call
+        const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
+        const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD;
+
+        if (email !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) {
+          throw new Error('Invalid admin credentials');
         }
-      } finally {
+
+        try {
+          await signInWithEmailAndPassword(auth, email, password);
+        } catch (error: any) {
+          // If user not found but credentials match hardcoded admin, create the user
+          if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+            try {
+              const { createUserWithEmailAndPassword } = await import('firebase/auth');
+              await createUserWithEmailAndPassword(auth, email, password);
+            } catch (createError: any) {
+              // If creation fails, throw original error
+              throw error;
+            }
+          } else {
+            throw error;
+          }
+        }
+
+        // Success - Generate OTP and show 2FA
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        setGeneratedOTP(code);
+        setShowTwoFactor(true);
         setIsLoading(false);
+        toast.success('Please verify your identity');
+
+      } catch (error: any) {
+        setIsLoading(false);
+        toast.error(error.message);
+        setErrors({ ...newErrors, form: error.message });
       }
     }
   };
 
-  const handleTwoFactorSubmit = (e: React.FormEvent) => {
+  const handleTwoFactorSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: { [key: string]: string } = {};
 
@@ -69,16 +93,19 @@ export function AdminLogin({ onLogin, onBack }: AdminLoginProps) {
       newErrors.twoFactorCode = '2FA code is required';
     } else if (twoFactorCode.length !== 6) {
       newErrors.twoFactorCode = 'Code must be 6 digits';
+    } else if (twoFactorCode !== generatedOTP) {
+      newErrors.twoFactorCode = 'Invalid OTP code';
     }
 
     setErrors(newErrors);
 
     if (Object.keys(newErrors).length === 0) {
       setIsLoading(true);
-      // Simulate 2FA verification (in real, use your 2FA provider)
+      // Simulate 2FA verification
       setTimeout(() => {
         setIsLoading(false);
         onLogin();
+        toast.success('Admin login successful');
       }, 1000);
     }
   };
@@ -194,7 +221,13 @@ export function AdminLogin({ onLogin, onBack }: AdminLoginProps) {
             <form onSubmit={handleTwoFactorSubmit} className="space-y-6">
               <div>
                 <h2 className="text-[#2C3E50] text-2xl mb-2">Two-Factor Authentication</h2>
-                <p className="text-gray-600 text-sm">Enter the 6-digit code from your authenticator app</p>
+                <p className="text-gray-600 text-sm mb-4">Enter the 6-digit code sent to your email</p>
+
+                {/* DEMO ONLY: Display OTP for testing */}
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-6 text-center">
+                  <p className="text-xs text-yellow-800 uppercase font-bold mb-1">Demo Mode: Your OTP Code</p>
+                  <p className="text-3xl font-mono tracking-widest text-[#2C3E50]">{generatedOTP}</p>
+                </div>
               </div>
 
               {/* 2FA Code */}

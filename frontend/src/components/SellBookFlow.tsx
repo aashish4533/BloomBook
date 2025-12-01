@@ -56,7 +56,7 @@ export function SellBookFlow({ onClose }: SellBookFlowProps) {
     pages: '',
     images: []
   });
-  
+
   const [locationData, setLocationData] = useState<LocationData>({
     method: 'both',
     address: '',
@@ -90,34 +90,49 @@ export function SellBookFlow({ onClose }: SellBookFlowProps) {
 
     try {
       // 1. Sanitize Location Data (remove undefined fields)
-      const cleanLocation = { ...locationData };
-      if (!cleanLocation.coordinates) {
-        delete cleanLocation.coordinates;
+      const cleanLocation = Object.fromEntries(
+        Object.entries(locationData).filter(([_, v]) => v !== undefined)
+      );
+
+      if (locationData.coordinates) {
+        // Ensure coordinates are numbers
+        cleanLocation.coordinates = {
+          lat: Number(locationData.coordinates.lat),
+          lng: Number(locationData.coordinates.lng)
+        };
       }
 
       // 2. Validate Numeric Data
       const price = parseFloat(bookData.price);
-      if (isNaN(price)) {
-        throw new Error("Invalid price. Please enter a valid number.");
+      if (isNaN(price) || price <= 0) {
+        throw new Error("Invalid price. Please enter a valid number greater than 0.");
       }
+
+      const pages = parseInt(bookData.pages);
+      const publishedYear = parseInt(bookData.publishedYear);
 
       const listingData = {
         ...bookData,
         price: price,
-        pages: parseInt(bookData.pages) || 0,
-        publishedYear: parseInt(bookData.publishedYear) || 0,
+        pages: isNaN(pages) ? 0 : pages,
+        publishedYear: isNaN(publishedYear) ? 0 : publishedYear,
         location: cleanLocation,
         userId: user.uid,
-        sellerName: user.displayName || 'Anonymous', 
+        sellerName: user.displayName || 'Anonymous',
         type: 'sell',
         status: 'active',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
 
+      // Remove any top-level undefined values just in case
+      Object.keys(listingData).forEach(key =>
+        (listingData as any)[key] === undefined && delete (listingData as any)[key]
+      );
+
       // 3. Submit to Firestore
       await addDoc(collection(db, 'books'), listingData);
-      
+
       toast.success('Listing created successfully!');
       setCurrentStep(4);
     } catch (err: any) {
@@ -161,11 +176,10 @@ export function SellBookFlow({ onClose }: SellBookFlowProps) {
               {[1, 2, 3].map((step) => (
                 <div key={step} className="flex-1">
                   <div
-                    className={`h-2 rounded-full transition-colors ${
-                      step <= currentStep
+                    className={`h-2 rounded-full transition-colors ${step <= currentStep
                         ? 'bg-[#C4A672]'
                         : 'bg-gray-200'
-                    }`}
+                      }`}
                   />
                 </div>
               ))}

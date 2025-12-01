@@ -30,7 +30,19 @@ export function RentalManagement() {
       setLoading(true);
       try {
         const snapshot = await getDocs(collection(db, 'rentals'));
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Rental));
+        const data = snapshot.docs.map(doc => {
+          const d = doc.data();
+          return {
+            id: doc.id,
+            bookTitle: d.bookTitle || 'Unknown Book',
+            renterName: d.renterName || 'Unknown Renter',
+            renterEmail: d.renterEmail || 'No Email',
+            startDate: d.startDate || new Date().toISOString(),
+            dueDate: d.dueDate || new Date().toISOString(),
+            status: d.status || 'pending',
+            rentalPrice: d.rentalPrice || d.price || 0
+          } as Rental;
+        });
         setRentals(data);
       } catch (err) {
         toast.error('Failed to fetch rentals');
@@ -44,7 +56,7 @@ export function RentalManagement() {
 
   const filteredRentals = rentals.filter(rental => {
     const matchesSearch = rental.bookTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         rental.renterName.toLowerCase().includes(searchQuery.toLowerCase());
+      rental.renterName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || rental.status === statusFilter;
     return matchesSearch && matchesStatus;
   });

@@ -4,8 +4,9 @@ import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
 import { Eye, EyeOff, Mail, Lock, Home, CheckCircle2 } from 'lucide-react';
-import { auth, googleProvider } from '../firebase';  // Import from firebase.ts
+import { auth, googleProvider, db } from '../firebase';  // Import from firebase.ts
 import { createUserWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 
 interface SignUpFormProps {
   onSwitchToLogin: () => void;
@@ -56,10 +57,23 @@ export function SignUpForm({ onSwitchToLogin, onSignUp }: SignUpFormProps) {
     setServerError(null);
     if (validateForm()) {
       try {
-        await createUserWithEmailAndPassword(auth, email, password);
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+
+        // Create user document in Firestore
+        await setDoc(doc(db, 'users', user.uid), {
+          email: user.email,
+          displayName: email.split('@')[0], // Default display name from email
+          photoURL: 'https://ui-avatars.com/api/?name=' + email.split('@')[0], // Default avatar
+          role: 'user',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+
         console.log('Signup successful');
         if (onSignUp) onSignUp();
       } catch (err: any) {
+        console.error("Signup error:", err);
         setServerError(err.message || 'Signup failed. Please try again.');
       }
     }
@@ -68,10 +82,29 @@ export function SignUpForm({ onSwitchToLogin, onSignUp }: SignUpFormProps) {
   const handleGoogleSignUp = async () => {
     setServerError(null);
     try {
-      await signInWithPopup(auth, googleProvider);
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+
+      // Check if user document exists
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userDocRef);
+
+      if (!userDoc.exists()) {
+        // Create new user document
+        await setDoc(userDocRef, {
+          email: user.email,
+          displayName: user.displayName || user.email?.split('@')[0] || 'User',
+          photoURL: user.photoURL || 'https://ui-avatars.com/api/?name=User',
+          role: 'user',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+      }
+
       console.log('Google signup successful');
       if (onSignUp) onSignUp();
     } catch (err: any) {
+      console.error("Google signup error:", err);
       setServerError(err.message || 'Google signup failed.');
     }
   };

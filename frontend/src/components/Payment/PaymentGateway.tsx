@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import { CreditCard, Lock, ShieldCheck, Check, AlertCircle, X } from 'lucide-react';
+import { toast } from 'sonner';
+import { db, auth } from '../../firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Card } from '../ui/card';
@@ -20,7 +23,7 @@ export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel }:
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [transactionId, setTransactionId] = useState('');
-  
+
   // Card details
   const [cardNumber, setCardNumber] = useState('');
   const [cardName, setCardName] = useState('');
@@ -75,12 +78,77 @@ export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel }:
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validation
+    if (paymentMethod === 'card') {
+      if (!cardNumber || cardNumber.replace(/\s/g, '').length < 16) {
+        toast.error('Please enter a valid 16-digit card number');
+        return;
+      }
+      if (!cardName.trim()) {
+        toast.error('Please enter the cardholder name');
+        return;
+      }
+      if (!expiryDate || !/^\d{2}\/\d{2}$/.test(expiryDate)) {
+        toast.error('Please enter a valid expiry date (MM/YY)');
+        return;
+      }
+      // Check if expiry date is in the future
+      const [expMonth, expYear] = expiryDate.split('/').map(Number);
+      const now = new Date();
+      const currentYear = parseInt(now.getFullYear().toString().slice(-2));
+      const currentMonth = now.getMonth() + 1;
+
+      if (expYear < currentYear || (expYear === currentYear && expMonth < currentMonth)) {
+        toast.error('Card has expired');
+        return;
+      }
+
+      if (!cvv || cvv.length < 3) {
+        toast.error('Please enter a valid CVV');
+        return;
+      }
+    }
+
     setIsProcessing(true);
 
     // Simulate payment processing
-    setTimeout(() => {
+    setTimeout(async () => {
       const txId = 'TXN' + Math.random().toString(36).substr(2, 9).toUpperCase();
       setTransactionId(txId);
+
+      // Save purchase to Firestore
+      try {
+        const user = auth.currentUser;
+        if (user) {
+          const purchaseRef = await addDoc(collection(db, 'purchases'), {
+            userId: user.uid,
+            bookTitle: itemTitle,
+            price: amount,
+            date: new Date().toISOString(),
+            status: 'completed',
+            transactionId: txId,
+            type: type,
+            createdAt: serverTimestamp()
+          });
+
+          // Also save to transactions collection for Admin Dashboard
+          await addDoc(collection(db, 'transactions'), {
+            type: type === 'rent' ? 'rent' : 'buy', // Map 'tuition' to 'buy' or handle separately if needed
+            bookTitle: itemTitle,
+            user: user.displayName || user.email || 'Unknown User',
+            amount: amount,
+            date: new Date().toISOString(),
+            status: 'completed',
+            relatedId: purchaseRef.id,
+            createdAt: serverTimestamp()
+          });
+        }
+      } catch (error) {
+        console.error("Error saving purchase:", error);
+        // We don't block success UI if saving history fails, but we log it
+      }
+
       setIsProcessing(false);
       setShowSuccess(true);
     }, 2000);
@@ -99,7 +167,7 @@ export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel }:
           </div>
           <h2 className="text-[#2C3E50] text-2xl mb-2">Payment Successful!</h2>
           <p className="text-gray-600 mb-6">Your transaction has been completed</p>
-          
+
           <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
             <div className="flex justify-between mb-2">
               <span className="text-gray-600">Transaction ID:</span>
@@ -178,9 +246,8 @@ export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel }:
             <Label className="mb-3 block">Select Payment Method</Label>
             <RadioGroup value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as 'card' | 'paypal')}>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-                  paymentMethod === 'card' ? 'border-[#C4A672] bg-[#C4A672]/5' : 'border-gray-200'
-                }`}>
+                <div className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${paymentMethod === 'card' ? 'border-[#C4A672] bg-[#C4A672]/5' : 'border-gray-200'
+                  }`}>
                   <RadioGroupItem value="card" id="card" className="sr-only" />
                   <label htmlFor="card" className="flex items-center gap-3 cursor-pointer">
                     <CreditCard className={`w-6 h-6 ${paymentMethod === 'card' ? 'text-[#C4A672]' : 'text-gray-400'}`} />
@@ -188,16 +255,15 @@ export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel }:
                       <p className="text-[#2C3E50]">Credit/Debit Card</p>
                       <p className="text-xs text-gray-500">Visa, Mastercard, Amex</p>
                     </div>
-                    <img 
-                      src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='25' viewBox='0 0 40 25'%3E%3Crect fill='%236772E5' width='40' height='25' rx='3'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-family='Arial' font-size='10' font-weight='bold'%3EStripe%3C/text%3E%3C/svg%3E" 
+                    <img
+                      src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='25' viewBox='0 0 40 25'%3E%3Crect fill='%236772E5' width='40' height='25' rx='3'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-family='Arial' font-size='10' font-weight='bold'%3EStripe%3C/text%3E%3C/svg%3E"
                       alt="Stripe"
                       className="h-6"
                     />
                   </label>
                 </div>
-                <div className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-                  paymentMethod === 'paypal' ? 'border-[#C4A672] bg-[#C4A672]/5' : 'border-gray-200'
-                }`}>
+                <div className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${paymentMethod === 'paypal' ? 'border-[#C4A672] bg-[#C4A672]/5' : 'border-gray-200'
+                  }`}>
                   <RadioGroupItem value="paypal" id="paypal" className="sr-only" />
                   <label htmlFor="paypal" className="flex items-center gap-3 cursor-pointer">
                     <div className="w-6 h-6 bg-[#0070BA] rounded flex items-center justify-center text-white text-xs">

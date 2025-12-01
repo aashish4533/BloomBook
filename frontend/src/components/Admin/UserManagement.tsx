@@ -1,9 +1,8 @@
-// Updated src/components/Admin/UserManagement.tsx
 import { useState, useEffect } from 'react';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Search, Download, Edit, Ban, MoreVertical, Eye, Mail } from 'lucide-react';
+import { Search, Edit, Ban, Shield } from 'lucide-react';
 import { UserEditModal } from './UserEditModal';
 import { db } from '../../firebase';
 import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
@@ -18,21 +17,35 @@ interface User {
   totalSales: number;
   joinedDate: string;
   location: string;
+  role: 'user' | 'admin';
 }
 
 export function UserManagement() {
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'banned' | 'suspended'>('all');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchUsers = async () => {
       setLoading(true);
       try {
         const snapshot = await getDocs(collection(db, 'users'));
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+        const data = snapshot.docs.map(doc => {
+          const d = doc.data();
+          return {
+            id: doc.id,
+            name: d.displayName || d.name || 'Unknown',
+            email: d.email || '',
+            status: d.status || 'active',
+            totalPurchases: d.totalPurchases || 0,
+            totalSales: d.totalSales || 0,
+            joinedDate: d.createdAt?.toDate ? d.createdAt.toDate().toISOString() : (d.joinedDate || new Date().toISOString()),
+            location: d.location || 'Unknown',
+            role: d.role || 'user'
+          } as User;
+        });
         setUsers(data);
       } catch (err) {
         toast.error('Failed to fetch users');
@@ -44,12 +57,29 @@ export function UserManagement() {
     fetchUsers();
   }, []);
 
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const handleBan = async (id: string) => {
+    if (confirm('Ban this user?')) {
+      try {
+        await updateDoc(doc(db, 'users', id), { status: 'banned' });
+        setUsers(prev => prev.map(u => u.id === id ? { ...u, status: 'banned' } : u));
+        toast.success('User banned');
+      } catch (err) {
+        toast.error('Failed to ban user');
+      }
+    }
+  };
+
+  const handleMakeAdmin = async (id: string) => {
+    if (confirm('Grant admin privileges to this user?')) {
+      try {
+        await updateDoc(doc(db, 'users', id), { role: 'admin' });
+        setUsers(prev => prev.map(u => u.id === id ? { ...u, role: 'admin' } : u));
+        toast.success('User promoted to admin');
+      } catch (err) {
+        toast.error('Failed to update user role');
+      }
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -64,17 +94,12 @@ export function UserManagement() {
     }
   };
 
-  const handleBan = async (id: string) => {
-    if (confirm('Ban this user?')) {
-      try {
-        await updateDoc(doc(db, 'users', id), { status: 'banned' });
-        setUsers(prev => prev.map(u => u.id === id ? { ...u, status: 'banned' } : u));
-        toast.success('User banned');
-      } catch (err) {
-        toast.error('Failed to ban user');
-      }
-    }
-  };
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   if (loading) return <div>Loading...</div>;
 
@@ -115,6 +140,7 @@ export function UserManagement() {
             <tr>
               <th className="px-6 py-4 text-left text-sm text-gray-600">User</th>
               <th className="px-6 py-4 text-left text-sm text-gray-600">Email</th>
+              <th className="px-6 py-4 text-left text-sm text-gray-600">Role</th>
               <th className="px-6 py-4 text-left text-sm text-gray-600">Status</th>
               <th className="px-6 py-4 text-left text-sm text-gray-600">Location</th>
               <th className="px-6 py-4 text-left text-sm text-gray-600">Activity</th>
@@ -137,6 +163,11 @@ export function UserManagement() {
                   </div>
                 </td>
                 <td className="px-6 py-4 text-gray-600">{user.email}</td>
+                <td className="px-6 py-4">
+                  <Badge variant={user.role === 'admin' ? 'default' : 'outline'} className={user.role === 'admin' ? 'bg-[#C4A672]' : ''}>
+                    {user.role === 'admin' ? 'Admin' : 'User'}
+                  </Badge>
+                </td>
                 <td className="px-6 py-4">
                   <Badge className={getStatusColor(user.status)}>
                     {user.status}
@@ -169,6 +200,17 @@ export function UserManagement() {
                     >
                       <Ban className="w-4 h-4" />
                     </Button>
+                    {user.role !== 'admin' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-[#C4A672] hover:text-[#8B7355]"
+                        onClick={() => handleMakeAdmin(user.id)}
+                        title="Make Admin"
+                      >
+                        <Shield className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
                 </td>
               </tr>
