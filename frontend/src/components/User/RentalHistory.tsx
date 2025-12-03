@@ -1,11 +1,10 @@
-// Updated src/components/User/RentalHistory.tsx
-import { useState, useEffect } from 'react';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Calendar, RefreshCw } from 'lucide-react';
 import { db, auth } from '../../firebase';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-import { toast } from 'sonner';
+import { collection, query, where, orderBy } from 'firebase/firestore';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { useCollection } from 'react-firebase-hooks/firestore';
 
 interface Rental {
   id: string;
@@ -18,38 +17,17 @@ interface Rental {
 }
 
 export function RentalHistory() {
-  const [rentals, setRentals] = useState<Rental[]>([]);
-  const [loading, setLoading] = useState(true);
-  const user = auth.currentUser;
+  const [user, loadingUser] = useAuthState(auth);
+  const [rentalsSnapshot, loadingRentals, error] = useCollection(
+    user ? query(collection(db, 'rentals'), where('renterId', '==', user.uid), orderBy('startDate', 'desc')) : null
+  );
 
-  useEffect(() => {
-    if (!user) return;
+  if (loadingUser || loadingRentals) return <div>Loading...</div>;
+  if (error) return <div>Error: {error.message}</div>;
 
-    const fetchRentals = async () => {
-      setLoading(true);
-      try {
-        const q = query(
-          collection(db, 'rentals'),
-          where('renterId', '==', user.uid),
-          orderBy('startDate', 'desc')
-        );
-        const snapshot = await getDocs(q);
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Rental));
-        setRentals(data);
-      } catch (err) {
-        toast.error('Failed to fetch rentals');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchRentals();
-  }, [user]);
-
+  const rentals = rentalsSnapshot?.docs.map(doc => ({ id: doc.id, ...doc.data() } as Rental)) || [];
   const activeRentals = rentals.filter(r => r.status === 'active');
   const pastRentals = rentals.filter(r => r.status !== 'active');
-
-  if (loading) return <div>Loading...</div>;
 
   return (
     <div className="space-y-6">

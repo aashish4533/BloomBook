@@ -4,8 +4,9 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { ChatMessage } from '../Chat/ChatMessage';
 import { toast } from 'sonner';
-import { db } from '../../firebase';
+import { db, storage } from '../../firebase';
 import { collection, addDoc, onSnapshot, query, orderBy, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 interface Message {
   id: string;
@@ -38,7 +39,7 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
   const [messages, setMessages] = useState<Message[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [selectedImages, setSelectedImages] = useState<{ file: File; preview: string }[]>([]);
   const [showMembers, setShowMembers] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -89,12 +90,22 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
     if (!newMessage.trim() && selectedImages.length === 0) return;
 
     try {
+      const imageUrls: string[] = [];
+
+      // Upload images
+      for (const img of selectedImages) {
+        const storageRef = ref(storage, `community-chat-images/${communityId}/${Date.now()}-${img.file.name}`);
+        const snapshot = await uploadBytes(storageRef, img.file);
+        const url = await getDownloadURL(snapshot.ref);
+        imageUrls.push(url);
+      }
+
       await addDoc(collection(db, 'communities', communityId, 'messages'), {
         senderId: currentUserId,
         senderName: 'You',
         senderAvatar: 'ME',
         content: newMessage,
-        images: selectedImages.length > 0 ? selectedImages : undefined,
+        images: imageUrls.length > 0 ? imageUrls : undefined,
         timestamp: serverTimestamp(),
       });
       setNewMessage('');
@@ -114,18 +125,15 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    
+
     files.forEach(file => {
       if (file.size > 5 * 1024 * 1024) {
         toast.error('Image size must be less than 5MB');
         return;
       }
 
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setSelectedImages(prev => [...prev, reader.result as string]);
-      };
-      reader.readAsDataURL(file);
+      const preview = URL.createObjectURL(file);
+      setSelectedImages(prev => [...prev, { file, preview }]);
     });
   };
 
@@ -212,7 +220,7 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
               <div className="max-w-3xl mx-auto flex gap-2 overflow-x-auto">
                 {selectedImages.map((img, index) => (
                   <div key={index} className="relative flex-shrink-0">
-                    <img src={img} alt="Preview" className="w-20 h-20 object-cover rounded-lg" />
+                    <img src={img.preview} alt="Preview" className="w-20 h-20 object-cover rounded-lg" />
                     <button
                       onClick={() => removeImage(index)}
                       className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center"

@@ -19,18 +19,24 @@ import {
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import { db, auth } from '../../firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
+import { useOutletContext, useNavigate } from 'react-router-dom';
+import { useDocument } from 'react-firebase-hooks/firestore';
 
-interface UserProfileProps {
-  onNavigateToAdminLogin?: () => void;
-  onPasswordChangeSuccess?: () => void;
-}
-
-export function UserProfile({ onNavigateToAdminLogin, onPasswordChangeSuccess }: UserProfileProps = {}) {
+export function UserProfile() {
   const [isEditing, setIsEditing] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
   const [showAdminSwitchConfirm, setShowAdminSwitchConfirm] = useState(false);
+
+  const user = auth.currentUser;
+  const [value, loading, error] = useDocument(
+    user ? doc(db, 'users', user.uid) : null,
+    {
+      snapshotListenOptions: { includeMetadataChanges: true },
+    }
+  );
+
   const [profile, setProfile] = useState({
     name: '',
     email: '',
@@ -41,34 +47,30 @@ export function UserProfile({ onNavigateToAdminLogin, onPasswordChangeSuccess }:
     zipCode: '',
     paymentMethod: ''
   });
-  const [loading, setLoading] = useState(true);
-  const user = auth.currentUser;
+
+  const { onPasswordChangeSuccess } = useOutletContext<{ onPasswordChangeSuccess: () => void }>() || {};
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      if (!user) return;
-
-      setLoading(true);
-      try {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          setProfile(userDoc.data());
-        }
-      } catch (err) {
-        toast.error('Failed to fetch profile');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProfile();
-  }, [user]);
+    if (value && value.exists()) {
+      const data = value.data();
+      setProfile(prev => ({
+        ...prev,
+        ...data,
+        name: data.displayName || prev.name, // Map displayName to name if needed
+        email: data.email || prev.email
+      }));
+    }
+  }, [value]);
 
   const handleSave = async () => {
     if (!user) return;
 
     try {
-      await updateDoc(doc(db, 'users', user.uid), profile);
+      await updateDoc(doc(db, 'users', user.uid), {
+        ...profile,
+        displayName: profile.name // Sync name back to displayName
+      });
       setIsEditing(false);
       toast.success('Profile updated successfully!', {
         description: 'Your changes have been saved.',
@@ -81,12 +83,11 @@ export function UserProfile({ onNavigateToAdminLogin, onPasswordChangeSuccess }:
 
   const handleAdminSwitch = () => {
     setShowAdminSwitchConfirm(false);
-    if (onNavigateToAdminLogin) {
-      onNavigateToAdminLogin();
-    }
+    navigate('/admin/login');
   };
 
   if (loading) return <div>Loading profile...</div>;
+  if (error) return <div>Error loading profile: {error.message}</div>;
 
   return (
     <div className="space-y-6">
@@ -95,10 +96,10 @@ export function UserProfile({ onNavigateToAdminLogin, onPasswordChangeSuccess }:
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-4">
             <div className="w-20 h-20 bg-[#C4A672] rounded-full flex items-center justify-center text-white text-2xl">
-              {profile.name.charAt(0)}
+              {profile.name ? profile.name.charAt(0) : 'U'}
             </div>
             <div>
-              <h2 className="text-[#2C3E50] text-2xl">{profile.name}</h2>
+              <h2 className="text-[#2C3E50] text-2xl">{profile.name || 'User'}</h2>
               <p className="text-gray-600">{profile.email}</p>
               <div className="flex items-center gap-4 mt-2">
                 <span className="text-sm text-gray-500">Member since 2024</span>
@@ -151,7 +152,7 @@ export function UserProfile({ onNavigateToAdminLogin, onPasswordChangeSuccess }:
               type="email"
               value={profile.email}
               onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-              disabled={!isEditing}
+              disabled={!isEditing} // Email usually shouldn't be editable directly here without re-auth
             />
           </div>
         </div>
@@ -287,8 +288,8 @@ export function UserProfile({ onNavigateToAdminLogin, onPasswordChangeSuccess }:
 
       {/* Modals */}
       {showChangePassword && (
-        <ChangePasswordModal 
-          onClose={() => setShowChangePassword(false)} 
+        <ChangePasswordModal
+          onClose={() => setShowChangePassword(false)}
           onSuccess={() => {
             setShowChangePassword(false);
             if (onPasswordChangeSuccess) {
@@ -310,13 +311,13 @@ export function UserProfile({ onNavigateToAdminLogin, onPasswordChangeSuccess }:
               Switch to Admin Portal
             </AlertDialogTitle>
             <AlertDialogDescription className="text-gray-600">
-              You are about to switch to the Admin Portal. You will be redirected to the admin login page. 
+              You are about to switch to the Admin Portal. You will be redirected to the admin login page.
               This action is only available to users with administrative privileges.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="hover:bg-gray-100">Cancel</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={handleAdminSwitch}
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >

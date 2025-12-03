@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Users, MessageCircle, Settings, MoreVertical, Heart, MessageSquare, Share2, Plus, UserPlus, UserMinus, Edit2, Trash2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -37,38 +38,40 @@ interface Member {
 }
 
 interface CommunityDetailsProps {
-  communityId: string;
-  onBack: () => void;
-  onNavigateToChat: (communityId: string) => void;
-  isAdmin: boolean;
-  isMember: boolean;
-  userId: string;
+  userId?: string;
 }
 
-export function CommunityDetails({
-  communityId,
-  onBack,
-  onNavigateToChat,
-  isAdmin: initialIsAdmin,
-  isMember: initialIsMember,
-  userId
-}: CommunityDetailsProps) {
+export function CommunityDetails({ userId }: CommunityDetailsProps) {
+  const { id: communityId } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+
   const [activeTab, setActiveTab] = useState('posts');
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
-  const [isMember, setIsMember] = useState(initialIsMember);
+  const [isMember, setIsMember] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [community, setCommunity] = useState<any>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const onBack = () => navigate('/communities');
+  const onNavigateToChat = (id: string) => navigate(`/communities/${id}/chat`);
+
   useEffect(() => {
     const fetchCommunity = async () => {
       setLoading(true);
       try {
+        if (!communityId) return;
         const commDoc = await getDoc(doc(db, 'communities', communityId));
         if (commDoc.exists()) {
-          setCommunity({ id: commDoc.id, ...commDoc.data() });
+          const data = commDoc.data();
+          setCommunity({ id: commDoc.id, ...data });
+
+          if (userId) {
+            setIsAdmin(data.adminId === userId);
+            setIsMember(data.members?.includes(userId) || false);
+          }
         }
 
         // Real-time posts
@@ -112,11 +115,12 @@ export function CommunityDetails({
   }, [communityId]);
 
   const handleJoin = async () => {
+    if (!communityId || !auth.currentUser?.uid) return;
     try {
       const commRef = doc(db, 'communities', communityId);
       if (community.privacy === 'private') {
         await updateDoc(commRef, {
-          pending: arrayUnion(auth.currentUser?.uid)
+          pending: arrayUnion(auth.currentUser.uid)
         });
         toast.success('Join request sent! Waiting for admin approval.');
       } else {
@@ -133,10 +137,11 @@ export function CommunityDetails({
   };
 
   const handleLeave = async () => {
+    if (!communityId || !auth.currentUser?.uid) return;
     try {
       const commRef = doc(db, 'communities', communityId);
       await updateDoc(commRef, {
-        members: arrayRemove(auth.currentUser?.uid),
+        members: arrayRemove(auth.currentUser.uid),
         memberCount: increment(-1)
       });
       setIsMember(false);
@@ -147,6 +152,7 @@ export function CommunityDetails({
   };
 
   const handleReact = async (postId: string, reaction: 'like' | 'love' | 'insightful') => {
+    if (!communityId) return;
     try {
       const postRef = doc(db, 'communities', communityId, 'posts', postId);
       // Update reactions in DB - assuming reactions field is a map
@@ -157,15 +163,15 @@ export function CommunityDetails({
       setPosts(prev =>
         prev.map(post => {
           if (post.id !== postId) return post;
-          
+
           const currentReaction = post.userReaction;
           const reactions = { ...post.reactions };
-          
+
           // Remove old reaction
           if (currentReaction) {
             reactions[currentReaction]--;
           }
-          
+
           // Add new reaction or toggle off
           if (currentReaction === reaction) {
             return { ...post, reactions, userReaction: undefined };
@@ -181,6 +187,7 @@ export function CommunityDetails({
   };
 
   const handleDeletePost = async (postId: string) => {
+    if (!communityId) return;
     if (confirm('Are you sure you want to delete this post?')) {
       try {
         await deleteDoc(doc(db, 'communities', communityId, 'posts', postId));
@@ -193,6 +200,7 @@ export function CommunityDetails({
   };
 
   const handleApproveMember = async (memberId: string) => {
+    if (!communityId) return;
     try {
       const commRef = doc(db, 'communities', communityId);
       await updateDoc(commRef, {
@@ -212,6 +220,7 @@ export function CommunityDetails({
   };
 
   const handleRejectMember = async (memberId: string) => {
+    if (!communityId) return;
     try {
       const commRef = doc(db, 'communities', communityId);
       await updateDoc(commRef, {
@@ -225,6 +234,7 @@ export function CommunityDetails({
   };
 
   const handleKickMember = async (memberId: string) => {
+    if (!communityId) return;
     if (confirm('Are you sure you want to remove this member?')) {
       try {
         const commRef = doc(db, 'communities', communityId);
@@ -241,18 +251,32 @@ export function CommunityDetails({
   };
 
   const handleCreatePost = async (content: string, images: string[]) => {
+    if (!communityId || !userId) return;
     try {
-      const postRef = await addDoc(collection(db, 'communities', communityId, 'posts'), {
+      const newPostData = {
         authorId: userId,
         authorName: 'Current User',  // Fetch real name
         authorAvatar: 'CU',
         content,
         images,
-        createdAt: new Date(),
+        createdAt: new Date().toISOString(), // Use ISO string for consistency or serverTimestamp if handled
         reactions: { like: 0, love: 0, insightful: 0 },
         commentCount: 0
+      };
+
+      const postRef = await addDoc(collection(db, 'communities', communityId, 'posts'), {
+        ...newPostData,
+        createdAt: serverTimestamp()
       });
-      setPosts(prev => [{ id: postRef.id, ...newPost }, ...prev]);
+
+      // Optimistic update
+      const optimisticPost: Post = {
+        id: postRef.id,
+        ...newPostData,
+        createdAt: new Date().toISOString() // Display local time immediately
+      };
+
+      setPosts(prev => [optimisticPost, ...prev]);
       setShowCreatePost(false);
       toast.success('Post published!');
     } catch (err) {
@@ -273,7 +297,7 @@ export function CommunityDetails({
           className="w-full h-full object-cover opacity-50"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-        
+
         {/* Back Button */}
         <button
           onClick={onBack}
@@ -310,7 +334,7 @@ export function CommunityDetails({
             {isMember ? (
               <>
                 <Button
-                  onClick={() => onNavigateToChat(communityId)}
+                  onClick={() => communityId && onNavigateToChat(communityId)}
                   className="bg-[#C4A672] hover:bg-[#8B7355] text-white"
                 >
                   <MessageCircle className="w-4 h-4 mr-2" />
@@ -337,7 +361,7 @@ export function CommunityDetails({
           </div>
 
           <div className="flex items-center gap-2">
-            {community.topic.map(topic => (
+            {community.topics?.map((topic: string) => (
               <Badge key={topic} variant="outline">{topic}</Badge>
             ))}
             {isAdmin && (
@@ -425,31 +449,28 @@ export function CommunityDetails({
                 <div className="flex items-center gap-6 pt-4 border-t border-gray-200">
                   <button
                     onClick={() => handleReact(post.id, 'like')}
-                    className={`flex items-center gap-2 text-sm transition-colors ${
-                      post.userReaction === 'like'
-                        ? 'text-blue-600'
-                        : 'text-gray-600 hover:text-blue-600'
-                    }`}
+                    className={`flex items-center gap-2 text-sm transition-colors ${post.userReaction === 'like'
+                      ? 'text-blue-600'
+                      : 'text-gray-600 hover:text-blue-600'
+                      }`}
                   >
                     👍 {post.reactions.like}
                   </button>
                   <button
                     onClick={() => handleReact(post.id, 'love')}
-                    className={`flex items-center gap-2 text-sm transition-colors ${
-                      post.userReaction === 'love'
-                        ? 'text-red-600'
-                        : 'text-gray-600 hover:text-red-600'
-                    }`}
+                    className={`flex items-center gap-2 text-sm transition-colors ${post.userReaction === 'love'
+                      ? 'text-red-600'
+                      : 'text-gray-600 hover:text-red-600'
+                      }`}
                   >
                     ❤️ {post.reactions.love}
                   </button>
                   <button
                     onClick={() => handleReact(post.id, 'insightful')}
-                    className={`flex items-center gap-2 text-sm transition-colors ${
-                      post.userReaction === 'insightful'
-                        ? 'text-yellow-600'
-                        : 'text-gray-600 hover:text-yellow-600'
-                    }`}
+                    className={`flex items-center gap-2 text-sm transition-colors ${post.userReaction === 'insightful'
+                      ? 'text-yellow-600'
+                      : 'text-gray-600 hover:text-yellow-600'
+                      }`}
                   >
                     💡 {post.reactions.insightful}
                   </button>
@@ -562,7 +583,7 @@ export function CommunityDetails({
           post={selectedPost}
           onClose={() => setSelectedPost(null)}
           isAdmin={isAdmin}
-          userId={userId}
+          userId={userId || ''}
         />
       )}
     </div>

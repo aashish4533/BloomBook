@@ -6,15 +6,16 @@ import { Textarea } from '../ui/textarea';
 import { Button } from '../ui/button';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { BookOpen, Search } from 'lucide-react';
+import { BookOpen, Search, Upload, X } from 'lucide-react';
 
 interface BookDetailsStepProps {
   initialData: BookFormData;
   onNext: (data: BookFormData) => void;
   onCancel: () => void;
+  isExchange?: boolean;
 }
 
-export function BookDetailsStep({ initialData, onNext, onCancel }: BookDetailsStepProps) {
+export function BookDetailsStep({ initialData, onNext, onCancel, isExchange = false }: BookDetailsStepProps) {
   const [formData, setFormData] = useState<BookFormData>(initialData);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isbnLookup, setIsbnLookup] = useState(false);
@@ -41,7 +42,7 @@ export function BookDetailsStep({ initialData, onNext, onCancel }: BookDetailsSt
   const validateISBN = (isbn: string) => {
     // Remove hyphens and spaces
     const cleanISBN = isbn.replace(/[-\s]/g, '');
-    
+
     // Check if it's either ISBN-10 or ISBN-13
     if (cleanISBN.length === 10 || cleanISBN.length === 13) {
       return /^[0-9X]+$/.test(cleanISBN);
@@ -62,11 +63,11 @@ export function BookDetailsStep({ initialData, onNext, onCancel }: BookDetailsSt
 
     setIsbnLookup(true);
     const cleanISBN = formData.isbn.replace(/[-\s]/g, '');
-    
+
     try {
       const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanISBN}`);
       const data = await response.json();
-      
+
       if (data.totalItems > 0) {
         const bookInfo = data.items[0].volumeInfo;
         setFormData({
@@ -88,6 +89,37 @@ export function BookDetailsStep({ initialData, onNext, onCancel }: BookDetailsSt
     }
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
+      const newImages = files.map(file => URL.createObjectURL(file));
+
+      setFormData(prev => ({
+        ...prev,
+        images: [...prev.images, ...newImages],
+        imageFiles: [...(prev.imageFiles || []), ...files]
+      }));
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setFormData(prev => {
+      const newImages = [...prev.images];
+      const newImageFiles = [...(prev.imageFiles || [])];
+
+      newImages.splice(index, 1);
+      if (newImageFiles.length > index) {
+        newImageFiles.splice(index, 1);
+      }
+
+      return {
+        ...prev,
+        images: newImages,
+        imageFiles: newImageFiles
+      };
+    });
+  };
+
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
 
@@ -105,12 +137,18 @@ export function BookDetailsStep({ initialData, onNext, onCancel }: BookDetailsSt
       newErrors.author = 'Author name is required';
     }
 
-    if (!formData.price) {
-      newErrors.price = 'Price is required';
-    } else if (parseFloat(formData.price) <= 0) {
-      newErrors.price = 'Price must be greater than 0';
-    } else if (parseFloat(formData.price) > 10000) {
-      newErrors.price = 'Price seems unreasonably high';
+    if (!isExchange) {
+      if (!formData.price) {
+        newErrors.price = 'Price is required';
+      } else if (parseFloat(formData.price) <= 0) {
+        newErrors.price = 'Price must be greater than 0';
+      } else if (parseFloat(formData.price) > 10000) {
+        newErrors.price = 'Price seems unreasonably high';
+      }
+    } else {
+      if (!formData.exchangePreferences?.trim()) {
+        newErrors.exchangePreferences = 'Please specify what you want in exchange';
+      }
     }
 
     if (formData.publishedYear && (parseInt(formData.publishedYear) < 1000 || parseInt(formData.publishedYear) > new Date().getFullYear())) {
@@ -140,7 +178,7 @@ export function BookDetailsStep({ initialData, onNext, onCancel }: BookDetailsSt
         </div>
         <div>
           <h3 className="text-[#2C3E50]">Book Information</h3>
-          <p className="text-gray-600 text-sm">Enter the details of the book you want to sell</p>
+          <p className="text-gray-600 text-sm">Enter the details of the book you want to {isExchange ? 'exchange' : 'sell'}</p>
         </div>
       </div>
 
@@ -219,28 +257,47 @@ export function BookDetailsStep({ initialData, onNext, onCancel }: BookDetailsSt
           )}
         </div>
 
-        {/* Price */}
-        <div className="space-y-2">
-          <Label htmlFor="price">Resale Price (USD) *</Label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-            <Input
-              id="price"
-              type="number"
-              step="0.01"
-              placeholder="0.00"
-              value={formData.price}
-              onChange={(e) => {
-                setFormData({ ...formData, price: e.target.value });
-                setErrors({ ...errors, price: '' });
-              }}
-              className={`pl-7 ${errors.price ? 'border-red-500' : ''}`}
-            />
+        {/* Price or Exchange Preferences */}
+        {!isExchange ? (
+          <div className="space-y-2">
+            <Label htmlFor="price">Resale Price (USD) *</Label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+              <Input
+                id="price"
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={formData.price}
+                onChange={(e) => {
+                  setFormData({ ...formData, price: e.target.value });
+                  setErrors({ ...errors, price: '' });
+                }}
+                className={`pl-7 ${errors.price ? 'border-red-500' : ''}`}
+              />
+            </div>
+            {errors.price && (
+              <p className="text-sm text-red-500">{errors.price}</p>
+            )}
           </div>
-          {errors.price && (
-            <p className="text-sm text-red-500">{errors.price}</p>
-          )}
-        </div>
+        ) : (
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="exchangePreferences">Exchange Preferences *</Label>
+            <Input
+              id="exchangePreferences"
+              placeholder="What are you looking for? e.g. 'Sci-Fi books', 'Specific Title'"
+              value={formData.exchangePreferences || ''}
+              onChange={(e) => {
+                setFormData({ ...formData, exchangePreferences: e.target.value });
+                setErrors({ ...errors, exchangePreferences: '' });
+              }}
+              className={errors.exchangePreferences ? 'border-red-500' : ''}
+            />
+            {errors.exchangePreferences && (
+              <p className="text-sm text-red-500">{errors.exchangePreferences}</p>
+            )}
+          </div>
+        )}
 
         {/* Condition */}
         <div className="space-y-2">
@@ -337,13 +394,47 @@ export function BookDetailsStep({ initialData, onNext, onCancel }: BookDetailsSt
           <Label htmlFor="description">Description</Label>
           <Textarea
             id="description"
-            placeholder="Describe the book's condition, any highlighting, notes, or other details buyers should know..."
+            placeholder="Describe the book's condition, any highlighting, notes, or other details..."
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             rows={4}
           />
           <p className="text-xs text-gray-500">
             {formData.description.length}/500 characters
+          </p>
+        </div>
+
+        {/* Image Upload */}
+        <div className="space-y-2 md:col-span-2">
+          <Label>Book Images</Label>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {formData.images.map((img, idx) => (
+              <div key={idx} className="relative aspect-[3/4] rounded-lg overflow-hidden border border-gray-200 group">
+                <img src={img} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => removeImage(idx)}
+                  className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+
+            <label className="aspect-[3/4] rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer hover:border-[#C4A672] hover:bg-[#C4A672]/5 transition-colors">
+              <Upload className="w-8 h-8 text-gray-400 mb-2" />
+              <span className="text-sm text-gray-500">Add Image</span>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={handleImageUpload}
+              />
+            </label>
+          </div>
+          <p className="text-xs text-gray-500">
+            Upload clear photos of the front cover, back cover, and any damage.
           </p>
         </div>
       </div>

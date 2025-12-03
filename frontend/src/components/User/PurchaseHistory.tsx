@@ -1,11 +1,10 @@
-// Updated src/components/User/PurchaseHistory.tsx
-import { useState, useEffect } from 'react';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
-import { Eye, Download } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { db, auth } from '../../firebase';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-import { toast } from 'sonner';
+import { collection, query, where, orderBy } from 'firebase/firestore';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { useCollection } from 'react-firebase-hooks/firestore';
 
 interface Purchase {
   id: string;
@@ -17,33 +16,10 @@ interface Purchase {
 }
 
 export function PurchaseHistory() {
-  const [purchases, setPurchases] = useState<Purchase[]>([]);
-  const [loading, setLoading] = useState(true);
-  const user = auth.currentUser;
-
-  useEffect(() => {
-    if (!user) return;
-
-    const fetchPurchases = async () => {
-      setLoading(true);
-      try {
-        const q = query(
-          collection(db, 'purchases'),
-          where('userId', '==', user.uid),
-          orderBy('date', 'desc')
-        );
-        const snapshot = await getDocs(q);
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Purchase));
-        setPurchases(data);
-      } catch (err) {
-        toast.error('Failed to fetch purchases');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchPurchases();
-  }, [user]);
+  const [user, loadingUser] = useAuthState(auth);
+  const [purchasesSnapshot, loadingPurchases, error] = useCollection(
+    user ? query(collection(db, 'purchases'), where('userId', '==', user.uid), orderBy('date', 'desc')) : null
+  );
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -58,7 +34,10 @@ export function PurchaseHistory() {
     }
   };
 
-  if (loading) return <div>Loading...</div>;
+  if (loadingUser || loadingPurchases) return <div>Loading...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+
+  const purchases = purchasesSnapshot?.docs.map(doc => ({ id: doc.id, ...doc.data() } as Purchase)) || [];
 
   return (
     <div className="space-y-6">
@@ -95,6 +74,11 @@ export function PurchaseHistory() {
               </div>
             </div>
           ))}
+          {purchases.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              <p>No purchase history found.</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

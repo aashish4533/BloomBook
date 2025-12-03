@@ -7,13 +7,13 @@ import { Shield, Lock, Mail, AlertCircle, ArrowLeft } from 'lucide-react';
 import { auth } from '../firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { toast } from 'sonner';
+import { Link, useNavigate } from 'react-router-dom';
 
 interface AdminLoginProps {
-  onLogin: () => void;
-  onBack?: () => void;
+  onLogin?: () => void;
 }
 
-export function AdminLogin({ onLogin, onBack }: AdminLoginProps) {
+export function AdminLogin({ onLogin }: AdminLoginProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [twoFactorCode, setTwoFactorCode] = useState('');
@@ -22,6 +22,7 @@ export function AdminLogin({ onLogin, onBack }: AdminLoginProps) {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isLoading, setIsLoading] = useState(false);
   const [generatedOTP, setGeneratedOTP] = useState('');
+  const navigate = useNavigate();
 
   const handleInitialLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,8 +105,9 @@ export function AdminLogin({ onLogin, onBack }: AdminLoginProps) {
       // Simulate 2FA verification
       setTimeout(() => {
         setIsLoading(false);
-        onLogin();
+        if (onLogin) onLogin();
         toast.success('Admin login successful');
+        navigate('/admin/dashboard');
       }, 1000);
     }
   };
@@ -113,17 +115,15 @@ export function AdminLogin({ onLogin, onBack }: AdminLoginProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#2C3E50] to-[#34495E] flex items-center justify-center p-4">
       {/* Back Button */}
-      {onBack && (
-        <button
-          onClick={onBack}
-          className="fixed top-6 left-6 flex items-center gap-2 text-white/80 hover:text-white transition-colors group"
-        >
-          <div className="w-10 h-10 rounded-full bg-white/10 group-hover:bg-white/20 flex items-center justify-center transition-colors">
-            <ArrowLeft className="w-5 h-5" />
-          </div>
-          <span className="hidden sm:inline">Back to Home</span>
-        </button>
-      )}
+      <Link
+        to="/"
+        className="fixed top-6 left-6 flex items-center gap-2 text-white/80 hover:text-white transition-colors group"
+      >
+        <div className="w-10 h-10 rounded-full bg-white/10 group-hover:bg-white/20 flex items-center justify-center transition-colors">
+          <ArrowLeft className="w-5 h-5" />
+        </div>
+        <span className="hidden sm:inline">Back to Home</span>
+      </Link>
 
       <div className="w-full max-w-md">
         {/* Header */}

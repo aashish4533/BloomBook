@@ -5,8 +5,9 @@ import { LocationStep } from './SellBook/LocationStep';
 import { ReviewStep } from './SellBook/ReviewStep';
 import { SuccessStep } from './SellBook/SuccessStep';
 import { X } from 'lucide-react';
-import { db, auth } from '../firebase';
+import { db, auth, storage } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { toast } from 'sonner';
 
 export interface BookFormData {
@@ -21,6 +22,8 @@ export interface BookFormData {
   language: string;
   pages: string;
   images: string[];
+  imageFiles?: File[];
+  exchangePreferences?: string;
 }
 
 export interface LocationData {
@@ -41,7 +44,7 @@ interface SellBookFlowProps {
 
 export function SellBookFlow({ onClose }: SellBookFlowProps) {
   const [currentStep, setCurrentStep] = useState(1);
-  const [isSubmitting, setIsSubmitting] = useState(false); // New loading state
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [bookData, setBookData] = useState<BookFormData>({
     isbn: '',
@@ -86,16 +89,15 @@ export function SellBookFlow({ onClose }: SellBookFlowProps) {
       return;
     }
 
-    setIsSubmitting(true); // Start loading
+    setIsSubmitting(true);
 
     try {
-      // 1. Sanitize Location Data (remove undefined fields)
+      // 1. Sanitize Location Data
       const cleanLocation = Object.fromEntries(
         Object.entries(locationData).filter(([_, v]) => v !== undefined)
       );
 
       if (locationData.coordinates) {
-        // Ensure coordinates are numbers
         cleanLocation.coordinates = {
           lat: Number(locationData.coordinates.lat),
           lng: Number(locationData.coordinates.lng)
@@ -111,6 +113,21 @@ export function SellBookFlow({ onClose }: SellBookFlowProps) {
       const pages = parseInt(bookData.pages);
       const publishedYear = parseInt(bookData.publishedYear);
 
+      // 3. Upload Images
+      const imageUrls: string[] = [];
+      if (bookData.imageFiles && bookData.imageFiles.length > 0) {
+        for (const file of bookData.imageFiles) {
+          try {
+            const storageRef = ref(storage, `book-covers/${user.uid}/${Date.now()}-${file.name}`);
+            const snapshot = await uploadBytes(storageRef, file);
+            const downloadURL = await getDownloadURL(snapshot.ref);
+            imageUrls.push(downloadURL);
+          } catch (uploadErr) {
+            console.error("Error uploading file:", file.name, uploadErr);
+          }
+        }
+      }
+
       const listingData = {
         ...bookData,
         price: price,
@@ -118,19 +135,23 @@ export function SellBookFlow({ onClose }: SellBookFlowProps) {
         publishedYear: isNaN(publishedYear) ? 0 : publishedYear,
         location: cleanLocation,
         userId: user.uid,
-        sellerName: user.displayName || 'Anonymous',
+        seller: {
+          name: user.displayName || 'Anonymous',
+          rating: 0, // Default for new seller
+          totalSales: 0,
+          avatar: user.photoURL || ''
+        },
+        images: imageUrls.length > 0 ? imageUrls : bookData.images,
         type: 'sell',
         status: 'active',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
 
-      // Remove any top-level undefined values just in case
-      Object.keys(listingData).forEach(key =>
-        (listingData as any)[key] === undefined && delete (listingData as any)[key]
-      );
+      // Remove imageFiles from listingData before saving to Firestore
+      delete (listingData as any).imageFiles;
 
-      // 3. Submit to Firestore
+      // 4. Submit to Firestore
       await addDoc(collection(db, 'books'), listingData);
 
       toast.success('Listing created successfully!');
@@ -139,7 +160,7 @@ export function SellBookFlow({ onClose }: SellBookFlowProps) {
       console.error('Failed to submit listing:', err);
       toast.error(err.message || 'Failed to create listing. Please try again.');
     } finally {
-      setIsSubmitting(false); // Stop loading
+      setIsSubmitting(false);
     }
   };
 
@@ -177,8 +198,8 @@ export function SellBookFlow({ onClose }: SellBookFlowProps) {
                 <div key={step} className="flex-1">
                   <div
                     className={`h-2 rounded-full transition-colors ${step <= currentStep
-                        ? 'bg-[#C4A672]'
-                        : 'bg-gray-200'
+                      ? 'bg-[#C4A672]'
+                      : 'bg-gray-200'
                       }`}
                   />
                 </div>
@@ -210,7 +231,7 @@ export function SellBookFlow({ onClose }: SellBookFlowProps) {
               onSubmit={handleSubmit}
               onBack={handleBack}
               onEdit={handleEdit}
-              isSubmitting={isSubmitting} // Pass loading state
+              isSubmitting={isSubmitting}
             />
           )}
           {currentStep === 4 && (

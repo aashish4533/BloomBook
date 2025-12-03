@@ -8,23 +8,29 @@ import { SystemSettings } from './Admin/SystemSettings';
 import { CommunityManagement } from './Admin/CommunityManagement';
 import { Button } from './ui/button';
 import { Users, BookOpen, Calendar, DollarSign, Settings, LogOut, BarChart3, Shield, MessageCircle, Bell } from 'lucide-react';
+import { Outlet, NavLink, Link, useLocation } from 'react-router-dom';
 
 interface AdminDashboardProps {
   onLogout: () => void;
 }
 
 export function AdminDashboard({ onLogout }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'users' | 'books' | 'rentals' | 'transactions' | 'communities' | 'announcements' | 'settings'>('users');
+  const location = useLocation();
+  const currentPath = location.pathname;
 
   const tabs = [
-    { id: 'users' as const, label: 'User Management', icon: Users },
-    { id: 'books' as const, label: 'Book Inventory', icon: BookOpen },
-    { id: 'rentals' as const, label: 'Rental Management', icon: Calendar },
-    { id: 'transactions' as const, label: 'Transaction History', icon: DollarSign },
-    { id: 'communities' as const, label: 'Communities', icon: MessageCircle },
-    { id: 'announcements' as const, label: 'Announcements', icon: Bell },
-    { id: 'settings' as const, label: 'System Settings', icon: Settings },
+    { id: 'users', label: 'User Management', icon: Users, path: '/admin/dashboard' },
+    { id: 'books', label: 'Book Inventory', icon: BookOpen, path: '/admin/dashboard/books' },
+    { id: 'rentals', label: 'Rental Management', icon: Calendar, path: '/admin/dashboard/rentals' },
+    { id: 'transactions', label: 'Transaction History', icon: DollarSign, path: '/admin/dashboard/transactions' },
+    { id: 'communities', label: 'Communities', icon: MessageCircle, path: '/admin/dashboard/communities' },
+    { id: 'announcements', label: 'Announcements', icon: Bell, path: '/admin/dashboard/announcements' },
+    { id: 'settings', label: 'System Settings', icon: Settings, path: '/admin/dashboard/settings' },
   ];
+
+  const activeTab = tabs.find(tab =>
+    tab.path === currentPath || (tab.path === '/admin/dashboard' && currentPath === '/admin/dashboard')
+  ) || tabs[0];
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -48,17 +54,18 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
-              <button
+              <NavLink
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${activeTab === tab.id
-                  ? 'bg-[#C4A672] text-white'
-                  : 'text-white/70 hover:bg-white/10 hover:text-white'
+                to={tab.path}
+                end={tab.path === '/admin/dashboard'}
+                className={({ isActive }) => `w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive
+                    ? 'bg-[#C4A672] text-white'
+                    : 'text-white/70 hover:bg-white/10 hover:text-white'
                   }`}
               >
                 <Icon className="w-5 h-5" />
                 <span className="text-sm">{tab.label}</span>
-              </button>
+              </NavLink>
             );
           })}
         </nav>
@@ -92,7 +99,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-[#2C3E50] text-2xl mb-1">
-                {tabs.find(t => t.id === activeTab)?.label}
+                {activeTab.label}
               </h2>
               <p className="text-gray-600 text-sm">
                 Manage and monitor your BookBloom platform
@@ -113,22 +120,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
 
         {/* Content */}
         <div className="p-8">
-          {activeTab === 'users' && <UserManagement />}
-          {activeTab === 'books' && <BookInventory />}
-          {activeTab === 'rentals' && <RentalManagement />}
-          {activeTab === 'transactions' && <TransactionHistory />}
-          {activeTab === 'communities' && <CommunityManagement />}
-          {activeTab === 'announcements' && (
-            <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
-              <Bell className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl text-gray-700 mb-2">Announcements Management</h3>
-              <p className="text-gray-500 mb-4">Manage announcements from the main Announcements page</p>
-              <Button className="bg-[#C4A672] hover:bg-[#8B7355] text-white">
-                Go to Announcements
-              </Button>
-            </div>
-          )}
-          {activeTab === 'settings' && <SystemSettings />}
+          <Outlet />
         </div>
       </main>
     </div>

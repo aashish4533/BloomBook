@@ -1,29 +1,27 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, FacebookAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage'; // Added getStorage for completeness
+import { getStorage } from 'firebase/storage';
 
 // ----------------------------------------------------
 // PASTE YOUR REAL CONFIGURATION OBJECT HERE:
 // Replace the contents of this object with the config you copied from the Firebase Console.
 const firebaseConfig = {
-  apiKey: "AIzaSyDFRufOWCuGDKfKffacZXgQWdGG7RJzIQI",
-  authDomain: "bookbloom-5429e.firebaseapp.com",
-  databaseURL: "https://bookbloom-5429e-default-rtdb.firebaseio.com",
-  projectId: "bookbloom-5429e",
-  storageBucket: "bookbloom-5429e.firebasestorage.app",
-  messagingSenderId: "322581834006",
-  appId: "1:322581834006:web:979f691da2d0a2cd7d0837",
-  measurementId: "G-93D0YZERSQ"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 // ----------------------------------------------------
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const storage = getStorage(app); // Initialize Storage
-
-// REMOVED: Emulator connection code. The app will now connect to the live project.
+const storage = getStorage(app);
 
 // Providers for social login
 const googleProvider = new GoogleAuthProvider();

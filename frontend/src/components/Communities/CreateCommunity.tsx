@@ -16,7 +16,24 @@ interface CreateCommunityProps {
   userName: string;
 }
 
+import { useNavigate } from 'react-router-dom';
+
 export function CreateCommunity({ onBack, onSuccess, userId, userName }: CreateCommunityProps) {
+  const navigate = useNavigate();
+
+  if (!userId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#FAF8F3]">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-[#2C3E50] mb-4">Please Log In</h2>
+          <p className="text-gray-600 mb-6">You need to be logged in to create a community.</p>
+          <Button onClick={() => navigate('/login')} className="bg-[#C4A672] text-white">
+            Go to Login
+          </Button>
+        </div>
+      </div>
+    );
+  }
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -204,11 +221,10 @@ export function CreateCommunity({ onBack, onSuccess, userId, userName }: CreateC
               <button
                 type="button"
                 onClick={() => setFormData(prev => ({ ...prev, privacy: 'public' }))}
-                className={`p-4 rounded-lg border-2 transition-all ${
-                  formData.privacy === 'public'
+                className={`p-4 rounded-lg border-2 transition-all ${formData.privacy === 'public'
                     ? 'border-[#C4A672] bg-[#C4A672]/10'
                     : 'border-gray-200 hover:border-gray-300'
-                }`}
+                  }`}
               >
                 <div className="flex items-start gap-3">
                   <Globe className="w-6 h-6 text-[#C4A672] flex-shrink-0 mt-1" />
@@ -229,11 +245,10 @@ export function CreateCommunity({ onBack, onSuccess, userId, userName }: CreateC
               <button
                 type="button"
                 onClick={() => setFormData(prev => ({ ...prev, privacy: 'private' }))}
-                className={`p-4 rounded-lg border-2 transition-all ${
-                  formData.privacy === 'private'
+                className={`p-4 rounded-lg border-2 transition-all ${formData.privacy === 'private'
                     ? 'border-[#C4A672] bg-[#C4A672]/10'
                     : 'border-gray-200 hover:border-gray-300'
-                }`}
+                  }`}
               >
                 <div className="flex items-start gap-3">
                   <Lock className="w-6 h-6 text-[#C4A672] flex-shrink-0 mt-1" />
@@ -262,11 +277,10 @@ export function CreateCommunity({ onBack, onSuccess, userId, userName }: CreateC
                   key={topic}
                   type="button"
                   onClick={() => toggleTopic(topic)}
-                  className={`px-4 py-2 rounded-full text-sm transition-all ${
-                    selectedTopics.includes(topic)
+                  className={`px-4 py-2 rounded-full text-sm transition-all ${selectedTopics.includes(topic)
                       ? 'bg-[#C4A672] text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                    }`}
                 >
                   {topic}
                   {selectedTopics.includes(topic) && (
@@ -305,7 +319,7 @@ export function CreateCommunity({ onBack, onSuccess, userId, userName }: CreateC
           {/* Community Image */}
           <div className="mb-8">
             <Label className="text-[#2C3E50] mb-2">Community Image (Optional)</Label>
-            
+
             {formData.image ? (
               <div className="relative">
                 <img

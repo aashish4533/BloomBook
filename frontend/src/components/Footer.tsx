@@ -1,24 +1,17 @@
 import { Input } from './ui/input';
 import { Button } from './ui/button';
+import { Link } from 'react-router-dom';
 
-interface FooterProps {
-  onNavigateToAbout?: () => void;
-  onNavigateToBuy?: () => void;
-  onNavigateToRent?: () => void;
-  onNavigateToSell?: () => void;
-  onNavigateToAnnouncements?: () => void;
-}
-
-export function Footer({ onNavigateToAbout, onNavigateToBuy, onNavigateToRent, onNavigateToSell, onNavigateToAnnouncements }: FooterProps) {
+export function Footer() {
   return (
     <footer className="bg-[#2C3E50] text-white py-8 px-8">
       <div className="max-w-7xl mx-auto">
         <nav className="flex items-center justify-center gap-8 mb-4">
-          <button onClick={onNavigateToBuy} className="hover:opacity-80 transition-opacity">Buy</button>
-          <button onClick={onNavigateToRent} className="hover:opacity-80 transition-opacity">Rent</button>
-          <button onClick={onNavigateToSell} className="hover:opacity-80 transition-opacity">Resell</button>
-          <button onClick={onNavigateToAnnouncements} className="hover:opacity-80 transition-opacity">Announcements</button>
-          <button onClick={onNavigateToAbout} className="hover:opacity-80 transition-opacity">About</button>
+          <Link to="/marketplace" className="hover:opacity-80 transition-opacity">Buy</Link>
+          <Link to="/rent" className="hover:opacity-80 transition-opacity">Rent</Link>
+          <Link to="/sell" className="hover:opacity-80 transition-opacity">Resell</Link>
+          <Link to="/announcements" className="hover:opacity-80 transition-opacity">Announcements</Link>
+          <Link to="/about" className="hover:opacity-80 transition-opacity">About</Link>
         </nav>
 
         <p className="text-center text-sm mb-6">

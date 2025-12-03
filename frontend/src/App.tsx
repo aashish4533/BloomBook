@@ -1,17 +1,28 @@
 import { useState, useEffect } from 'react';
-import { Navbar } from './components/Navbar';
-import { Footer } from './components/Footer';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from './firebase';
+
+// Layouts
+import { MainLayout } from './components/Layouts/MainLayout';
+import { AuthLayout } from './components/Layouts/AuthLayout';
+
+// Routes
+import { ProtectedRoute } from './components/Routes/ProtectedRoute';
+import { AdminRoute } from './components/Routes/AdminRoute';
+
+// Components
+import { HomeScreen } from './components/HomeScreen';
 import { LoginForm } from './components/LoginForm';
 import { SignUpForm } from './components/SignUpForm';
-import { HomeScreen } from './components/HomeScreen';
-import { BookMarketplace } from './components/BookMarketplace';
-import { ChatButton } from './components/ChatButton';
 import { AdminLogin } from './components/AdminLogin';
 import { AdminDashboard } from './components/AdminDashboard';
 import { UserDashboard } from './components/UserDashboard';
+import { BookMarketplace } from './components/BookMarketplace';
+import { BookDetailsPage } from './components/BookDetailsPage';
 import { RentBookFlow } from './components/RentBookFlow';
-import { LogoutConfirmation } from './components/LogoutConfirmation';
 import { SellBookFlow } from './components/SellBookFlow';
+import { ExchangeBookFlow } from './components/ExchangeBookFlow';
 import { CommunitiesBrowse } from './components/Communities/CommunitiesBrowse';
 import { CreateCommunity } from './components/Communities/CreateCommunity';
 import { CommunityDetails } from './components/Communities/CommunityDetails';
@@ -22,536 +33,160 @@ import { AboutPage } from './components/AboutPage';
 import { AdvancedSearch } from './components/AdvancedSearch';
 import { WishlistPage } from './components/WishlistPage';
 import { TuitionHub } from './components/TuitionHub';
-import { PaymentGateway } from './components/Payment/PaymentGateway';
+import { NotesHub } from './components/NotesHub';
 import { DeliveryTracking } from './components/DeliveryTracking';
-import { BarcodeScanner } from './components/BarcodeScanner';
-import { VideoPlayer } from './components/VideoPlayer';
-import { NotesViewer } from './components/NotesViewer';
-import { ErrorModal } from './components/ErrorModal';
-import { LoadingState } from './components/LoadingState';
-import { auth } from './firebase';
-import { onAuthStateChanged } from 'firebase/auth';
-import { Toaster } from './components/ui/sonner';
 
-type PageType =
-  | 'home'
-  | 'marketplace'
-  | 'login'
-  | 'signup'
-  | 'admin-login'
-  | 'admin-dashboard'
-  | 'user-dashboard'
-  | 'rent'
-  | 'sell'
-  | 'communities-browse'
-  | 'communities-create'
-  | 'community-detail'
-  | 'group-chat'
-  | 'private-chat'
-  | 'announcements'
-  | 'about'
-  | 'advanced-search'
-  | 'wishlist'
-  | 'tuition'
-  | 'delivery-tracking';
+// User Dashboard Sub-components
+import { UserProfile } from './components/User/UserProfile';
+import { PurchaseHistory } from './components/User/PurchaseHistory';
+import { SalesHistory } from './components/User/SalesHistory';
+import { RentalHistory } from './components/User/RentalHistory';
+import { Wishlist } from './components/User/Wishlist';
+import { UserCommunities } from './components/User/UserCommunities';
+import { UserChats } from './components/User/UserChats';
 
-interface PaymentContext {
-  amount: number;
-  type: 'buy' | 'rent' | 'tuition';
-  itemTitle: string;
+// Admin Dashboard Sub-components
+import { UserManagement } from './components/Admin/UserManagement';
+import { BookInventory } from './components/Admin/BookInventory';
+import { RentalManagement } from './components/Admin/RentalManagement';
+import { TransactionHistory } from './components/Admin/TransactionHistory';
+import { CommunityManagement } from './components/Admin/CommunityManagement';
+import { SystemSettings } from './components/Admin/SystemSettings';
+import { Button } from './components/ui/button'; // For Admin Announcements placeholder
+
+// Wrappers for components that need navigation or location state
+function SellBookFlowWrapper() {
+  const navigate = useNavigate();
+  return <SellBookFlow onClose={() => navigate('/')} />;
+}
+
+function RentBookFlowWrapper() {
+  const navigate = useNavigate();
+  return <RentBookFlow onClose={() => navigate('/')} />;
+}
+
+function ExchangeBookFlowWrapper() {
+  const navigate = useNavigate();
+  return <ExchangeBookFlow onClose={() => navigate('/')} />;
+}
+
+function PrivateChatWrapper() {
+  const location = useLocation();
+  const { otherUser, bookContext } = location.state || {};
+
+  if (!otherUser) {
+    return <Navigate to="/dashboard/chats" replace />;
+  }
+
+  return <PrivateChat otherUser={otherUser} bookContext={bookContext} />;
+}
+
+function AdminAnnouncementsWrapper() {
+  const navigate = useNavigate();
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+      <h3 className="text-xl text-gray-700 mb-2">Announcements Management</h3>
+      <p className="text-gray-500 mb-4">Manage announcements from the main Announcements page</p>
+      <Button onClick={() => navigate('/announcements')} className="bg-[#C4A672] hover:bg-[#8B7355] text-white">
+        Go to Announcements
+      </Button>
+    </div>
+  );
 }
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<PageType>('home');
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [userRole, setUserRole] = useState<'user' | 'admin' | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [selectedCommunityId, setSelectedCommunityId] = useState<string | null>(null);
-  const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
-  const [chatContext, setChatContext] = useState<{
-    otherUser: { id: string; name: string; avatar: string; online: boolean };
-    bookContext?: { id: string; title: string; price: number; image: string };
-  } | null>(null);
-
-  // New modal states
-  const [showPaymentGateway, setShowPaymentGateway] = useState(false);
-  const [paymentContext, setPaymentContext] = useState<PaymentContext | null>(null);
-  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
-  const [showVideoPlayer, setShowVideoPlayer] = useState(false);
-  const [showNotesViewer, setShowNotesViewer] = useState(false);
-  const [showErrorModal, setShowErrorModal] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        setUserRole('user');
+        if (!userRole) setUserRole('user');
         setCurrentUser(user);
       } else {
         setUserRole(null);
         setCurrentUser(null);
       }
+      setIsLoading(false);
     });
     return () => unsubscribe();
-  }, []);
-
-  const handleAdminLogin = () => {
-    setUserRole('admin');
-    setCurrentPage('admin-dashboard');
-  };
-
-  const handleUserLogin = () => {
-    setUserRole('user');
-    setCurrentPage('home');
-  };
+  }, [userRole]);
 
   const handleLogout = () => {
-    setShowLogoutConfirm(true);
-  };
-
-  const confirmLogout = () => {
+    auth.signOut();
     setUserRole(null);
-    setCurrentPage('login');
-    setShowLogoutConfirm(false);
+    setCurrentUser(null);
   };
 
-  const cancelLogout = () => {
-    setShowLogoutConfirm(false);
-  };
-
-  const handleNavigateToCommunities = () => {
-    setCurrentPage('communities-browse');
-  };
-
-  const handleNavigateToCommunityDetail = (communityId: string) => {
-    setSelectedCommunityId(communityId);
-    setCurrentPage('community-detail');
-  };
-
-  const handleNavigateToCreateCommunity = () => {
-    setCurrentPage('communities-create');
-  };
-
-  const handleCommunityCreated = (communityId: string) => {
-    setSelectedCommunityId(communityId);
-    setCurrentPage('community-detail');
-  };
-
-  const handleOpenChat = (otherUser: any, bookContext?: any) => {
-    setChatContext({ otherUser, bookContext });
-    setCurrentPage('private-chat');
-  };
-
-  // Full-page components (no navbar/footer)
-  if (currentPage === 'admin-login') {
-    return <AdminLogin onLogin={handleAdminLogin} onBack={() => setCurrentPage('home')} />;
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
 
-  if (currentPage === 'admin-dashboard') {
-    return <AdminDashboard onLogout={handleLogout} />;
-  }
-
-  if (currentPage === 'user-dashboard') {
-    return (
-      <>
-        <UserDashboard
-          onLogout={handleLogout}
-          onNavigateToMarketplace={() => setCurrentPage('marketplace')}
-          onNavigateToRent={() => setCurrentPage('rent')}
-          onNavigateToSell={() => setCurrentPage('sell')}
-          onNavigateToCommunities={handleNavigateToCommunities}
-          onNavigateToAdminLogin={() => setCurrentPage('admin-login')}
-        />
-        {showLogoutConfirm && (
-          <LogoutConfirmation onConfirm={confirmLogout} onCancel={cancelLogout} />
-        )}
-      </>
-    );
-  }
-
-  if (currentPage === 'communities-create') {
-    return (
-      <CreateCommunity
-        onBack={() => setCurrentPage('communities-browse')}
-        onSuccess={handleCommunityCreated}
-        userId={currentUser?.uid || ''}
-        userName={currentUser?.displayName || 'Anonymous'}
-      />
-    );
-  }
-
-  if (currentPage === 'community-detail' && selectedCommunityId) {
-    return (
-      <CommunityDetails
-        communityId={selectedCommunityId}
-        onBack={() => setCurrentPage('communities-browse')}
-        onNavigateToChat={(communityId) => {
-          setSelectedCommunityId(communityId);
-          setCurrentPage('group-chat');
-        }}
-        isAdmin={false} // TODO: Check if user is admin
-        isMember={true} // TODO: Check if user is member
-        userId={currentUser?.uid || ''}
-      />
-    );
-  }
-
-  if (currentPage === 'group-chat' && selectedCommunityId) {
-    return (
-      <GroupChat
-        communityId={selectedCommunityId}
-        communityName="Science Fiction Lovers" // TODO: Get from state
-        onBack={() => setCurrentPage('community-detail')}
-        currentUserId={currentUser?.uid || ''}
-      />
-    );
-  }
-
-  if (currentPage === 'private-chat' && chatContext) {
-    return (
-      <PrivateChat
-        otherUser={chatContext.otherUser}
-        bookContext={chatContext.bookContext}
-        onBack={() => setCurrentPage('marketplace')}
-        currentUserId={currentUser?.uid || ''}
-      />
-    );
-  }
-
-  if (currentPage === 'announcements') {
-    return <AnnouncementsPage isAdmin={userRole === 'admin'} onBack={() => setCurrentPage('home')} />;
-  }
-
-  if (currentPage === 'about') {
-    return (
-      <>
-        <Navbar
-          isLoggedIn={userRole === 'user'}
-          currentPage={currentPage}
-          onNavigateHome={() => setCurrentPage('home')}
-          onNavigateBuy={() => setCurrentPage('marketplace')}
-          onNavigateRent={() => setCurrentPage('rent')}
-          onNavigateSell={() => setCurrentPage('sell')}
-          onNavigateCommunities={handleNavigateToCommunities}
-          onNavigateSearch={() => setCurrentPage('advanced-search')}
-          onNavigateWishlist={() => setCurrentPage('wishlist')}
-          onNavigateTuition={() => setCurrentPage('tuition')}
-          onNavigateAnnouncements={() => setCurrentPage('announcements')}
-          onNavigateAbout={() => setCurrentPage('about')}
-          onNavigateLogin={() => setCurrentPage('login')}
-          onNavigateRegister={() => setCurrentPage('signup')}
-          onNavigateProfile={() => setCurrentPage('user-dashboard')}
-          onLogout={handleLogout}
-        />
-        <AboutPage
-          onBack={() => setCurrentPage('home')}
-          onNavigateToCommunities={handleNavigateToCommunities}
-        />
-        <Footer
-          onNavigateToAbout={() => setCurrentPage('about')}
-          onNavigateToBuy={() => setCurrentPage('marketplace')}
-          onNavigateToRent={() => setCurrentPage('rent')}
-          onNavigateToSell={() => setCurrentPage('sell')}
-          onNavigateToAnnouncements={() => setCurrentPage('announcements')}
-        />
-      </>
-    );
-  }
-
-  if (currentPage === 'advanced-search') {
-    return (
-      <>
-        <Navbar
-          isLoggedIn={userRole === 'user'}
-          currentPage={currentPage}
-          onNavigateHome={() => setCurrentPage('home')}
-          onNavigateBuy={() => setCurrentPage('marketplace')}
-          onNavigateRent={() => setCurrentPage('rent')}
-          onNavigateSell={() => setCurrentPage('sell')}
-          onNavigateCommunities={handleNavigateToCommunities}
-          onNavigateSearch={() => setCurrentPage('advanced-search')}
-          onNavigateWishlist={() => setCurrentPage('wishlist')}
-          onNavigateTuition={() => setCurrentPage('tuition')}
-          onNavigateAnnouncements={() => setCurrentPage('announcements')}
-          onNavigateAbout={() => setCurrentPage('about')}
-          onNavigateLogin={() => setCurrentPage('login')}
-          onNavigateRegister={() => setCurrentPage('signup')}
-          onNavigateProfile={() => setCurrentPage('user-dashboard')}
-          onLogout={handleLogout}
-        />
-        <AdvancedSearch
-          onBack={() => setCurrentPage('home')}
-          onNavigateToBook={(bookId) => {
-            setSelectedBookId(bookId);
-            setCurrentPage('marketplace');
-          }}
-        />
-        <Footer
-          onNavigateToAbout={() => setCurrentPage('about')}
-          onNavigateToBuy={() => setCurrentPage('marketplace')}
-          onNavigateToRent={() => setCurrentPage('rent')}
-          onNavigateToSell={() => setCurrentPage('sell')}
-          onNavigateToAnnouncements={() => setCurrentPage('announcements')}
-        />
-      </>
-    );
-  }
-
-  if (currentPage === 'wishlist') {
-    return (
-      <>
-        <Navbar
-          isLoggedIn={userRole === 'user'}
-          currentPage={currentPage}
-          onNavigateHome={() => setCurrentPage('home')}
-          onNavigateBuy={() => setCurrentPage('marketplace')}
-          onNavigateRent={() => setCurrentPage('rent')}
-          onNavigateSell={() => setCurrentPage('sell')}
-          onNavigateCommunities={handleNavigateToCommunities}
-          onNavigateSearch={() => setCurrentPage('advanced-search')}
-          onNavigateWishlist={() => setCurrentPage('wishlist')}
-          onNavigateTuition={() => setCurrentPage('tuition')}
-          onNavigateAnnouncements={() => setCurrentPage('announcements')}
-          onNavigateAbout={() => setCurrentPage('about')}
-          onNavigateLogin={() => setCurrentPage('login')}
-          onNavigateRegister={() => setCurrentPage('signup')}
-          onNavigateProfile={() => setCurrentPage('user-dashboard')}
-          onLogout={handleLogout}
-        />
-        <WishlistPage
-          onBack={() => setCurrentPage('home')}
-          onNavigateToMarketplace={() => setCurrentPage('marketplace')}
-          onNavigateToBook={(bookId) => {
-            setSelectedBookId(bookId);
-            setCurrentPage('marketplace');
-          }}
-        />
-        <Footer
-          onNavigateToAbout={() => setCurrentPage('about')}
-          onNavigateToBuy={() => setCurrentPage('marketplace')}
-          onNavigateToRent={() => setCurrentPage('rent')}
-          onNavigateToSell={() => setCurrentPage('sell')}
-          onNavigateToAnnouncements={() => setCurrentPage('announcements')}
-        />
-      </>
-    );
-  }
-
-  if (currentPage === 'tuition') {
-    return (
-      <>
-        <Navbar
-          isLoggedIn={userRole === 'user'}
-          currentPage={currentPage}
-          onNavigateHome={() => setCurrentPage('home')}
-          onNavigateBuy={() => setCurrentPage('marketplace')}
-          onNavigateRent={() => setCurrentPage('rent')}
-          onNavigateSell={() => setCurrentPage('sell')}
-          onNavigateCommunities={handleNavigateToCommunities}
-          onNavigateSearch={() => setCurrentPage('advanced-search')}
-          onNavigateWishlist={() => setCurrentPage('wishlist')}
-          onNavigateTuition={() => setCurrentPage('tuition')}
-          onNavigateAnnouncements={() => setCurrentPage('announcements')}
-          onNavigateAbout={() => setCurrentPage('about')}
-          onNavigateLogin={() => setCurrentPage('login')}
-          onNavigateRegister={() => setCurrentPage('signup')}
-          onNavigateProfile={() => setCurrentPage('user-dashboard')}
-          onLogout={handleLogout}
-        />
-        <TuitionHub
-          onBack={() => setCurrentPage('home')}
-          isLoggedIn={userRole === 'user'}
-        />
-        <Footer
-          onNavigateToAbout={() => setCurrentPage('about')}
-          onNavigateToBuy={() => setCurrentPage('marketplace')}
-          onNavigateToRent={() => setCurrentPage('rent')}
-          onNavigateToSell={() => setCurrentPage('sell')}
-          onNavigateToAnnouncements={() => setCurrentPage('announcements')}
-        />
-      </>
-    );
-  }
-
-  if (currentPage === 'delivery-tracking') {
-    return (
-      <>
-        <Navbar
-          isLoggedIn={userRole === 'user'}
-          currentPage={currentPage}
-          onNavigateHome={() => setCurrentPage('home')}
-          onNavigateBuy={() => setCurrentPage('marketplace')}
-          onNavigateRent={() => setCurrentPage('rent')}
-          onNavigateSell={() => setCurrentPage('sell')}
-          onNavigateCommunities={handleNavigateToCommunities}
-          onNavigateSearch={() => setCurrentPage('advanced-search')}
-          onNavigateWishlist={() => setCurrentPage('wishlist')}
-          onNavigateTuition={() => setCurrentPage('tuition')}
-          onNavigateAnnouncements={() => setCurrentPage('announcements')}
-          onNavigateAbout={() => setCurrentPage('about')}
-          onNavigateLogin={() => setCurrentPage('login')}
-          onNavigateRegister={() => setCurrentPage('signup')}
-          onNavigateProfile={() => setCurrentPage('user-dashboard')}
-          onLogout={handleLogout}
-        />
-        <DeliveryTracking
-          onBack={() => setCurrentPage('home')}
-          orderId={currentOrderId}
-        />
-        <Footer
-          onNavigateToAbout={() => setCurrentPage('about')}
-          onNavigateToBuy={() => setCurrentPage('marketplace')}
-          onNavigateToRent={() => setCurrentPage('rent')}
-          onNavigateToSell={() => setCurrentPage('sell')}
-          onNavigateToAnnouncements={() => setCurrentPage('announcements')}
-        />
-      </>
-    );
-  }
-
-  // Regular pages with navbar/footer
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar
-        isLoggedIn={userRole === 'user'}
-        currentPage={currentPage}
-        onNavigateHome={() => setCurrentPage('home')}
-        onNavigateBuy={() => setCurrentPage('marketplace')}
-        onNavigateRent={() => setCurrentPage('rent')}
-        onNavigateSell={() => setCurrentPage('sell')}
-        onNavigateCommunities={handleNavigateToCommunities}
-        onNavigateSearch={() => setCurrentPage('advanced-search')}
-        onNavigateWishlist={() => setCurrentPage('wishlist')}
-        onNavigateTuition={() => setCurrentPage('tuition')}
-        onNavigateAnnouncements={() => setCurrentPage('announcements')}
-        onNavigateAbout={() => setCurrentPage('about')}
-        onNavigateLogin={() => setCurrentPage('login')}
-        onNavigateRegister={() => setCurrentPage('signup')}
-        onNavigateProfile={() => setCurrentPage('user-dashboard')}
-        onLogout={handleLogout}
-      />
-      <main className="flex-1">
-        {currentPage === 'home' && (
-          <HomeScreen
-            onNavigateToCommunities={handleNavigateToCommunities}
-            onNavigateToBook={(bookId) => {
-              setSelectedBookId(bookId);
-              setCurrentPage('marketplace');
-            }}
-            onNavigateToAnnouncements={() => setCurrentPage('announcements')}
-            onNavigateToSearch={() => setCurrentPage('advanced-search')}
-            isLoggedIn={userRole === 'user'}
-          />
-        )}
-        {currentPage === 'marketplace' && (
-          <BookMarketplace
-            onBack={() => setCurrentPage('home')}
-          />
-        )}
-        {currentPage === 'communities-browse' && (
-          <CommunitiesBrowse
-            onNavigateToDetail={handleNavigateToCommunityDetail}
-            onNavigateToCreate={handleNavigateToCreateCommunity}
-            onBack={() => setCurrentPage('home')}
-            isLoggedIn={userRole === 'user'}
-          />
-        )}
-        {currentPage === 'rent' && (
-          <RentBookFlow onClose={() => setCurrentPage('home')} />
-        )}
-        {currentPage === 'sell' && (
-          <SellBookFlow onClose={() => setCurrentPage('home')} />
-        )}
-        {currentPage === 'login' && (
-          <LoginForm
-            onSwitchToSignUp={() => setCurrentPage('signup')}
-            onLogin={handleUserLogin}
-          />
-        )}
-        {currentPage === 'signup' && (
-          <SignUpForm
-            onSwitchToLogin={() => setCurrentPage('login')}
-            onSignUp={() => {
-              handleUserLogin();
-              setCurrentPage('home');
-            }}
-          />
-        )}
-        <ChatButton />
+    <Router>
+      <Routes>
+        {/* Auth Routes */}
+        <Route element={<AuthLayout />}>
+          <Route path="/login" element={<LoginForm onLogin={() => setUserRole('user')} />} />
+          <Route path="/register" element={<SignUpForm onSignUp={() => setUserRole('user')} />} />
+          <Route path="/admin/login" element={<AdminLogin onLogin={() => setUserRole('admin')} />} />
+        </Route>
 
-        {showLogoutConfirm && (
-          <LogoutConfirmation onConfirm={confirmLogout} onCancel={cancelLogout} />
-        )}
+        {/* Main App Routes */}
+        <Route element={<MainLayout isLoggedIn={!!currentUser} onLogout={handleLogout} />}>
+          <Route path="/" element={<HomeScreen isLoggedIn={!!currentUser} />} />
+          <Route path="/marketplace" element={<BookMarketplace />} />
+          <Route path="/book/:id" element={<BookDetailsPage />} />
+          <Route path="/sell" element={<SellBookFlowWrapper />} />
+          <Route path="/rent" element={<RentBookFlowWrapper />} />
+          <Route path="/exchange" element={<ExchangeBookFlowWrapper />} />
 
-        {/* Payment Gateway Modal */}
-        {showPaymentGateway && paymentContext && (
-          <PaymentGateway
-            amount={paymentContext.amount}
-            type={paymentContext.type}
-            itemTitle={paymentContext.itemTitle}
-            onSuccess={(transactionId) => {
-              setShowPaymentGateway(false);
-              setCurrentOrderId(transactionId);
-              setCurrentPage('delivery-tracking');
-            }}
-            onCancel={() => setShowPaymentGateway(false)}
-          />
-        )}
+          <Route path="/communities" element={<CommunitiesBrowse isLoggedIn={!!currentUser} />} />
+          <Route path="/communities/create" element={<CreateCommunity userId={currentUser?.uid} userName={currentUser?.displayName} />} />
+          <Route path="/communities/:id" element={<CommunityDetails userId={currentUser?.uid} />} />
+          <Route path="/communities/:id/chat" element={<GroupChat currentUserId={currentUser?.uid} />} />
 
-        {/* Barcode Scanner Modal */}
-        {showBarcodeScanner && (
-          <BarcodeScanner
-            onScanComplete={(isbn) => {
-              setShowBarcodeScanner(false);
-              // Use scanned ISBN
-            }}
-            onCancel={() => setShowBarcodeScanner(false)}
-          />
-        )}
+          <Route path="/chat" element={<PrivateChatWrapper />} />
 
-        {/* Video Player Modal */}
-        {showVideoPlayer && (
-          <VideoPlayer
-            title="Lecture Video"
-            description="Educational content"
-            onClose={() => setShowVideoPlayer(false)}
-            downloadable={true}
-          />
-        )}
+          <Route path="/announcements" element={<AnnouncementsPage isAdmin={userRole === 'admin'} />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/search" element={<AdvancedSearch />} />
+          <Route path="/wishlist" element={<WishlistPage />} />
+          <Route path="/tuition" element={<TuitionHub isLoggedIn={!!currentUser} />} />
+          <Route path="/notes" element={<NotesHub />} />
+          <Route path="/tracking/:orderId" element={<DeliveryTracking />} />
 
-        {/* Notes Viewer Modal */}
-        {showNotesViewer && (
-          <NotesViewer
-            title="Study Notes"
-            author="Book Bloom"
-            onClose={() => setShowNotesViewer(false)}
-            downloadable={true}
-          />
-        )}
+          {/* Protected User Routes */}
+          <Route element={<ProtectedRoute isLoggedIn={!!currentUser} />}>
+            <Route path="/dashboard" element={<UserDashboard onLogout={handleLogout} />}>
+              <Route index element={<UserProfile />} />
+              <Route path="purchases" element={<PurchaseHistory />} />
+              <Route path="sales" element={<SalesHistory />} />
+              <Route path="rentals" element={<RentalHistory />} />
+              <Route path="wishlist" element={<Wishlist />} />
+              <Route path="communities" element={<UserCommunities />} />
+              <Route path="chats" element={<UserChats />} />
+            </Route>
+          </Route>
 
-        {/* Error Modal */}
-        {showErrorModal && (
-          <ErrorModal
-            message={errorMessage}
-            onClose={() => setShowErrorModal(false)}
-          />
-        )}
+          {/* Admin Routes */}
+          <Route element={<AdminRoute userRole={userRole} />}>
+            <Route path="/admin/dashboard" element={<AdminDashboard onLogout={handleLogout} />}>
+              <Route index element={<UserManagement />} />
+              <Route path="books" element={<BookInventory />} />
+              <Route path="rentals" element={<RentalManagement />} />
+              <Route path="transactions" element={<TransactionHistory />} />
+              <Route path="communities" element={<CommunityManagement />} />
+              <Route path="announcements" element={<AdminAnnouncementsWrapper />} />
+              <Route path="settings" element={<SystemSettings />} />
+            </Route>
+          </Route>
+        </Route>
 
-        {/* Loading State */}
-        {isLoading && (
-          <LoadingState fullScreen={true} message="Please wait..." />
-        )}
-      </main>
-      <Footer
-        onNavigateToAbout={() => setCurrentPage('about')}
-        onNavigateToBuy={() => setCurrentPage('marketplace')}
-        onNavigateToRent={() => setCurrentPage('rent')}
-        onNavigateToSell={() => setCurrentPage('sell')}
-        onNavigateToAnnouncements={() => setCurrentPage('announcements')}
-      />
-      <Toaster />
-    </div>
+        {/* Catch all */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Router>
   );
 }

@@ -9,6 +9,7 @@ import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { db, auth } from '../firebase';
 import { collection, query, where, orderBy, getDocs, doc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
 
 interface Notification {
   id: string;
@@ -20,24 +21,15 @@ interface Notification {
 }
 
 interface HomeScreenProps {
-  onNavigateToCommunities: () => void;
-  onNavigateToBook: (bookId: string) => void;
-  onNavigateToAnnouncements: () => void;
-  onNavigateToSearch?: () => void;
   isLoggedIn: boolean;
 }
 
-export function HomeScreen({
-  onNavigateToCommunities,
-  onNavigateToBook,
-  onNavigateToAnnouncements,
-  onNavigateToSearch,
-  isLoggedIn
-}: HomeScreenProps) {
+export function HomeScreen({ isLoggedIn }: HomeScreenProps) {
   const [activeTab, setActiveTab] = useState<'buy' | 'sell' | 'rent'>('buy');
   const [searchQuery, setSearchQuery] = useState('');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const user = auth.currentUser;
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!isLoggedIn || !user) return;
@@ -84,7 +76,7 @@ export function HomeScreen({
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FAF8F3] to-white pb-20 md:pb-0">
       {/* Announcement Carousel - Top */}
-      <AnnouncementCarousel onViewAll={onNavigateToAnnouncements} />
+      <AnnouncementCarousel onViewAll={() => navigate('/announcements')} />
 
       {/* Notification Carousel */}
       <div className="max-w-7xl mx-auto px-4 pt-4">
@@ -99,7 +91,7 @@ export function HomeScreen({
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div
           className="relative cursor-pointer shadow-subtle rounded-lg transition-smooth hover:shadow-card"
-          onClick={onNavigateToSearch}
+          onClick={() => navigate('/search')}
         >
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <Input
@@ -107,7 +99,7 @@ export function HomeScreen({
             placeholder="Search books by title, author, ISBN, or topic..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onFocus={onNavigateToSearch}
+            onFocus={() => navigate('/search')}
             className="pl-12 pr-4 h-14 text-lg bg-white border-2 border-blue-600/30 focus:border-blue-600 focus-glow cursor-pointer"
             readOnly
           />
@@ -135,7 +127,7 @@ export function HomeScreen({
 
       {/* AI Recommendations */}
       <div className="max-w-7xl mx-auto px-4">
-        <AIRecommendations context="home" onBookClick={onNavigateToBook} />
+        <AIRecommendations context="home" onBookClick={(id) => navigate(`/book/${id}`)} />
       </div>
 
       {/* Featured Books Section - Book Marketplace */}
@@ -172,7 +164,7 @@ export function HomeScreen({
 
         <FeaturedBooks
           activeTab={activeTab}
-          onNavigateToBook={onNavigateToBook}
+          onNavigateToBook={(id) => navigate(`/book/${id}`)}
         />
       </div>
 
@@ -185,7 +177,7 @@ export function HomeScreen({
               <p className="text-gray-600">Connect with readers who share your interests</p>
             </div>
             <Button
-              onClick={onNavigateToCommunities}
+              onClick={() => navigate('/communities')}
               className="bg-blue-600 hover:bg-blue-700 text-white transition-smooth btn-scale shadow-subtle"
             >
               Browse All →
@@ -193,7 +185,7 @@ export function HomeScreen({
           </div>
 
           <CommunitiesSection
-            onNavigateToCommunities={onNavigateToCommunities}
+            onNavigateToCommunities={() => navigate('/communities')}
             isLoggedIn={isLoggedIn}
           />
         </div>

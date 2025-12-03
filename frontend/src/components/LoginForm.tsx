@@ -1,54 +1,72 @@
 // Updated src/components/LoginForm.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
 import { Eye, EyeOff, Mail, Lock, Home } from 'lucide-react';
-import { auth, googleProvider, facebookProvider } from '../firebase';  // Import from firebase.ts
-import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
+import { auth, googleProvider, facebookProvider } from '../firebase';
+import { signInWithPopup } from 'firebase/auth';
+import { Link, useNavigate } from 'react-router-dom';
+import { useSignInWithEmailAndPassword } from 'react-firebase-hooks/auth';
+import { toast } from 'sonner';
 
 interface LoginFormProps {
-  onSwitchToSignUp: () => void;
   onLogin?: () => void;
 }
 
-export function LoginForm({ onSwitchToSignUp, onLogin }: LoginFormProps) {
+export function LoginForm({ onLogin }: LoginFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);  // Added for error display
+  const navigate = useNavigate();
+
+  const [
+    signInWithEmailAndPassword,
+    user,
+    loading,
+    error,
+  ] = useSignInWithEmailAndPassword(auth);
+
+  useEffect(() => {
+    if (error) {
+      // Show error toast
+      toast.error(error.message);
+    }
+    if (user) {
+      console.log('Login successful');
+      if (onLogin) onLogin();
+      navigate('/');
+    }
+  }, [user, error, onLogin, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      console.log('Login successful');
-      if (onLogin) onLogin();
-    } catch (err: any) {
-      setError(err.message || 'Login failed. Please try again.');
+      await signInWithEmailAndPassword(email, password);
+    } catch (err) {
+      console.error(err);
     }
   };
 
   const handleGoogleLogin = async () => {
-    setError(null);
     try {
       await signInWithPopup(auth, googleProvider);
       console.log('Google login successful');
       if (onLogin) onLogin();
+      navigate('/');
     } catch (err: any) {
-      setError(err.message || 'Google login failed.');
+      toast.error(err.message || 'Google login failed.');
     }
   };
 
   const handleFacebookLogin = async () => {
-    setError(null);
     try {
       await signInWithPopup(auth, facebookProvider);
       console.log('Facebook login successful');
       if (onLogin) onLogin();
+      navigate('/');
     } catch (err: any) {
-      setError(err.message || 'Facebook login failed.');
+      toast.error(err.message || 'Facebook login failed.');
     }
   };
 
@@ -62,7 +80,7 @@ export function LoginForm({ onSwitchToSignUp, onLogin }: LoginFormProps) {
           </div>
           <h2 className="text-white text-4xl">Welcome to Book Bloom</h2>
           <p className="text-white/90 text-lg">
-            Your trusted platform for buying, selling, and renting books. 
+            Your trusted platform for buying, selling, and renting books.
             Discover your next great read today.
           </p>
           <div className="grid grid-cols-3 gap-4 pt-8">
@@ -165,11 +183,12 @@ export function LoginForm({ onSwitchToSignUp, onLogin }: LoginFormProps) {
               {/* Login Button */}
               <Button
                 type="submit"
+                disabled={loading}
                 className="w-full h-12 bg-[#C4A672] hover:bg-[#8B7355] text-white"
               >
-                Login
+                {loading ? 'Logging in...' : 'Login'}
               </Button>
-              {error && <p className="text-sm text-red-500">{error}</p>}  {/* Added error display */}
+              {error && <p className="text-sm text-red-500">{error.message}</p>}
 
               {/* Divider */}
               <div className="relative">
@@ -218,7 +237,7 @@ export function LoginForm({ onSwitchToSignUp, onLogin }: LoginFormProps) {
                   onClick={handleFacebookLogin}
                 >
                   <svg className="w-5 h-5 mr-2" fill="#1877F2" viewBox="0 0 24 24">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
                   </svg>
                   Facebook
                 </Button>
@@ -229,12 +248,12 @@ export function LoginForm({ onSwitchToSignUp, onLogin }: LoginFormProps) {
             <div className="text-center pt-4">
               <p className="text-gray-600">
                 Don't have an account?{' '}
-                <button
-                  onClick={onSwitchToSignUp}
+                <Link
+                  to="/register"
                   className="text-[#C4A672] hover:text-[#8B7355] hover:underline"
                 >
                   Sign up for free
-                </button>
+                </Link>
               </p>
             </div>
           </div>

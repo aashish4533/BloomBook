@@ -1,10 +1,9 @@
-// Updated src/components/User/SalesHistory.tsx
-import { useState, useEffect } from 'react';
 import { Badge } from '../ui/badge';
 import { DollarSign } from 'lucide-react';
 import { db, auth } from '../../firebase';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-import { toast } from 'sonner';
+import { collection, query, where, orderBy } from 'firebase/firestore';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { useCollection } from 'react-firebase-hooks/firestore';
 
 interface Sale {
   id: string;
@@ -16,41 +15,18 @@ interface Sale {
 }
 
 export function SalesHistory() {
-  const [sales, setSales] = useState<Sale[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [totalEarnings, setTotalEarnings] = useState(0);
-  const user = auth.currentUser;
+  const [user, loadingUser] = useAuthState(auth);
+  const [salesSnapshot, loadingSales, error] = useCollection(
+    user ? query(collection(db, 'sales'), where('sellerId', '==', user.uid), orderBy('date', 'desc')) : null
+  );
 
-  useEffect(() => {
-    if (!user) return;
+  if (loadingUser || loadingSales) return <div>Loading...</div>;
+  if (error) return <div>Error: {error.message}</div>;
 
-    const fetchSales = async () => {
-      setLoading(true);
-      try {
-        const q = query(
-          collection(db, 'sales'),
-          where('sellerId', '==', user.uid),
-          orderBy('date', 'desc')
-        );
-        const snapshot = await getDocs(q);
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sale));
-        setSales(data);
-
-        const earnings = data
-          .filter(s => s.status === 'sold')
-          .reduce((sum, s) => sum + s.price, 0);
-        setTotalEarnings(earnings);
-      } catch (err) {
-        toast.error('Failed to fetch sales');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchSales();
-  }, [user]);
-
-  if (loading) return <div>Loading...</div>;
+  const sales = salesSnapshot?.docs.map(doc => ({ id: doc.id, ...doc.data() } as Sale)) || [];
+  const totalEarnings = sales
+    .filter(s => s.status === 'sold')
+    .reduce((sum, s) => sum + s.price, 0);
 
   return (
     <div className="space-y-6">

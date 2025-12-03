@@ -7,6 +7,31 @@ import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 
+import { db, auth } from '../firebase';
+import { collection, addDoc, serverTimestamp, query, where } from 'firebase/firestore';
+import { useCollection } from 'react-firebase-hooks/firestore';
+import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Label } from './ui/label';
+import { Textarea } from './ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+
+interface Tutor {
+  id: string;
+  name: string;
+  subject: string;
+  specialization: string;
+  rating: number;
+  reviews: number;
+  students: number;
+  hourlyRate: number;
+  avatar: string;
+  verified: boolean;
+  experience: string;
+  availability: string;
+  userId: string;
+}
+
 interface TuitionHubProps {
   onBack: () => void;
   isLoggedIn: boolean;
@@ -16,92 +41,57 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
 
-  const tutors = [
-    {
-      id: '1',
-      name: 'Dr. Sarah Johnson',
-      subject: 'Mathematics',
-      specialization: 'Calculus & Algebra',
-      rating: 4.9,
-      reviews: 342,
-      students: 1200,
-      hourlyRate: 45,
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&q=80',
-      verified: true,
-      experience: '10+ years',
-      availability: 'Available'
-    },
-    {
-      id: '2',
-      name: 'Prof. Michael Chen',
-      subject: 'Physics',
-      specialization: 'Quantum Mechanics & Thermodynamics',
-      rating: 4.8,
-      reviews: 287,
-      students: 890,
-      hourlyRate: 50,
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80',
-      verified: true,
-      experience: '15+ years',
-      availability: 'Available'
-    },
-    {
-      id: '3',
-      name: 'Emily Rodriguez',
-      subject: 'English Literature',
-      specialization: 'Essay Writing & Literary Analysis',
-      rating: 4.7,
-      reviews: 198,
-      students: 650,
-      hourlyRate: 35,
-      avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&q=80',
-      verified: true,
-      experience: '7+ years',
-      availability: 'Limited Slots'
-    },
-    {
-      id: '4',
-      name: 'James Wilson',
-      subject: 'Computer Science',
-      specialization: 'Programming & Data Structures',
-      rating: 4.9,
-      reviews: 421,
-      students: 1500,
-      hourlyRate: 55,
-      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&q=80',
-      verified: true,
-      experience: '12+ years',
-      availability: 'Available'
-    },
-    {
-      id: '5',
-      name: 'Dr. Lisa Anderson',
-      subject: 'Chemistry',
-      specialization: 'Organic & Inorganic Chemistry',
-      rating: 4.8,
-      reviews: 267,
-      students: 780,
-      hourlyRate: 48,
-      avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&q=80',
-      verified: true,
-      experience: '9+ years',
-      availability: 'Available'
-    },
-    {
-      id: '6',
-      name: 'David Kim',
-      subject: 'Economics',
-      specialization: 'Microeconomics & Macroeconomics',
-      rating: 4.6,
-      reviews: 156,
-      students: 520,
-      hourlyRate: 40,
-      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&q=80',
-      verified: true,
-      experience: '6+ years',
-      availability: 'Available'
-    },
-  ];
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [tutorForm, setTutorForm] = useState({
+    subject: '',
+    specialization: '',
+    hourlyRate: '',
+    experience: '',
+    availability: 'Available',
+    bio: ''
+  });
+
+  const [value, loading, error] = useCollection(collection(db, 'tutors'));
+
+  const tutors = value?.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tutor)) || [];
+
+  const handleBecomeTutor = async () => {
+    if (!auth.currentUser) {
+      toast.error('Please login to become a tutor');
+      return;
+    }
+
+    try {
+      await addDoc(collection(db, 'tutors'), {
+        userId: auth.currentUser.uid,
+        name: auth.currentUser.displayName || 'Anonymous',
+        avatar: auth.currentUser.photoURL || '',
+        subject: tutorForm.subject,
+        specialization: tutorForm.specialization,
+        hourlyRate: parseFloat(tutorForm.hourlyRate),
+        experience: tutorForm.experience,
+        availability: tutorForm.availability,
+        bio: tutorForm.bio,
+        rating: 0,
+        reviews: 0,
+        students: 0,
+        verified: false,
+        createdAt: serverTimestamp()
+      });
+      toast.success('Tutor profile created successfully!');
+      setIsRegistering(false);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to create profile');
+    }
+  };
+
+  const filteredTutors = tutors.filter(tutor => {
+    const matchesSearch = tutor.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      tutor.subject?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = activeCategory === 'all' || tutor.subject?.toLowerCase().includes(activeCategory);
+    return matchesSearch && matchesCategory;
+  });
 
   const upcomingSessions = [
     {
@@ -142,7 +132,7 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
             <ArrowLeft className="w-5 h-5" />
             <span>Back</span>
           </button>
-          
+
           <div className="flex items-center gap-4 mb-6">
             <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center">
               <GraduationCap className="w-10 h-10" />
@@ -243,14 +233,79 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
         <div>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-[#2C3E50] text-2xl">Available Tutors ({tutors.length})</h2>
-            <Button variant="outline">
-              <Filter className="w-4 h-4 mr-2" />
-              Filters
-            </Button>
+            <div className="flex gap-2">
+              <Dialog open={isRegistering} onOpenChange={setIsRegistering}>
+                <DialogTrigger asChild>
+                  <Button className="bg-[#C4A672] hover:bg-[#8B7355] text-white">
+                    Become a Tutor
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle>Register as a Tutor</DialogTitle>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="subject">Subject</Label>
+                      <Input
+                        id="subject"
+                        value={tutorForm.subject}
+                        onChange={(e) => setTutorForm({ ...tutorForm, subject: e.target.value })}
+                        placeholder="e.g. Mathematics"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="specialization">Specialization</Label>
+                      <Input
+                        id="specialization"
+                        value={tutorForm.specialization}
+                        onChange={(e) => setTutorForm({ ...tutorForm, specialization: e.target.value })}
+                        placeholder="e.g. Calculus"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="rate">Hourly Rate ($)</Label>
+                      <Input
+                        id="rate"
+                        type="number"
+                        value={tutorForm.hourlyRate}
+                        onChange={(e) => setTutorForm({ ...tutorForm, hourlyRate: e.target.value })}
+                        placeholder="45"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="experience">Experience</Label>
+                      <Input
+                        id="experience"
+                        value={tutorForm.experience}
+                        onChange={(e) => setTutorForm({ ...tutorForm, experience: e.target.value })}
+                        placeholder="e.g. 5 years"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="bio">Bio</Label>
+                      <Textarea
+                        id="bio"
+                        value={tutorForm.bio}
+                        onChange={(e) => setTutorForm({ ...tutorForm, bio: e.target.value })}
+                        placeholder="Tell students about yourself..."
+                      />
+                    </div>
+                    <Button onClick={handleBecomeTutor} className="bg-[#C4A672] text-white">
+                      Submit Application
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              <Button variant="outline">
+                <Filter className="w-4 h-4 mr-2" />
+                Filters
+              </Button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {tutors.map((tutor) => (
+            {filteredTutors.map((tutor) => (
               <Card key={tutor.id} className="overflow-hidden hover:shadow-lg transition-shadow">
                 <div className="p-6">
                   {/* Tutor Header */}

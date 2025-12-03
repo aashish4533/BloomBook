@@ -9,8 +9,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
-import { db, auth } from '../../firebase';
+import { db, auth, storage } from '../../firebase';
 import { collection, addDoc, onSnapshot, query, orderBy, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 interface Message {
   id: string;
@@ -59,7 +60,7 @@ const formatTime = (date: Date) => {
   const now = new Date();
   const diff = now.getTime() - date.getTime();
   const hours = Math.floor(diff / 3600000);
-  
+
   if (hours < 1) {
     const minutes = Math.floor(diff / 60000);
     return minutes < 1 ? 'Just now' : `${minutes}m ago`;
@@ -104,7 +105,7 @@ function ChatMessage({ message, showAvatar }: { message: Message; showAvatar: bo
 export function PrivateChat({ otherUser, bookContext, onBack, currentUserId }: PrivateChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [selectedImages, setSelectedImages] = useState<{ file: File; preview: string }[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [isArchived, setIsArchived] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -156,18 +157,15 @@ export function PrivateChat({ otherUser, bookContext, onBack, currentUserId }: P
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    
+
     files.forEach(file => {
       if (file.size > 5 * 1024 * 1024) {
         toast.error('Image size must be less than 5MB');
         return;
       }
 
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setSelectedImages(prev => [...prev, reader.result as string]);
-      };
-      reader.readAsDataURL(file);
+      const preview = URL.createObjectURL(file);
+      setSelectedImages(prev => [...prev, { file, preview }]);
     });
   };
 
@@ -179,12 +177,22 @@ export function PrivateChat({ otherUser, bookContext, onBack, currentUserId }: P
     if (!newMessage.trim() && selectedImages.length === 0) return;
 
     try {
+      const imageUrls: string[] = [];
+
+      // Upload images
+      for (const img of selectedImages) {
+        const storageRef = ref(storage, `chat-images/${chatId}/${Date.now()}-${img.file.name}`);
+        const snapshot = await uploadBytes(storageRef, img.file);
+        const url = await getDownloadURL(snapshot.ref);
+        imageUrls.push(url);
+      }
+
       await addDoc(collection(db, 'chats', chatId, 'messages'), {
         senderId: currentUserId,
         senderName: 'You',
         senderAvatar: 'ME',
         content: newMessage,
-        images: selectedImages.length > 0 ? selectedImages : undefined,
+        images: imageUrls.length > 0 ? imageUrls : undefined,
         timestamp: serverTimestamp(),
         status: 'sent'
       });
@@ -317,7 +325,7 @@ export function PrivateChat({ otherUser, bookContext, onBack, currentUserId }: P
             <div className="flex gap-2 mt-2 overflow-x-auto">
               {selectedImages.map((img, index) => (
                 <div key={index} className="relative">
-                  <img src={img} alt="Preview" className="w-16 h-16 object-cover rounded" />
+                  <img src={img.preview} alt="Preview" className="w-16 h-16 object-cover rounded" />
                   <button
                     onClick={() => removeImage(index)}
                     className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"

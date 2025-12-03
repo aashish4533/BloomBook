@@ -10,14 +10,16 @@ interface NotesViewerProps {
   pages?: number;
   onClose?: () => void;
   downloadable?: boolean;
+  fileUrl?: string;
 }
 
 export function NotesViewer({
   title,
   author = 'BookBloom',
-  pages = 12,
+  pages = 1,
   onClose,
-  downloadable = true
+  downloadable = true,
+  fileUrl
 }: NotesViewerProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [zoom, setZoom] = useState(100);
@@ -31,11 +33,16 @@ export function NotesViewer({
   };
 
   const handleDownload = () => {
-    alert('Downloading PDF...\n\nIn a production app, this would trigger a PDF download.');
+    if (fileUrl) {
+      window.open(fileUrl, '_blank');
+    } else {
+      alert('No file URL provided');
+    }
   };
 
   const handlePrint = () => {
-    alert('Opening print dialog...\n\nIn a production app, this would open the browser print dialog.');
+    // Printing iframe content is tricky cross-origin, but we can try window.print() or just let user print from PDF viewer
+    window.print();
   };
 
   return (
@@ -65,31 +72,6 @@ export function NotesViewer({
       {/* Toolbar */}
       <div className="bg-[#2A2A2A] border-b border-gray-700 px-6 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          {/* Page Navigation */}
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-              className="text-white hover:bg-gray-700"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <span className="text-white text-sm">
-              Page {currentPage} of {pages}
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setCurrentPage(Math.min(pages, currentPage + 1))}
-              disabled={currentPage === pages}
-              className="text-white hover:bg-gray-700"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
-
           {/* Zoom Controls */}
           <div className="flex items-center gap-3">
             <Button
@@ -124,14 +106,6 @@ export function NotesViewer({
               <Printer className="w-4 h-4 mr-2" />
               Print
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-white hover:bg-gray-700"
-            >
-              <Share2 className="w-4 h-4 mr-2" />
-              Share
-            </Button>
             {downloadable && (
               <Button
                 onClick={handleDownload}
@@ -147,96 +121,24 @@ export function NotesViewer({
       </div>
 
       {/* Document Viewer */}
-      <div className="flex-1 overflow-auto bg-gray-800 p-8">
-        <div className="max-w-4xl mx-auto">
-          <Card
-            className="bg-white shadow-2xl"
-            style={{
-              transform: `scale(${zoom / 100})`,
-              transformOrigin: 'top center',
-              transition: 'transform 0.2s'
-            }}
-          >
-            <div className="p-12">
-              {/* PDF Content Placeholder */}
-              <div className="space-y-6">
-                {/* Header */}
-                <div className="border-b pb-6">
-                  <h1 className="text-4xl text-[#2C3E50] mb-2">{title}</h1>
-                  <p className="text-gray-600">Page {currentPage}</p>
-                </div>
-
-                {/* Mock Content */}
-                <div className="space-y-4">
-                  <h2 className="text-2xl text-[#2C3E50]">Chapter {currentPage}: Introduction</h2>
-
-                  <p className="text-gray-700 leading-relaxed">
-                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor
-                    incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud
-                    exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-                  </p>
-
-                  <p className="text-gray-700 leading-relaxed">
-                    Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu
-                    fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in
-                    culpa qui officia deserunt mollit anim id est laborum.
-                  </p>
-
-                  {/* Code block example */}
-                  <div className="bg-gray-100 rounded-lg p-4 my-6">
-                    <pre className="text-sm text-gray-800 overflow-x-auto">
-                      {`function example() {
-  console.log("Sample code block");
-  return true;
-}`}
-                    </pre>
-                  </div>
-
-                  <h3 className="text-xl text-[#2C3E50] mt-6">Key Points</h3>
-                  <ul className="list-disc list-inside space-y-2 text-gray-700">
-                    <li>Important concept number one with detailed explanation</li>
-                    <li>Key takeaway from this section</li>
-                    <li>Critical information to remember</li>
-                    <li>Additional notes and references</li>
-                  </ul>
-
-                  <p className="text-gray-700 leading-relaxed mt-6">
-                    Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque
-                    laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi
-                    architecto beatae vitae dicta sunt explicabo.
-                  </p>
-
-                  {/* Image placeholder */}
-                  <div className="bg-gray-200 rounded-lg p-8 my-6 flex items-center justify-center">
-                    <div className="text-center text-gray-500">
-                      <FileText className="w-16 h-16 mx-auto mb-2" />
-                      <p>Figure {currentPage}.1: Diagram or Image</p>
-                    </div>
-                  </div>
-
-                  <p className="text-gray-700 leading-relaxed">
-                    Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia
-                    consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.
-                  </p>
-                </div>
-
-                {/* Footer */}
-                <div className="border-t pt-6 mt-8 text-center text-sm text-gray-500">
-                  <p>{title} - Page {currentPage} of {pages}</p>
-                  <p className="mt-1">© 2024 {author}. All rights reserved.</p>
-                </div>
-              </div>
-            </div>
-          </Card>
-        </div>
+      <div className="flex-1 overflow-hidden bg-gray-800 relative">
+        {fileUrl ? (
+          <iframe
+            src={fileUrl}
+            className="w-full h-full border-0"
+            title="PDF Viewer"
+          />
+        ) : (
+          <div className="flex items-center justify-center h-full text-white">
+            No PDF URL provided
+          </div>
+        )}
       </div>
 
       {/* Footer Info */}
       <div className="bg-[#1E1E1E] border-t border-gray-700 px-6 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between text-sm text-gray-400">
           <div className="flex items-center gap-6">
-            <span>Total Pages: {pages}</span>
-            <span>File Size: 2.4 MB</span>
             <span>Format: PDF</span>
           </div>
           <div className="flex items-center gap-2">

@@ -1,19 +1,21 @@
 // Updated src/components/SignUpForm.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
 import { Eye, EyeOff, Mail, Lock, Home, CheckCircle2 } from 'lucide-react';
-import { auth, googleProvider, db } from '../firebase';  // Import from firebase.ts
-import { createUserWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
+import { auth, googleProvider, db } from '../firebase';
+import { signInWithPopup } from 'firebase/auth';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { Link, useNavigate } from 'react-router-dom';
+import { useCreateUserWithEmailAndPassword } from 'react-firebase-hooks/auth';
+import { toast } from 'sonner';
 
 interface SignUpFormProps {
-  onSwitchToLogin: () => void;
   onSignUp?: () => void;
 }
 
-export function SignUpForm({ onSwitchToLogin, onSignUp }: SignUpFormProps) {
+export function SignUpForm({ onSignUp }: SignUpFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [email, setEmail] = useState('');
@@ -21,7 +23,46 @@ export function SignUpForm({ onSwitchToLogin, onSignUp }: SignUpFormProps) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  const [serverError, setServerError] = useState<string | null>(null);  // For Firebase errors
+  const navigate = useNavigate();
+
+  const [
+    createUserWithEmailAndPassword,
+    userCredential,
+    loading,
+    error,
+  ] = useCreateUserWithEmailAndPassword(auth);
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error.message);
+    }
+  }, [error]);
+
+  useEffect(() => {
+    const createUserDoc = async () => {
+      if (userCredential) {
+        const user = userCredential.user;
+        try {
+          await setDoc(doc(db, 'users', user.uid), {
+            email: user.email,
+            displayName: email.split('@')[0],
+            photoURL: 'https://ui-avatars.com/api/?name=' + email.split('@')[0],
+            role: 'user',
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          });
+          console.log('Signup successful');
+          if (onSignUp) onSignUp();
+          navigate('/');
+        } catch (err) {
+          console.error("Error creating user doc:", err);
+          toast.error("Account created but failed to set up profile.");
+        }
+      }
+    };
+    createUserDoc();
+  }, [userCredential, email, navigate, onSignUp]);
+
 
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
@@ -54,43 +95,24 @@ export function SignUpForm({ onSwitchToLogin, onSignUp }: SignUpFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setServerError(null);
     if (validateForm()) {
       try {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-
-        // Create user document in Firestore
-        await setDoc(doc(db, 'users', user.uid), {
-          email: user.email,
-          displayName: email.split('@')[0], // Default display name from email
-          photoURL: 'https://ui-avatars.com/api/?name=' + email.split('@')[0], // Default avatar
-          role: 'user',
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        });
-
-        console.log('Signup successful');
-        if (onSignUp) onSignUp();
-      } catch (err: any) {
-        console.error("Signup error:", err);
-        setServerError(err.message || 'Signup failed. Please try again.');
+        await createUserWithEmailAndPassword(email, password);
+      } catch (err) {
+        console.error(err);
       }
     }
   };
 
   const handleGoogleSignUp = async () => {
-    setServerError(null);
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
 
-      // Check if user document exists
       const userDocRef = doc(db, 'users', user.uid);
       const userDoc = await getDoc(userDocRef);
 
       if (!userDoc.exists()) {
-        // Create new user document
         await setDoc(userDocRef, {
           email: user.email,
           displayName: user.displayName || user.email?.split('@')[0] || 'User',
@@ -103,9 +125,10 @@ export function SignUpForm({ onSwitchToLogin, onSignUp }: SignUpFormProps) {
 
       console.log('Google signup successful');
       if (onSignUp) onSignUp();
+      navigate('/');
     } catch (err: any) {
       console.error("Google signup error:", err);
-      setServerError(err.message || 'Google signup failed.');
+      toast.error(err.message || 'Google signup failed.');
     }
   };
 
@@ -304,11 +327,11 @@ export function SignUpForm({ onSwitchToLogin, onSignUp }: SignUpFormProps) {
               {/* Sign Up Button */}
               <Button
                 type="submit"
+                disabled={loading}
                 className="w-full h-12 bg-[#C4A672] hover:bg-[#8B7355] text-white"
               >
-                Create Account
+                {loading ? 'Creating Account...' : 'Create Account'}
               </Button>
-              {serverError && <p className="text-sm text-red-500 text-center">{serverError}</p>}  {/* Added */}
 
               {/* Divider */}
               <div className="relative">
@@ -355,12 +378,12 @@ export function SignUpForm({ onSwitchToLogin, onSignUp }: SignUpFormProps) {
             <div className="text-center pt-4">
               <p className="text-gray-600">
                 Already have an account?{' '}
-                <button
-                  onClick={onSwitchToLogin}
+                <Link
+                  to="/login"
                   className="text-[#C4A672] hover:text-[#8B7355] hover:underline"
                 >
                   Login here
-                </button>
+                </Link>
               </p>
             </div>
           </div>
