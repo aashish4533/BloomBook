@@ -7,7 +7,7 @@ import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { toast } from 'sonner';
 import { db } from '../../firebase';
-import { collection, addDoc, serverTimestamp, doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, arrayUnion, setDoc } from 'firebase/firestore';
 
 interface CreateCommunityProps {
   onBack: () => void;
@@ -153,18 +153,43 @@ export function CreateCommunity({ onBack, onSuccess, userId, userName }: CreateC
         privacy: formData.privacy,
         topics: selectedTopics,
         location: formData.location,
-        image: imageUrl || 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&q=80', // Default image
+        coverImage: imageUrl || 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&q=80', // Use coverImage to match CommunityDetails
+        image: imageUrl || 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&q=80', // Keep image for backward compatibility
         adminId: userId,
         adminName: userName,
         memberCount: 1,
         postsCount: 0,
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
+        members: [] // Initialize empty or with/admin
       });
 
       // Add creator as member
       await updateDoc(doc(db, 'communities', newCommunity.id), {
-        members: arrayUnion({ userId: userId, name: userName, timestamp: new Date() })
-      }); // Updating to store object with name/timestamp as used in browse component
+        members: arrayUnion(userId) // Storing just ID as per other logic, OR object? 
+        // CommunityDetails line 128 uses arrayUnion(auth.currentUser.uid) which implies members is array of strings (Ids).
+        // BUT CommunityDetails line 89 maps doc data to Member object... wait.
+        // Line 89: `snapshot.docs.map...` fetches from SUBCOLLECTION 'members'.
+        // Line 128: `updateDoc(commRef, { members: arrayUnion... })` updates the ARRAY field on the document itself.
+        // It seems there's a dual system: 'members' array on doc AND 'members' subcollection?
+        // Let's stick to updating the doc field for count/list, but `CommunityDetails` fetch uses subcollection?
+        // Checking CommunityDetails again:
+        // Line 87: `collection(db, 'communities', communityId, 'members')` - Subcollection!
+        // Line 128: `await updateDoc... members: arrayUnion(uid)`. This updates the array on the doc.
+        // So we need to do BOTH or at least what is expected.
+        // The previous code in CreateCommunity tried to update `members` with an OBJECT `{userId, name...}`.
+        // If `members` field on doc expects IDs (array of strings), pushing an object might break it or be inconsistent.
+        // If line 128 in CommunityDetails pushes a UID string, then `members` should be strings.
+        // I will fix CreateCommunity to push UID to `members` array, AND create the subcollection doc.
+      });
+
+      // Create member in subcollection
+      await setDoc(doc(db, 'communities', newCommunity.id, 'members', userId), {
+        id: userId,
+        name: userName,
+        role: 'admin',
+        joinedAt: new Date().toISOString(),
+        avatar: 'CU' // Placeholder
+      });
 
       toast.success('Community created successfully! You are now the admin.');
       onSuccess(newCommunity.id);

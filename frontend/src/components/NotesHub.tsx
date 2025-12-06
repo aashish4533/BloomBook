@@ -6,9 +6,8 @@ import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Label } from './ui/label';
-import { db, auth, storage } from '../firebase';
+import { db, auth } from '../firebase';
 import { collection, addDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useCollection } from 'react-firebase-hooks/firestore';
 import { toast } from 'sonner';
 import { NotesViewer } from './NotesViewer';
@@ -67,10 +66,32 @@ export function NotesHub() {
             return;
         }
 
+        setIsUploading(true);
+
         try {
-            const storageRef = ref(storage, `notes/${auth.currentUser.uid}/${Date.now()}-${uploadForm.file.name}`);
-            await uploadBytes(storageRef, uploadForm.file);
-            const downloadURL = await getDownloadURL(storageRef);
+            const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+            const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+
+            if (!cloudName || !uploadPreset) {
+                toast.error("Cloudinary credentials missing");
+                setIsUploading(false);
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', uploadForm.file);
+            formData.append('upload_preset', uploadPreset);
+            // Resource type auto allows PDF
+
+            const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) throw new Error('Upload failed');
+
+            const data = await response.json();
+            const downloadURL = data.secure_url;
 
             await addDoc(collection(db, 'notes'), {
                 title: uploadForm.title,
@@ -91,6 +112,7 @@ export function NotesHub() {
         } catch (err) {
             console.error(err);
             toast.error('Failed to upload notes');
+            setIsUploading(false);
         }
     };
 

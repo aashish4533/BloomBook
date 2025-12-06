@@ -5,6 +5,10 @@ import { ImageWithFallback } from './figma/ImageWithFallback';
 import { Badge } from './ui/badge';
 import { useCart } from '../context/CartContext';
 import { Button } from './ui/button';
+import { auth } from '../firebase';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { handleAuthCheck } from '../utils/auth';
 
 interface BookCardProps {
   book: Book;
@@ -13,9 +17,15 @@ interface BookCardProps {
 
 export function BookCard({ book, onClick }: BookCardProps) {
   const { addToCart } = useCart();
+  const [user] = useAuthState(auth);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
+
+    if (!handleAuthCheck(user, navigate, location.pathname)) return;
+
     addToCart({
       id: book.id,
       title: book.title,

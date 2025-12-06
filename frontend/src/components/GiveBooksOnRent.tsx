@@ -6,6 +6,9 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Card } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { db, auth } from '../firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { toast } from 'sonner';
 
 interface GiveBooksOnRentProps {
   onClose: () => void;
@@ -29,7 +32,8 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
     city: '',
     state: '',
     pincode: '',
-    phone: ''
+    phone: '',
+    imageFiles: [] as File[]
   });
 
   const handleNext = () => {
@@ -50,12 +54,93 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
     }
   };
 
-  const handleSubmit = () => {
-    setCurrentStep('success');
-    setTimeout(() => {
-      onSuccess?.();
-      onClose();
-    }, 2000);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      toast.error('Please login to submit listing');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // 1. Upload Images to Cloudinary
+      const imageUrls: string[] = [];
+      if (formData.imageFiles && formData.imageFiles.length > 0) {
+        const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+        const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+
+        if (!cloudName || !uploadPreset) {
+          toast.error("Configuration error: Cloudinary credentials missing");
+          return;
+        }
+
+        for (const file of formData.imageFiles) {
+          try {
+            const uploadFormData = new FormData();
+            uploadFormData.append('file', file);
+            uploadFormData.append('upload_preset', uploadPreset);
+
+            const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+              method: 'POST',
+              body: uploadFormData
+            });
+
+            if (!response.ok) throw new Error('Image upload failed');
+
+            const data = await response.json();
+            imageUrls.push(data.secure_url);
+          } catch (uploadErr) {
+            console.error("Error uploading file:", file.name, uploadErr);
+            toast.error(`Failed to upload ${file.name}`);
+          }
+        }
+      }
+
+      // 2. Prepare Data
+      const listingData = {
+        title: formData.title,
+        author: formData.author,
+        isbn: formData.isbn,
+        condition: formData.condition,
+        description: formData.description,
+        price: Number(formData.pricePerWeek),
+        pricePerWeek: Number(formData.pricePerWeek),
+        securityDeposit: Number(formData.securityDeposit),
+        rentalPeriod: formData.rentalPeriod,
+        images: imageUrls,
+        location: {
+          address: formData.address,
+          city: formData.city,
+          state: formData.state,
+          zipCode: formData.pincode // Mapping pincode to zipCode for consistency
+        },
+        userId: user.uid,
+        seller: {
+          name: user.displayName || 'Anonymous',
+          rating: 0,
+          totalSales: 0,
+          avatar: user.photoURL || ''
+        },
+        type: 'rent',
+        status: 'active',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+
+      // 3. Submit to Firestore
+      await addDoc(collection(db, 'books'), listingData);
+
+      toast.success('Book listed for rent successfully!');
+      setCurrentStep('success');
+    } catch (err: any) {
+      console.error('Failed to submit listing:', err);
+      toast.error('Failed to create listing. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const updateFormData = (field: string, value: string) => {
@@ -103,21 +188,19 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
             {['Details', 'Pricing', 'Location', 'Review'].map((step, index) => (
               <div key={step} className="flex items-center">
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-smooth ${
-                    ['details', 'pricing', 'location', 'review'].indexOf(currentStep) >= index
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-200 text-gray-500'
-                  }`}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-smooth ${['details', 'pricing', 'location', 'review'].indexOf(currentStep) >= index
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-500'
+                    }`}
                 >
                   {index + 1}
                 </div>
                 {index < 3 && (
                   <div
-                    className={`w-16 h-1 mx-2 transition-smooth ${
-                      ['details', 'pricing', 'location', 'review'].indexOf(currentStep) > index
-                        ? 'bg-blue-600'
-                        : 'bg-gray-200'
-                    }`}
+                    className={`w-16 h-1 mx-2 transition-smooth ${['details', 'pricing', 'location', 'review'].indexOf(currentStep) > index
+                      ? 'bg-blue-600'
+                      : 'bg-gray-200'
+                      }`}
                   />
                 )}
               </div>
@@ -172,7 +255,7 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
                 <Label htmlFor="condition">Book Condition *</Label>
                 <Select
                   value={formData.condition}
-                  onValueChange={(value) => updateFormData('condition', value)}
+                  onValueChange={(value: string) => updateFormData('condition', value)}
                 >
                   <SelectTrigger className="mt-1 focus-glow">
                     <SelectValue placeholder="Select condition" />
@@ -193,8 +276,34 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
                   onChange={(e) => updateFormData('description', e.target.value)}
                   placeholder="Add any additional details about the book..."
                   rows={3}
-                  className="mt-1 focus-glow"
                 />
+              </div>
+              <div>
+                <Label htmlFor="images">Book Images *</Label>
+                <div className="mt-1 flex items-center gap-4">
+                  <div className="flex-1">
+                    <Input
+                      id="images"
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={(e) => {
+                        if (e.target.files) {
+                          setFormData(prev => ({
+                            ...prev,
+                            imageFiles: Array.from(e.target.files || [])
+                          }));
+                        }
+                      }}
+                      className="focus-glow"
+                    />
+                  </div>
+                  {formData.imageFiles && formData.imageFiles.length > 0 && (
+                    <span className="text-sm text-green-600">
+                      {formData.imageFiles.length} file(s) selected
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </Card>
@@ -211,7 +320,7 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
                 <Label htmlFor="period">Maximum Rental Period</Label>
                 <Select
                   value={formData.rentalPeriod}
-                  onValueChange={(value) => updateFormData('rentalPeriod', value)}
+                  onValueChange={(value: string) => updateFormData('rentalPeriod', value)}
                 >
                   <SelectTrigger className="mt-1 focus-glow">
                     <SelectValue placeholder="Select period" />

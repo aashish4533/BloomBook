@@ -18,7 +18,7 @@ interface Purchase {
 export function PurchaseHistory() {
   const [user, loadingUser] = useAuthState(auth);
   const [purchasesSnapshot, loadingPurchases, error] = useCollection(
-    user ? query(collection(db, 'purchases'), where('userId', '==', user.uid), orderBy('date', 'desc')) : null
+    user ? query(collection(db, 'purchases'), where('buyerId', '==', user.uid), orderBy('date', 'desc')) : null
   );
 
   const getStatusColor = (status: string) => {

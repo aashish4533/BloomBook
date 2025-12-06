@@ -8,7 +8,10 @@ import { SystemSettings } from './Admin/SystemSettings';
 import { CommunityManagement } from './Admin/CommunityManagement';
 import { Button } from './ui/button';
 import { Users, BookOpen, Calendar, DollarSign, Settings, LogOut, BarChart3, Shield, MessageCircle, Bell } from 'lucide-react';
-import { Outlet, NavLink, Link, useLocation } from 'react-router-dom';
+import { Outlet, NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
+import { auth } from '../firebase';
+import { useEffect } from 'react';
+import { toast } from 'sonner';
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -16,7 +19,32 @@ interface AdminDashboardProps {
 
 export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const currentPath = location.pathname;
+
+  useEffect(() => {
+    const checkAdminAuth = async () => {
+      const user = auth.currentUser;
+      if (!user) {
+        navigate('/admin/login');
+        return;
+      }
+
+      try {
+        const tokenResult = await user.getIdTokenResult();
+        // Check for custom claim 'admin' or specific email
+        if (tokenResult.claims.role !== 'admin' && user.email !== 'admin@bookbloom.com') {
+          toast.error('Unauthorized access: Admin privileges required');
+          navigate('/');
+        }
+      } catch (error) {
+        console.error('Error verifying admin status:', error);
+        navigate('/admin/login');
+      }
+    };
+
+    checkAdminAuth();
+  }, [navigate]);
 
   const tabs = [
     { id: 'users', label: 'User Management', icon: Users, path: '/admin/dashboard' },
@@ -59,8 +87,8 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                 to={tab.path}
                 end={tab.path === '/admin/dashboard'}
                 className={({ isActive }) => `w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive
-                    ? 'bg-[#C4A672] text-white'
-                    : 'text-white/70 hover:bg-white/10 hover:text-white'
+                  ? 'bg-[#C4A672] text-white'
+                  : 'text-white/70 hover:bg-white/10 hover:text-white'
                   }`}
               >
                 <Icon className="w-5 h-5" />

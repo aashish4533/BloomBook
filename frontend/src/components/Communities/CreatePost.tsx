@@ -12,6 +12,7 @@ interface CreatePostProps {
 export function CreatePost({ onClose, onSubmit }: CreatePostProps) {
   const [content, setContent] = useState('');
   const [images, setImages] = useState<string[]>([]);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const MAX_CHARS = 5000;
@@ -19,7 +20,7 @@ export function CreatePost({ onClose, onSubmit }: CreatePostProps) {
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    
+
     if (images.length + files.length > MAX_IMAGES) {
       toast.error(`Maximum ${MAX_IMAGES} images allowed`);
       return;
@@ -37,13 +38,16 @@ export function CreatePost({ onClose, onSubmit }: CreatePostProps) {
       };
       reader.readAsDataURL(file);
     });
+
+    setImageFiles(prev => [...prev, ...files]);
   };
 
   const removeImage = (index: number) => {
     setImages(prev => prev.filter((_, i) => i !== index));
+    setImageFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!content.trim()) {
       toast.error('Post content cannot be empty');
       return;
@@ -55,12 +59,45 @@ export function CreatePost({ onClose, onSubmit }: CreatePostProps) {
     }
 
     setIsSubmitting(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      onSubmit(content, images);
+
+    try {
+      const uploadedImageUrls: string[] = [];
+
+      // Upload images if any
+      if (imageFiles.length > 0) {
+        const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+        const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+
+        if (!cloudName || !uploadPreset) {
+          toast.error("Configuration error: Cloudinary credentials missing");
+          setIsSubmitting(false);
+          return;
+        }
+
+        for (const file of imageFiles) {
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('upload_preset', uploadPreset);
+
+          const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+            method: 'POST',
+            body: formData
+          });
+
+          if (!response.ok) throw new Error('Image upload failed');
+
+          const data = await response.json();
+          uploadedImageUrls.push(data.secure_url);
+        }
+      }
+
+      onSubmit(content, uploadedImageUrls);
+    } catch (error) {
+      console.error('Error uploading images:', error);
+      toast.error('Failed to create post. Please try again.');
+    } finally {
       setIsSubmitting(false);
-    }, 500);
+    }
   };
 
   return (
@@ -90,9 +127,8 @@ export function CreatePost({ onClose, onSubmit }: CreatePostProps) {
               autoFocus
             />
             <div className="flex items-center justify-between mt-2">
-              <span className={`text-sm ${
-                content.length > MAX_CHARS ? 'text-red-500' : 'text-gray-500'
-              }`}>
+              <span className={`text-sm ${content.length > MAX_CHARS ? 'text-red-500' : 'text-gray-500'
+                }`}>
                 {content.length}/{MAX_CHARS}
               </span>
             </div>

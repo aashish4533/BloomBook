@@ -11,6 +11,9 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { useLocation } from 'react-router-dom';
+import { handleAuthCheck } from '../utils/auth';
+import { useAuthState } from 'react-firebase-hooks/auth';
 
 interface BookDetailModalProps {
   book: Book;
@@ -22,6 +25,8 @@ export function BookDetailModal({ book, onClose }: BookDetailModalProps) {
   const [showNegotiate, setShowNegotiate] = useState(false);
   const [showExchangeModal, setShowExchangeModal] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const [user] = useAuthState(auth);
   const { addToCart } = useCart();
 
   const getConditionColor = (condition: string) => {
@@ -36,12 +41,22 @@ export function BookDetailModal({ book, onClose }: BookDetailModalProps) {
   };
 
   const handleAddToCart = () => {
-    addToCart(book);
+    if (!handleAuthCheck(user, navigate, location.pathname)) return;
+    addToCart({
+      id: book.id,
+      title: book.title,
+      price: book.price,
+      image: book.images?.[0] || '',
+      type: book.type === 'rent' ? 'rent' : 'buy',
+      sellerName: book.seller?.name || 'Unknown',
+      sellerId: book.userId || 'unknown'
+    });
     toast.success('Added to cart');
     onClose();
   };
 
   const handleContactSeller = () => {
+    if (!handleAuthCheck(user, navigate, location.pathname)) return;
     navigate('/chat', {
       state: {
         otherUser: {
@@ -62,6 +77,7 @@ export function BookDetailModal({ book, onClose }: BookDetailModalProps) {
   };
 
   const handleNegotiate = () => {
+    if (!handleAuthCheck(user, navigate, location.pathname)) return;
     setShowNegotiate(true);
   };
 
@@ -237,6 +253,19 @@ function NegotiateDialog({ book, onClose }: { book: Book; onClose: () => void })
         status: 'pending',
         createdAt: serverTimestamp()
       });
+
+      // Send Notification to Seller
+      if (book.userId) {
+        await addDoc(collection(db, 'notifications'), {
+          userId: book.userId,
+          type: 'offer',
+          title: 'New Price Offer',
+          message: `${user.displayName || 'A buyer'} offered $${parseFloat(offerPrice)} for "${book.title}"`,
+          read: false,
+          createdAt: serverTimestamp(),
+          link: '/dashboard/sales' // Or relevant link
+        });
+      }
 
       toast.success('Offer sent to seller!');
       onClose();

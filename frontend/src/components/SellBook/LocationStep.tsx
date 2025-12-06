@@ -15,11 +15,11 @@ import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
 let DefaultIcon = L.icon({
-    iconUrl: icon,
-    shadowUrl: iconShadow,
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
+  iconUrl: icon,
+  shadowUrl: iconShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
@@ -42,11 +42,11 @@ export function LocationStep({ initialData, onNext, onBack }: LocationStepProps)
   const [formData, setFormData] = useState<LocationData>(initialData);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [locating, setLocating] = useState(false);
-  
+
   // Default center (San Francisco) if no coordinates provided
   const defaultCenter: [number, number] = [37.7749, -122.4194];
-  const mapCenter: [number, number] = formData.coordinates 
-    ? [formData.coordinates.lat, formData.coordinates.lng] 
+  const mapCenter: [number, number] = formData.coordinates
+    ? [formData.coordinates.lat, formData.coordinates.lng]
     : defaultCenter;
 
   const validateForm = () => {
@@ -67,12 +67,12 @@ export function LocationStep({ initialData, onNext, onBack }: LocationStepProps)
 
   const handleUseCurrentLocation = () => {
     setLocating(true);
-    
+
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const { latitude, longitude } = position.coords;
-          
+
           try {
             // FETCH IMPLEMENTATION: OpenStreetMap Nominatim API
             // This fetches address details based on the lat/long
@@ -80,9 +80,9 @@ export function LocationStep({ initialData, onNext, onBack }: LocationStepProps)
               `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
             );
             const data = await response.json();
-            
+
             const addressParts = data.address || {};
-            
+
             // Construct fields from API response
             const street = [addressParts.house_number, addressParts.road].filter(Boolean).join(' ');
             const city = addressParts.city || addressParts.town || addressParts.village || addressParts.hamlet || '';
@@ -98,10 +98,10 @@ export function LocationStep({ initialData, onNext, onBack }: LocationStepProps)
                 lng: longitude
               }
             });
-            
+
             // Clear any previous errors
             setErrors({});
-            
+
           } catch (error) {
             console.error("Reverse geocoding failed", error);
             // Fallback: If API fails, at least update the map coordinates
@@ -157,15 +157,13 @@ export function LocationStep({ initialData, onNext, onBack }: LocationStepProps)
           <button
             type="button"
             onClick={() => setFormData({ ...formData, method: 'pickup' })}
-            className={`p-4 border-2 rounded-lg transition-all ${
-              formData.method === 'pickup'
-                ? 'border-[#C4A672] bg-[#C4A672]/5'
-                : 'border-gray-200 hover:border-gray-300'
-            }`}
+            className={`p-4 border-2 rounded-lg transition-all ${formData.method === 'pickup'
+              ? 'border-[#C4A672] bg-[#C4A672]/5'
+              : 'border-gray-200 hover:border-gray-300'
+              }`}
           >
-            <Package className={`w-6 h-6 mx-auto mb-2 ${
-              formData.method === 'pickup' ? 'text-[#C4A672]' : 'text-gray-400'
-            }`} />
+            <Package className={`w-6 h-6 mx-auto mb-2 ${formData.method === 'pickup' ? 'text-[#C4A672]' : 'text-gray-400'
+              }`} />
             <div className="text-center">
               <div className="text-sm">Local Pickup</div>
               <div className="text-xs text-gray-500 mt-1">Meet in person</div>
@@ -175,15 +173,13 @@ export function LocationStep({ initialData, onNext, onBack }: LocationStepProps)
           <button
             type="button"
             onClick={() => setFormData({ ...formData, method: 'shipping' })}
-            className={`p-4 border-2 rounded-lg transition-all ${
-              formData.method === 'shipping'
-                ? 'border-[#C4A672] bg-[#C4A672]/5'
-                : 'border-gray-200 hover:border-gray-300'
-            }`}
+            className={`p-4 border-2 rounded-lg transition-all ${formData.method === 'shipping'
+              ? 'border-[#C4A672] bg-[#C4A672]/5'
+              : 'border-gray-200 hover:border-gray-300'
+              }`}
           >
-            <Truck className={`w-6 h-6 mx-auto mb-2 ${
-              formData.method === 'shipping' ? 'text-[#C4A672]' : 'text-gray-400'
-            }`} />
+            <Truck className={`w-6 h-6 mx-auto mb-2 ${formData.method === 'shipping' ? 'text-[#C4A672]' : 'text-gray-400'
+              }`} />
             <div className="text-center">
               <div className="text-sm">Shipping Only</div>
               <div className="text-xs text-gray-500 mt-1">Ship to buyer</div>
@@ -193,19 +189,16 @@ export function LocationStep({ initialData, onNext, onBack }: LocationStepProps)
           <button
             type="button"
             onClick={() => setFormData({ ...formData, method: 'both' })}
-            className={`p-4 border-2 rounded-lg transition-all ${
-              formData.method === 'both'
-                ? 'border-[#C4A672] bg-[#C4A672]/5'
-                : 'border-gray-200 hover:border-gray-300'
-            }`}
+            className={`p-4 border-2 rounded-lg transition-all ${formData.method === 'both'
+              ? 'border-[#C4A672] bg-[#C4A672]/5'
+              : 'border-gray-200 hover:border-gray-300'
+              }`}
           >
             <div className="flex justify-center gap-1 mb-2">
-              <Package className={`w-5 h-5 ${
-                formData.method === 'both' ? 'text-[#C4A672]' : 'text-gray-400'
-              }`} />
-              <Truck className={`w-5 h-5 ${
-                formData.method === 'both' ? 'text-[#C4A672]' : 'text-gray-400'
-              }`} />
+              <Package className={`w-5 h-5 ${formData.method === 'both' ? 'text-[#C4A672]' : 'text-gray-400'
+                }`} />
+              <Truck className={`w-5 h-5 ${formData.method === 'both' ? 'text-[#C4A672]' : 'text-gray-400'
+                }`} />
             </div>
             <div className="text-center">
               <div className="text-sm">Both Options</div>
@@ -219,21 +212,24 @@ export function LocationStep({ initialData, onNext, onBack }: LocationStepProps)
       <div className="space-y-4 bg-gray-50 rounded-lg p-4">
         <div className="flex items-center justify-between">
           <Label>Your Location *</Label>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleUseCurrentLocation}
-            disabled={locating}
-          >
-            <MapPinned className="w-4 h-4 mr-2" />
-            {locating ? 'Locating...' : 'Use Current Location'}
-          </Button>
         </div>
 
         <div className="grid grid-cols-1 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="address">Street Address *</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="address">Street Address *</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleUseCurrentLocation}
+                disabled={locating}
+                className="h-8 text-xs bg-[#C4A672]/10 text-[#C4A672] hover:bg-[#C4A672]/20 border-[#C4A672]/30"
+              >
+                <MapPinned className="w-3 h-3 mr-1" />
+                {locating ? 'Locating...' : '📍 Use Current Location'}
+              </Button>
+            </div>
             <Input
               id="address"
               value={formData.address}
@@ -266,7 +262,7 @@ export function LocationStep({ initialData, onNext, onBack }: LocationStepProps)
               {errors.state && <p className="text-sm text-red-500">{errors.state}</p>}
             </div>
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="zipCode">ZIP Code *</Label>
             <Input
@@ -282,9 +278,9 @@ export function LocationStep({ initialData, onNext, onBack }: LocationStepProps)
 
       {/* REAL MAP IMPLEMENTATION */}
       <div className="h-64 rounded-lg overflow-hidden border border-gray-300 z-0 relative">
-        <MapContainer 
-          center={mapCenter} 
-          zoom={13} 
+        <MapContainer
+          center={mapCenter}
+          zoom={13}
           style={{ height: '100%', width: '100%' }}
         >
           <TileLayer

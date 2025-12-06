@@ -9,6 +9,9 @@ import { Label } from './ui/label';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Checkbox } from './ui/checkbox';
 import { ArrowLeft, CreditCard, Building2, Wallet, Lock, ShieldCheck, CheckCircle2, AlertCircle, MapPin, Package, Truck } from 'lucide-react';
+import { db, auth } from '../firebase';
+import { collection, addDoc, serverTimestamp, updateDoc, doc } from 'firebase/firestore';
+import { toast } from 'sonner';
 
 interface PurchaseConfirmationProps {
   book: Book;
@@ -27,17 +30,116 @@ export function PurchaseConfirmation({ book, onClose, onBack }: PurchaseConfirma
   const tax = (book.price + shippingCost) * 0.08;
   const total = book.price + shippingCost + tax;
 
-  const handlePurchase = () => {
+  const [locating, setLocating] = useState(false);
+  const [addressData, setAddressData] = useState({
+    street: '',
+    city: '',
+    state: '',
+    zip: ''
+  });
+
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by your browser');
+      return;
+    }
+
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(async (position) => {
+      try {
+        const { latitude, longitude } = position.coords;
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+        );
+        const data = await response.json();
+
+        setAddressData({
+          street: data.address.road || data.address.house_number || '',
+          city: data.address.city || data.address.town || data.address.village || '',
+          state: data.address.state || '',
+          zip: data.address.postcode || ''
+        });
+        toast.success('Location fetched successfully');
+      } catch (error) {
+        toast.error('Failed to fetch address details');
+      } finally {
+        setLocating(false);
+      }
+    }, (error) => {
+      toast.error('Unable to retrieve your location');
+      setLocating(false);
+    });
+  };
+
+  const handlePurchase = async () => {
     if (!agreeToTerms) {
       alert('Please agree to the terms and conditions');
       return;
     }
 
+    const user = auth.currentUser;
+    if (!user) {
+      toast.error('Please log in to purchase');
+      return;
+    }
+
     setProcessing(true);
-    setTimeout(() => {
-      setProcessing(false);
+    try {
+      // 1. Create Purchase Record (for Buyer)
+      const purchaseRef = await addDoc(collection(db, 'purchases'), {
+        buyerId: user.uid,
+        buyerName: user.displayName || 'Anonymous',
+        bookId: book.id,
+        bookTitle: book.title,
+        author: book.author,
+        price: book.price,
+        image: book.images?.[0] || '',
+        sellerId: book.userId || 'unknown',
+        date: new Date().toISOString(),
+        status: 'completed',
+        createdAt: serverTimestamp()
+      });
+
+      // 2. Create Sale Record (for Seller) - if sellerId exists
+      // The Book interface in BookMarketplace passes seller but maybe not id?
+      // BookCard passes sellerName. BookDetailModal passes book.
+      // Let's assume book.userId holds the seller ID as seen in BookDetailModal ("sellerId: book.userId").
+      if (book.userId) {
+        await addDoc(collection(db, 'sales'), {
+          sellerId: book.userId,
+          bookId: book.id,
+          bookTitle: book.title,
+          price: book.price,
+          buyerId: user.uid,
+          buyerName: user.displayName || 'Anonymous',
+          date: new Date().toISOString(),
+          status: 'sold',
+          createdAt: serverTimestamp()
+        });
+      }
+
+      // 3. Create Transaction Record (for Admin)
+      await addDoc(collection(db, 'transactions'), {
+        type: 'buy',
+        bookTitle: book.title,
+        user: user.displayName || user.email || 'Unknown User',
+        amount: total,
+        date: new Date().toISOString(),
+        status: 'completed',
+        relatedId: purchaseRef.id,
+        createdAt: serverTimestamp()
+      });
+
+      // 4. Update Book Status if needed (Optional but good)
+      // await updateDoc(doc(db, 'books', book.id), { status: 'sold' });
+
       setStep('success');
-    }, 2000);
+    } catch (error) {
+      console.error("Purchase error:", error);
+      toast.error("Failed to complete purchase");
+    } finally {
+      setProcessing(false);
+    }
   };
 
   if (step === 'success') {
@@ -133,9 +235,8 @@ export function PurchaseConfirmation({ book, onClose, onBack }: PurchaseConfirma
             <div className="space-y-3">
               <Label>Select Payment Method</Label>
               <RadioGroup value={paymentMethod} onValueChange={(value: any) => setPaymentMethod(value)}>
-                <div className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-                  paymentMethod === 'card' ? 'border-[#C4A672] bg-[#C4A672]/5' : 'border-gray-200'
-                }`}>
+                <div className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${paymentMethod === 'card' ? 'border-[#C4A672] bg-[#C4A672]/5' : 'border-gray-200'
+                  }`}>
                   <div className="flex items-center gap-3">
                     <RadioGroupItem value="card" id="card" />
                     <Label htmlFor="card" className="flex items-center gap-2 cursor-pointer flex-1">
@@ -187,9 +288,8 @@ export function PurchaseConfirmation({ book, onClose, onBack }: PurchaseConfirma
                   )}
                 </div>
 
-                <div className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-                  paymentMethod === 'paypal' ? 'border-[#C4A672] bg-[#C4A672]/5' : 'border-gray-200'
-                }`}>
+                <div className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${paymentMethod === 'paypal' ? 'border-[#C4A672] bg-[#C4A672]/5' : 'border-gray-200'
+                  }`}>
                   <div className="flex items-center gap-3">
                     <RadioGroupItem value="paypal" id="paypal" />
                     <Label htmlFor="paypal" className="flex items-center gap-2 cursor-pointer flex-1">
@@ -204,9 +304,8 @@ export function PurchaseConfirmation({ book, onClose, onBack }: PurchaseConfirma
                   )}
                 </div>
 
-                <div className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-                  paymentMethod === 'bank' ? 'border-[#C4A672] bg-[#C4A672]/5' : 'border-gray-200'
-                }`}>
+                <div className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${paymentMethod === 'bank' ? 'border-[#C4A672] bg-[#C4A672]/5' : 'border-gray-200'
+                  }`}>
                   <div className="flex items-center gap-3">
                     <RadioGroupItem value="bank" id="bank" />
                     <Label htmlFor="bank" className="flex items-center gap-2 cursor-pointer flex-1">
@@ -228,7 +327,7 @@ export function PurchaseConfirmation({ book, onClose, onBack }: PurchaseConfirma
               <Checkbox
                 id="terms"
                 checked={agreeToTerms}
-                onCheckedChange={(checked) => setAgreeToTerms(checked === true)}
+                onCheckedChange={(checked: boolean | string) => setAgreeToTerms(checked === true)}
               />
               <Label htmlFor="terms" className="text-sm text-gray-600 cursor-pointer">
                 I agree to the{' '}
@@ -345,9 +444,8 @@ export function PurchaseConfirmation({ book, onClose, onBack }: PurchaseConfirma
           <div className="space-y-3">
             <Label>Delivery Method</Label>
             <RadioGroup value={deliveryMethod} onValueChange={(value: any) => setDeliveryMethod(value)}>
-              <div className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-                deliveryMethod === 'shipping' ? 'border-[#C4A672] bg-[#C4A672]/5' : 'border-gray-200'
-              }`}>
+              <div className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${deliveryMethod === 'shipping' ? 'border-[#C4A672] bg-[#C4A672]/5' : 'border-gray-200'
+                }`}>
                 <div className="flex items-center gap-3">
                   <RadioGroupItem value="shipping" id="shipping" />
                   <Label htmlFor="shipping" className="flex items-center gap-2 cursor-pointer flex-1">
@@ -361,19 +459,46 @@ export function PurchaseConfirmation({ book, onClose, onBack }: PurchaseConfirma
                 </div>
                 {deliveryMethod === 'shipping' && (
                   <div className="mt-3 pl-7 space-y-2">
-                    <Input placeholder="Street Address" />
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input placeholder="City" />
-                      <Input placeholder="State" />
+                    <div className="flex justify-end mb-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleUseCurrentLocation}
+                        disabled={locating}
+                        className="h-8 text-xs border-[#C4A672] text-[#C4A672] hover:bg-[#C4A672]/10"
+                      >
+                        {locating ? <span className="animate-spin mr-2">⏳</span> : <MapPin className="w-3 h-3 mr-1" />}
+                        {locating ? 'Locating...' : 'Use Current Location'}
+                      </Button>
                     </div>
-                    <Input placeholder="ZIP Code" />
+                    <Input
+                      placeholder="Street Address"
+                      value={addressData.street}
+                      onChange={(e) => setAddressData({ ...addressData, street: e.target.value })}
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        placeholder="City"
+                        value={addressData.city}
+                        onChange={(e) => setAddressData({ ...addressData, city: e.target.value })}
+                      />
+                      <Input
+                        placeholder="State"
+                        value={addressData.state}
+                        onChange={(e) => setAddressData({ ...addressData, state: e.target.value })}
+                      />
+                    </div>
+                    <Input
+                      placeholder="ZIP Code"
+                      value={addressData.zip}
+                      onChange={(e) => setAddressData({ ...addressData, zip: e.target.value })}
+                    />
                   </div>
                 )}
               </div>
 
-              <div className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
-                deliveryMethod === 'pickup' ? 'border-[#C4A672] bg-[#C4A672]/5' : 'border-gray-200'
-              }`}>
+              <div className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${deliveryMethod === 'pickup' ? 'border-[#C4A672] bg-[#C4A672]/5' : 'border-gray-200'
+                }`}>
                 <div className="flex items-center gap-3">
                   <RadioGroupItem value="pickup" id="pickup" />
                   <Label htmlFor="pickup" className="flex items-center gap-2 cursor-pointer flex-1">
@@ -387,10 +512,30 @@ export function PurchaseConfirmation({ book, onClose, onBack }: PurchaseConfirma
                 </div>
                 {deliveryMethod === 'pickup' && (
                   <div className="mt-3 pl-7">
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-900">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-900 mb-2">
                       <MapPin className="w-4 h-4 inline mr-1" />
                       Pickup location and details will be shared after purchase
                     </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-blue-600 border-blue-200 hover:bg-blue-50"
+                      onClick={() => {
+                        let query = encodeURIComponent(book.seller.name + " generic location");
+                        if (book.location) {
+                          if (book.location.coordinates) {
+                            query = `${book.location.coordinates.lat},${book.location.coordinates.lng}`;
+                          } else if (book.location.address) {
+                            query = encodeURIComponent(book.location.address);
+                          } else if (book.location.city) {
+                            query = encodeURIComponent(`${book.location.city}, ${book.location.state}`);
+                          }
+                        }
+                        window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
+                      }}
+                    >
+                      Get Directions (Map)
+                    </Button>
                   </div>
                 )}
               </div>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { GraduationCap, Video, Calendar, Clock, Star, Users, BookOpen, Search, Filter, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
@@ -29,7 +30,19 @@ interface Tutor {
   verified: boolean;
   experience: string;
   availability: string;
+  availableHours: string; // New field
   userId: string;
+}
+
+interface TuitionRequest {
+  id: string;
+  studentId: string;
+  studentName: string;
+  subject: string;
+  topic: string; // "Need Math Tutor..."
+  gradeLevel: string;
+  budget: string;
+  createdAt: any;
 }
 
 interface TuitionHubProps {
@@ -40,6 +53,7 @@ interface TuitionHubProps {
 export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
+  const navigate = useNavigate();
 
   const [isRegistering, setIsRegistering] = useState(false);
   const [tutorForm, setTutorForm] = useState({
@@ -48,12 +62,54 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
     hourlyRate: '',
     experience: '',
     availability: 'Available',
-    bio: ''
+    availableHours: '', // New field
+    bio: '',
+    certificate: null as string | null // New field
   });
 
+  const [requestForm, setRequestForm] = useState({
+    subject: '',
+    topic: '',
+    gradeLevel: '',
+    budget: ''
+  });
+  const [isPostingRequest, setIsPostingRequest] = useState(false);
+  const [certFile, setCertFile] = useState<File | null>(null);
+
   const [value, loading, error] = useCollection(collection(db, 'tutors'));
+  const [requestsValue] = useCollection(query(collection(db, 'tuition_requests')));
 
   const tutors = value?.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tutor)) || [];
+  const tuitionRequests = requestsValue?.docs.map(doc => ({ id: doc.id, ...doc.data() } as TuitionRequest)) || [];
+
+  const handleCertUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setCertFile(e.target.files[0]);
+    }
+  };
+
+  const handlePostRequest = async () => {
+    if (!auth.currentUser) {
+      toast.error('Please login to post a request');
+      return;
+    }
+    try {
+      await addDoc(collection(db, 'tuition_requests'), {
+        studentId: auth.currentUser.uid,
+        studentName: auth.currentUser.displayName || 'Anonymous',
+        subject: requestForm.subject,
+        topic: requestForm.topic, // "Need Math Tutor for Grade 10"
+        gradeLevel: requestForm.gradeLevel,
+        budget: requestForm.budget,
+        createdAt: serverTimestamp()
+      });
+      toast.success('Request posted successfully!');
+      setIsPostingRequest(false);
+      setRequestForm({ subject: '', topic: '', gradeLevel: '', budget: '' });
+    } catch (err) {
+      toast.error('Failed to post request');
+    }
+  };
 
   const handleBecomeTutor = async () => {
     if (!auth.currentUser) {
@@ -62,6 +118,22 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
     }
 
     try {
+      let certUrl = '';
+      if (certFile) {
+        const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+        const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+        const formData = new FormData();
+        formData.append('file', certFile);
+        formData.append('upload_preset', uploadPreset);
+
+        const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        certUrl = data.secure_url;
+      }
+
       await addDoc(collection(db, 'tutors'), {
         userId: auth.currentUser.uid,
         name: auth.currentUser.displayName || 'Anonymous',
@@ -71,11 +143,13 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
         hourlyRate: parseFloat(tutorForm.hourlyRate),
         experience: tutorForm.experience,
         availability: tutorForm.availability,
+        availableHours: tutorForm.availableHours, // Save available hours
         bio: tutorForm.bio,
+        certificate: certUrl, // Save certificate URL
         rating: 0,
         reviews: 0,
         students: 0,
-        verified: false,
+        verified: !!certUrl, // Auto-verify if cert provided (simplified logic)
         createdAt: serverTimestamp()
       });
       toast.success('Tutor profile created successfully!');
@@ -291,9 +365,41 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                         placeholder="Tell students about yourself..."
                       />
                     </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="availableHours">Available Hours</Label>
+                      <Input
+                        id="availableHours"
+                        value={tutorForm.availableHours}
+                        onChange={(e) => setTutorForm({ ...tutorForm, availableHours: e.target.value })}
+                        placeholder="e.g. Mon-Fri, 5 PM - 8 PM"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Degree/Certificate (Verification)</Label>
+                      <Input type="file" onChange={handleCertUpload} />
+                    </div>
                     <Button onClick={handleBecomeTutor} className="bg-[#C4A672] text-white">
                       Submit Application
                     </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              <Dialog open={isPostingRequest} onOpenChange={setIsPostingRequest}>
+                <DialogTrigger asChild>
+                  <Button className="bg-[#2C3E50] text-white hover:bg-[#1a252f]">
+                    Post Tuition Request
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Post Tuition Request</DialogTitle>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <Input placeholder="Subject (e.g. Math)" value={requestForm.subject} onChange={e => setRequestForm({ ...requestForm, subject: e.target.value })} />
+                    <Input placeholder="Details (e.g. Need help with Grade 10 Geometry)" value={requestForm.topic} onChange={e => setRequestForm({ ...requestForm, topic: e.target.value })} />
+                    <Input placeholder="Grade Level" value={requestForm.gradeLevel} onChange={e => setRequestForm({ ...requestForm, gradeLevel: e.target.value })} />
+                    <Input placeholder="Budget (Optional)" value={requestForm.budget} onChange={e => setRequestForm({ ...requestForm, budget: e.target.value })} />
+                    <Button onClick={handlePostRequest} className="bg-[#C4A672] text-white">Post Request</Button>
                   </div>
                 </DialogContent>
               </Dialog>
@@ -303,6 +409,26 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
               </Button>
             </div>
           </div>
+
+          {/* Tuition Requests Section */}
+          {tuitionRequests.length > 0 && (
+            <div className="mb-12">
+              <h3 className="text-[#2C3E50] text-xl mb-4">Student Requests</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {tuitionRequests.map(req => (
+                  <Card key={req.id} className="p-4 border border-blue-100 bg-blue-50/50">
+                    <div className="flex justify-between items-start mb-2">
+                      <Badge variant="outline" className="bg-white">{req.subject}</Badge>
+                      <span className="text-xs text-gray-500">From {req.studentName}</span>
+                    </div>
+                    <h4 className="font-medium text-[#2C3E50] mb-1">{req.topic}</h4>
+                    <p className="text-sm text-gray-600 mb-2">{req.gradeLevel}</p>
+                    {req.budget && <p className="text-sm font-semibold text-[#C4A672]">Budget: {req.budget}</p>}
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredTutors.map((tutor) => (
@@ -368,12 +494,34 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                       <p className="text-xs text-gray-500">Starting at</p>
                       <p className="text-[#C4A672] text-xl">${tutor.hourlyRate}/hr</p>
                     </div>
-                    <Button
-                      className="bg-[#C4A672] hover:bg-[#8B7355] text-white"
-                      disabled={!isLoggedIn}
-                    >
-                      {isLoggedIn ? 'Book Session' : 'Login to Book'}
-                    </Button>
+                    {isLoggedIn ? (
+                      <div className="flex gap-2">
+                        <Button size="sm" className="bg-[#C4A672] hover:bg-[#8B7355] text-white">
+                          Book Session
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-[#C4A672] text-[#C4A672] hover:bg-[#C4A672]/10"
+                          onClick={() => {
+                            navigate('/chat', {
+                              state: {
+                                otherUser: {
+                                  id: tutor.userId,
+                                  name: tutor.name,
+                                  avatar: tutor.avatar,
+                                  online: true
+                                }
+                              }
+                            });
+                          }}
+                        >
+                          Hire Tutor
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button disabled variant="outline">Login to Book</Button>
+                    )}
                   </div>
                 </div>
               </Card>
@@ -382,7 +530,7 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
         </div>
 
         {/* How It Works Section */}
-        <div className="mt-16">
+        < div className="mt-16" >
           <h2 className="text-[#2C3E50] text-2xl text-center mb-8">How It Works</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <Card className="p-6 text-center">
@@ -414,7 +562,7 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
             </Card>
           </div>
         </div>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 }

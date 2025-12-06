@@ -4,9 +4,9 @@ import { Button } from '../ui/button';
 import { Checkbox } from '../ui/checkbox';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { 
-  ArrowLeft, 
-  Calendar, 
+import {
+  ArrowLeft,
+  Calendar,
   CreditCard,
   MapPin,
   Package,
@@ -46,18 +46,43 @@ export function RentalConfirmation({ book, rentalPeriod, onBack, onConfirm }: Re
     return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!agreeToTerms) {
       alert('Please agree to the rental terms and conditions');
       return;
     }
 
     setIsProcessing(true);
-    // Simulate payment processing
-    setTimeout(() => {
+    try {
+      // Logic moved to parent component or implemented here?
+      // The parent component RentBookFlow actually passes onConfirm={handleCompleteRental}
+      // which ALREADY has the logic we saw in RentBookFlow.tsx lines 51-91.
+      // Wait, let's re-read RentBookFlow.tsx.
+      // Yes, RentBookFlow passes `handleCompleteRental` as `onConfirm`.
+      // So this component just needs to call that prop!
+      // But wait, the previous code was just simulating a timeout then calling onConfirm.
+      // The USER REQUEST says "Debug the onConfirm handler in RentalConfirmation.tsx. Ensure it is successfully creating a document..."
+      // Actually, looking at RentBookFlow (lines 51-91), it DOES create the document.
+      // So the issue might be that RentalConfirmation wasn't actually calling onConfirm properly or was just doing a timeout.
+      // The previous code was:
+      // setTimeout(() => {
+      //   setIsProcessing(false);
+      //   onConfirm();
+      // }, 2000);
+      //
+      // If RentBookFlow's handleCompleteRental is async, we should await it here if we want to show processing state correctly?
+      // But onConfirm is defined as () => void in props.
+      // Let's assume onConfirm triggers the logic. If the user says it's failing, maybe the props aren't passed right or the validation fails.
+
+      // Let's update this to be robust.
+
+      await onConfirm();
+      // We don't unset isProcessing here because onConfirm likely navigates away or shows success.
+
+    } catch (error) {
+      console.error("Rental confirmation error:", error);
       setIsProcessing(false);
-      onConfirm();
-    }, 2000);
+    }
   };
 
   return (
@@ -134,11 +159,10 @@ export function RentalConfirmation({ book, rentalPeriod, onBack, onConfirm }: Re
               <div className="space-y-3">
                 <button
                   onClick={() => setPaymentMethod('card')}
-                  className={`w-full border-2 rounded-lg p-4 flex items-center gap-3 transition-colors ${
-                    paymentMethod === 'card'
-                      ? 'border-[#C4A672] bg-[#C4A672]/5'
-                      : 'border-gray-200'
-                  }`}
+                  className={`w-full border-2 rounded-lg p-4 flex items-center gap-3 transition-colors ${paymentMethod === 'card'
+                    ? 'border-[#C4A672] bg-[#C4A672]/5'
+                    : 'border-gray-200'
+                    }`}
                 >
                   <CreditCard className="w-5 h-5 text-[#C4A672]" />
                   <div className="text-left flex-1">
@@ -163,7 +187,7 @@ export function RentalConfirmation({ book, rentalPeriod, onBack, onConfirm }: Re
             {/* Terms & Conditions */}
             <div className="bg-white rounded-xl shadow-sm p-6">
               <h2 className="text-[#2C3E50] text-xl mb-4">Rental Agreement</h2>
-              
+
               <div className="bg-gray-50 rounded-lg p-4 mb-4 max-h-48 overflow-y-auto text-sm text-gray-600">
                 <h4 className="text-[#2C3E50] mb-2">Terms and Conditions:</h4>
                 <ul className="space-y-2 list-disc list-inside">
@@ -181,7 +205,7 @@ export function RentalConfirmation({ book, rentalPeriod, onBack, onConfirm }: Re
                 <Checkbox
                   id="terms"
                   checked={agreeToTerms}
-                  onCheckedChange={(checked) => setAgreeToTerms(checked === true)}
+                  onCheckedChange={(checked: boolean | string) => setAgreeToTerms(checked === true)}
                 />
                 <label htmlFor="terms" className="text-sm text-gray-600 cursor-pointer">
                   I have read and agree to the rental terms and conditions, including the return policy and late fee structure

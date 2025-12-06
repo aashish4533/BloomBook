@@ -255,7 +255,7 @@ export function CommunityDetails({ userId }: CommunityDetailsProps) {
     try {
       const newPostData = {
         authorId: userId,
-        authorName: 'Current User',  // Fetch real name
+        authorName: auth.currentUser?.displayName || 'Anonymous',
         authorAvatar: 'CU',
         content,
         images,
@@ -375,7 +375,7 @@ export function CommunityDetails({ userId }: CommunityDetailsProps) {
         {/* Description */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
           <h3 className="text-[#2C3E50] mb-2">About</h3>
-          <p className="text-gray-600">{community.description}</p>
+          <p className="text-gray-600">{community.description || community.desc || community.about || "No description available."}</p>
         </div>
 
         {/* Tabs */}
