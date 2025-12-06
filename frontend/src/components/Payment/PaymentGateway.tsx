@@ -9,16 +9,18 @@ import { Card } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Label } from '../ui/label';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { CartItem } from '../../context/CartContext';
 
 interface PaymentGatewayProps {
   amount: number;
-  type: 'buy' | 'rent' | 'tuition';
+  type: 'buy' | 'rent';
   itemTitle: string;
   onSuccess: (transactionId: string) => void;
   onCancel: () => void;
+  cartItems?: CartItem[];
 }
 
-export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel }: PaymentGatewayProps) {
+export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel, cartItems }: PaymentGatewayProps) {
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'paypal'>('card');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -117,36 +119,51 @@ export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel }:
       const txId = 'TXN' + Math.random().toString(36).substr(2, 9).toUpperCase();
       setTransactionId(txId);
 
-      // Save purchase to Firestore
       try {
         const user = auth.currentUser;
         if (user) {
-          const purchaseRef = await addDoc(collection(db, 'purchases'), {
-            userId: user.uid,
-            bookTitle: itemTitle,
+          const itemsToProcess = cartItems && cartItems.length > 0 ? cartItems : [{
+            id: 'single-item',
+            title: itemTitle,
             price: amount,
-            date: new Date().toISOString(),
-            status: 'completed',
-            transactionId: txId,
+            image: '',
             type: type,
-            createdAt: serverTimestamp()
-          });
+            sellerName: 'Unknown',
+            sellerId: 'unknown'
+          }];
 
-          // Also save to transactions collection for Admin Dashboard
-          await addDoc(collection(db, 'transactions'), {
-            type: type === 'rent' ? 'rent' : 'buy', // Map 'tuition' to 'buy' or handle separately if needed
-            bookTitle: itemTitle,
-            user: user.displayName || user.email || 'Unknown User',
-            amount: amount,
-            date: new Date().toISOString(),
-            status: 'completed',
-            relatedId: purchaseRef.id,
-            createdAt: serverTimestamp()
-          });
+          for (const item of itemsToProcess) {
+            // Save purchase/rental logic
+            const collectionName = item.type === 'rent' ? 'rentals' : 'purchases';
+
+            const docRef = await addDoc(collection(db, collectionName), {
+              userId: user.uid,
+              bookId: item.id || '', // id might be missing from single item flow if not careful, but cart items have it
+              bookTitle: item.title,
+              price: item.price,
+              date: new Date().toISOString(),
+              status: 'completed', // or 'active' for rentals
+              transactionId: txId,
+              type: item.type,
+              createdAt: serverTimestamp(),
+              // Specific fields could differ, keeping it simple for uniformity first
+            });
+
+            // Also save to transactions collection for Admin Dashboard
+            await addDoc(collection(db, 'transactions'), {
+              type: type === 'rent' ? 'rent' : 'buy', // Use strict type or map item.type
+              bookTitle: item.title,
+              user: user.displayName || user.email || 'Unknown User',
+              amount: item.price,
+              date: new Date().toISOString(),
+              status: 'completed',
+              relatedId: docRef.id,
+              createdAt: serverTimestamp()
+            });
+          }
         }
       } catch (error) {
         console.error("Error saving purchase:", error);
-        // We don't block success UI if saving history fails, but we log it
       }
 
       setIsProcessing(false);
@@ -244,7 +261,7 @@ export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel }:
           {/* Payment Method Selection */}
           <div className="mb-6">
             <Label className="mb-3 block">Select Payment Method</Label>
-            <RadioGroup value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as 'card' | 'paypal')}>
+            <RadioGroup value={paymentMethod} onValueChange={(v: string) => setPaymentMethod(v as 'card' | 'paypal')}>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${paymentMethod === 'card' ? 'border-[#C4A672] bg-[#C4A672]/5' : 'border-gray-200'
                   }`}>

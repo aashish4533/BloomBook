@@ -5,9 +5,8 @@ import { LocationStep } from './SellBook/LocationStep';
 import { ReviewStep } from './SellBook/ReviewStep';
 import { SuccessStep } from './SellBook/SuccessStep';
 import { X } from 'lucide-react';
-import { db, auth, storage } from '../firebase';
+import { db, auth } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { toast } from 'sonner';
 
 export interface BookFormData {
@@ -113,17 +112,40 @@ export function SellBookFlow({ onClose }: SellBookFlowProps) {
       const pages = parseInt(bookData.pages);
       const publishedYear = parseInt(bookData.publishedYear);
 
-      // 3. Upload Images
+      // 3. Upload Images to Cloudinary
       const imageUrls: string[] = [];
       if (bookData.imageFiles && bookData.imageFiles.length > 0) {
+        const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+        const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+
+        if (!cloudName || !uploadPreset) {
+          console.error("Cloudinary credentials missing");
+          toast.error("Configuration error: Cloudinary credentials missing");
+          return;
+        }
+
         for (const file of bookData.imageFiles) {
           try {
-            const storageRef = ref(storage, `book-covers/${user.uid}/${Date.now()}-${file.name}`);
-            const snapshot = await uploadBytes(storageRef, file);
-            const downloadURL = await getDownloadURL(snapshot.ref);
-            imageUrls.push(downloadURL);
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('upload_preset', uploadPreset);
+
+            const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+              method: 'POST',
+              body: formData
+            });
+
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.error?.message || 'Image upload failed');
+            }
+
+            const data = await response.json();
+            imageUrls.push(data.secure_url);
           } catch (uploadErr) {
             console.error("Error uploading file:", file.name, uploadErr);
+            toast.error(`Failed to upload ${file.name}`);
+            // Decide if we want to stop or continue. Continuing for now but user should know.
           }
         }
       }
@@ -142,7 +164,7 @@ export function SellBookFlow({ onClose }: SellBookFlowProps) {
           avatar: user.photoURL || ''
         },
         images: imageUrls.length > 0 ? imageUrls : bookData.images,
-        type: 'sell',
+        type: 'sell', // Explicitly 'sell' for this flow
         status: 'active',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()

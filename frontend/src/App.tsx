@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
+import { CartProvider } from './context/CartContext';
 
 // Layouts
 import { MainLayout } from './components/Layouts/MainLayout';
@@ -44,6 +45,7 @@ import { RentalHistory } from './components/User/RentalHistory';
 import { Wishlist } from './components/User/Wishlist';
 import { UserCommunities } from './components/User/UserCommunities';
 import { UserChats } from './components/User/UserChats';
+import { UserExchanges } from './components/User/UserExchanges';
 
 // Admin Dashboard Sub-components
 import { UserManagement } from './components/Admin/UserManagement';
@@ -124,69 +126,72 @@ export default function App() {
   }
 
   return (
-    <Router>
-      <Routes>
-        {/* Auth Routes */}
-        <Route element={<AuthLayout />}>
-          <Route path="/login" element={<LoginForm onLogin={() => setUserRole('user')} />} />
-          <Route path="/register" element={<SignUpForm onSignUp={() => setUserRole('user')} />} />
-          <Route path="/admin/login" element={<AdminLogin onLogin={() => setUserRole('admin')} />} />
-        </Route>
+    <CartProvider>
+      <Router>
+        <Routes>
+          {/* Auth Routes */}
+          <Route element={<AuthLayout />}>
+            <Route path="/login" element={<LoginForm onLogin={() => setUserRole('user')} />} />
+            <Route path="/register" element={<SignUpForm onSignUp={() => setUserRole('user')} />} />
+            <Route path="/admin/login" element={<AdminLogin onLogin={() => setUserRole('admin')} />} />
+          </Route>
 
-        {/* Main App Routes */}
-        <Route element={<MainLayout isLoggedIn={!!currentUser} onLogout={handleLogout} />}>
-          <Route path="/" element={<HomeScreen isLoggedIn={!!currentUser} />} />
-          <Route path="/marketplace" element={<BookMarketplace />} />
-          <Route path="/book/:id" element={<BookDetailsPage />} />
-          <Route path="/sell" element={<SellBookFlowWrapper />} />
-          <Route path="/rent" element={<RentBookFlowWrapper />} />
-          <Route path="/exchange" element={<ExchangeBookFlowWrapper />} />
+          {/* Main App Routes */}
+          <Route element={<MainLayout isLoggedIn={!!currentUser} onLogout={handleLogout} />}>
+            <Route path="/" element={<HomeScreen isLoggedIn={!!currentUser} />} />
+            <Route path="/marketplace" element={<BookMarketplace />} />
+            <Route path="/book/:id" element={<BookDetailsPage />} />
+            <Route path="/sell" element={<SellBookFlowWrapper />} />
+            <Route path="/rent" element={<RentBookFlowWrapper />} />
+            <Route path="/exchange" element={<ExchangeBookFlowWrapper />} />
 
-          <Route path="/communities" element={<CommunitiesBrowse isLoggedIn={!!currentUser} />} />
-          <Route path="/communities/create" element={<CreateCommunity userId={currentUser?.uid} userName={currentUser?.displayName} />} />
-          <Route path="/communities/:id" element={<CommunityDetails userId={currentUser?.uid} />} />
-          <Route path="/communities/:id/chat" element={<GroupChat currentUserId={currentUser?.uid} />} />
+            <Route path="/communities" element={<CommunitiesBrowse isLoggedIn={!!currentUser} />} />
+            <Route path="/communities/create" element={<CreateCommunity userId={currentUser?.uid} userName={currentUser?.displayName} />} />
+            <Route path="/communities/:id" element={<CommunityDetails userId={currentUser?.uid} />} />
+            <Route path="/communities/:id/chat" element={<GroupChat currentUserId={currentUser?.uid} />} />
 
-          <Route path="/chat" element={<PrivateChatWrapper />} />
+            <Route path="/chat" element={<PrivateChatWrapper />} />
 
-          <Route path="/announcements" element={<AnnouncementsPage isAdmin={userRole === 'admin'} />} />
-          <Route path="/about" element={<AboutPage />} />
-          <Route path="/search" element={<AdvancedSearch />} />
-          <Route path="/wishlist" element={<WishlistPage />} />
-          <Route path="/tuition" element={<TuitionHub isLoggedIn={!!currentUser} />} />
-          <Route path="/notes" element={<NotesHub />} />
-          <Route path="/tracking/:orderId" element={<DeliveryTracking />} />
+            <Route path="/announcements" element={<AnnouncementsPage isAdmin={userRole === 'admin'} />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="/search" element={<AdvancedSearch />} />
+            <Route path="/wishlist" element={<WishlistPage />} />
+            <Route path="/tuition" element={<TuitionHub isLoggedIn={!!currentUser} />} />
+            <Route path="/notes" element={<NotesHub />} />
+            <Route path="/tracking/:orderId" element={<DeliveryTracking />} />
 
-          {/* Protected User Routes */}
-          <Route element={<ProtectedRoute isLoggedIn={!!currentUser} />}>
-            <Route path="/dashboard" element={<UserDashboard onLogout={handleLogout} />}>
-              <Route index element={<UserProfile />} />
-              <Route path="purchases" element={<PurchaseHistory />} />
-              <Route path="sales" element={<SalesHistory />} />
-              <Route path="rentals" element={<RentalHistory />} />
-              <Route path="wishlist" element={<Wishlist />} />
-              <Route path="communities" element={<UserCommunities />} />
-              <Route path="chats" element={<UserChats />} />
+            {/* Protected User Routes */}
+            <Route element={<ProtectedRoute isLoggedIn={!!currentUser} />}>
+              <Route path="/dashboard" element={<UserDashboard onLogout={handleLogout} />}>
+                <Route index element={<UserProfile />} />
+                <Route path="purchases" element={<PurchaseHistory />} />
+                <Route path="sales" element={<SalesHistory />} />
+                <Route path="rentals" element={<RentalHistory />} />
+                <Route path="wishlist" element={<Wishlist />} />
+                <Route path="communities" element={<UserCommunities />} />
+                <Route path="chats" element={<UserChats />} />
+                <Route path="exchanges" element={<UserExchanges />} />
+              </Route>
+            </Route>
+
+            {/* Admin Routes */}
+            <Route element={<AdminRoute userRole={userRole} />}>
+              <Route path="/admin/dashboard" element={<AdminDashboard onLogout={handleLogout} />}>
+                <Route index element={<UserManagement />} />
+                <Route path="books" element={<BookInventory />} />
+                <Route path="rentals" element={<RentalManagement />} />
+                <Route path="transactions" element={<TransactionHistory />} />
+                <Route path="communities" element={<CommunityManagement />} />
+                <Route path="announcements" element={<AdminAnnouncementsWrapper />} />
+                <Route path="settings" element={<SystemSettings />} />
+              </Route>
             </Route>
           </Route>
 
-          {/* Admin Routes */}
-          <Route element={<AdminRoute userRole={userRole} />}>
-            <Route path="/admin/dashboard" element={<AdminDashboard onLogout={handleLogout} />}>
-              <Route index element={<UserManagement />} />
-              <Route path="books" element={<BookInventory />} />
-              <Route path="rentals" element={<RentalManagement />} />
-              <Route path="transactions" element={<TransactionHistory />} />
-              <Route path="communities" element={<CommunityManagement />} />
-              <Route path="announcements" element={<AdminAnnouncementsWrapper />} />
-              <Route path="settings" element={<SystemSettings />} />
-            </Route>
-          </Route>
-        </Route>
-
-        {/* Catch all */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Router>
+          {/* Catch all */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Router>
+    </CartProvider>
   );
 }

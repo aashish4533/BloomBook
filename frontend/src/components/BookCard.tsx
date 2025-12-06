@@ -1,8 +1,10 @@
 // Updated src/components/BookCard.tsx
 import { Book } from './BookMarketplace';
-import { Star, User, Tag, Calendar } from 'lucide-react';
+import { Star, User, Tag, Calendar, ShoppingCart } from 'lucide-react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { Badge } from './ui/badge';
+import { useCart } from '../context/CartContext';
+import { Button } from './ui/button';
 
 interface BookCardProps {
   book: Book;
@@ -10,6 +12,20 @@ interface BookCardProps {
 }
 
 export function BookCard({ book, onClick }: BookCardProps) {
+  const { addToCart } = useCart();
+
+  const handleAddToCart = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    addToCart({
+      id: book.id,
+      title: book.title,
+      price: book.price,
+      image: book.images?.[0] || '',
+      type: book.type === 'rent' ? 'rent' : 'buy',
+      sellerName: book.seller?.name || 'Unknown',
+      sellerId: 'unknown' // Book type in marketplace might not have sellerId at top level, keeping safe
+    });
+  };
   const getConditionColor = (condition: string) => {
     switch (condition) {
       case 'New':
@@ -74,9 +90,21 @@ export function BookCard({ book, onClick }: BookCardProps) {
 
         <div className="pt-3 border-t border-gray-100">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[#C4A672] text-xl">
-              {book.type === 'exchange' ? 'Exchange' : `$${book.price.toFixed(2)}`}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[#C4A672] text-xl">
+                {book.type === 'exchange' ? 'Exchange' : `$${book.price.toFixed(2)}`}
+              </span>
+            </div>
+            {book.type !== 'exchange' && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 w-8 p-0 rounded-full"
+                onClick={handleAddToCart}
+              >
+                <ShoppingCart className="h-4 w-4 text-[#C4A672]" />
+              </Button>
+            )}
           </div>
 
           {/* Seller Info */}

@@ -9,9 +9,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
-import { db, auth, storage } from '../../firebase';
+import { db, auth } from '../../firebase';
 import { collection, addDoc, onSnapshot, query, orderBy, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+
 
 interface Message {
   id: string;
@@ -180,11 +180,27 @@ export function PrivateChat({ otherUser, bookContext, onBack, currentUserId }: P
       const imageUrls: string[] = [];
 
       // Upload images
+      // Upload images to Cloudinary
       for (const img of selectedImages) {
-        const storageRef = ref(storage, `chat-images/${chatId}/${Date.now()}-${img.file.name}`);
-        const snapshot = await uploadBytes(storageRef, img.file);
-        const url = await getDownloadURL(snapshot.ref);
-        imageUrls.push(url);
+        const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+        const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+
+        if (!cloudName || !uploadPreset) {
+          throw new Error("Cloudinary configuration missing");
+        }
+
+        const formData = new FormData();
+        formData.append('file', img.file);
+        formData.append('upload_preset', uploadPreset);
+
+        const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) throw new Error('Image upload failed');
+        const data = await response.json();
+        imageUrls.push(data.secure_url);
       }
 
       await addDoc(collection(db, 'chats', chatId, 'messages'), {

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Home, ShoppingBag, Calendar, DollarSign, User, LogIn, UserPlus, LogOut, ChevronDown, UserCircle2, History, Heart, Settings, Users, Search } from 'lucide-react';
 import { Button } from './ui/button';
 import { NotificationBell } from './NotificationBell';
+import { CartDrawer } from './Cart/CartDrawer';
 import { Link, useLocation } from 'react-router-dom';
 
 interface NavbarProps {
@@ -76,8 +77,8 @@ export function Navbar({
                     key={item.id}
                     to={item.path}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${active
-                        ? 'bg-[#2C3E50] text-white'
-                        : 'text-[#2C3E50] hover:bg-[#8B7355] hover:text-white'
+                      ? 'bg-[#2C3E50] text-white'
+                      : 'text-[#2C3E50] hover:bg-[#8B7355] hover:text-white'
                       }`}
                   >
                     <Icon className="w-5 h-5" />
@@ -91,6 +92,9 @@ export function Navbar({
             <div className="flex items-center gap-3">
               {isLoggedIn ? (
                 <>
+                  {/* Cart Drawer */}
+                  <CartDrawer />
+
                   {/* Notification Bell */}
                   <NotificationBell />
 
@@ -226,8 +230,8 @@ export function Navbar({
                   key={item.id}
                   to={item.path}
                   className={`flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-colors ${active
-                      ? 'text-[#2C3E50]'
-                      : 'text-[#2C3E50]/60'
+                    ? 'text-[#2C3E50]'
+                    : 'text-[#2C3E50]/60'
                     }`}
                 >
                   <Icon className={`w-6 h-6 ${active ? 'fill-[#2C3E50]' : ''}`} />

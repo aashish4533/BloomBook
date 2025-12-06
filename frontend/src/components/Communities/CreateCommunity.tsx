@@ -40,13 +40,15 @@ export function CreateCommunity({ onBack, onSuccess, userId, userName }: CreateC
     privacy: 'public' as 'public' | 'private',
     topic: '',
     location: '',
-    image: null as string | null
+    image: null as string | null,
+    imageFile: null as File | null
   });
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
 
+  // ... (topics array same as before)
   const topics = [
     'Fiction', 'Non-Fiction', 'Science Fiction', 'Fantasy', 'Mystery',
     'Romance', 'Thriller', 'Horror', 'Biography', 'History',
@@ -91,7 +93,7 @@ export function CreateCommunity({ onBack, onSuccess, userId, userName }: CreateC
 
       const reader = new FileReader();
       reader.onloadend = () => {
-        setFormData(prev => ({ ...prev, image: reader.result as string }));
+        setFormData(prev => ({ ...prev, image: reader.result as string, imageFile: file }));
       };
       reader.readAsDataURL(file);
     }
@@ -117,13 +119,41 @@ export function CreateCommunity({ onBack, onSuccess, userId, userName }: CreateC
     setIsSubmitting(true);
 
     try {
+      let imageUrl = formData.image; // fallback to base64 if no file (shouldn't happen if we clear it right) or if we keep existing logic (but we initialized image as string | null)
+
+      // Upload Image to Cloudinary if file exists
+      if (formData.imageFile) {
+        const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+        const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+
+        if (!cloudName || !uploadPreset) {
+          throw new Error("Cloudinary configuration missing");
+        }
+
+        const uploadData = new FormData();
+        uploadData.append('file', formData.imageFile);
+        uploadData.append('upload_preset', uploadPreset);
+
+        const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+          method: 'POST',
+          body: uploadData
+        });
+
+        if (!response.ok) {
+          throw new Error('Image upload failed');
+        }
+
+        const data = await response.json();
+        imageUrl = data.secure_url;
+      }
+
       const newCommunity = await addDoc(collection(db, 'communities'), {
         name: formData.name,
         description: formData.description,
         privacy: formData.privacy,
         topics: selectedTopics,
         location: formData.location,
-        image: formData.image,
+        image: imageUrl || 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&q=80', // Default image
         adminId: userId,
         adminName: userName,
         memberCount: 1,
@@ -133,13 +163,13 @@ export function CreateCommunity({ onBack, onSuccess, userId, userName }: CreateC
 
       // Add creator as member
       await updateDoc(doc(db, 'communities', newCommunity.id), {
-        members: arrayUnion(userId)
-      });
+        members: arrayUnion({ userId: userId, name: userName, timestamp: new Date() })
+      }); // Updating to store object with name/timestamp as used in browse component
 
       toast.success('Community created successfully! You are now the admin.');
       onSuccess(newCommunity.id);
-    } catch (err) {
-      toast.error('Failed to create community');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create community');
       console.error(err);
     } finally {
       setIsSubmitting(false);
@@ -222,8 +252,8 @@ export function CreateCommunity({ onBack, onSuccess, userId, userName }: CreateC
                 type="button"
                 onClick={() => setFormData(prev => ({ ...prev, privacy: 'public' }))}
                 className={`p-4 rounded-lg border-2 transition-all ${formData.privacy === 'public'
-                    ? 'border-[#C4A672] bg-[#C4A672]/10'
-                    : 'border-gray-200 hover:border-gray-300'
+                  ? 'border-[#C4A672] bg-[#C4A672]/10'
+                  : 'border-gray-200 hover:border-gray-300'
                   }`}
               >
                 <div className="flex items-start gap-3">
@@ -246,8 +276,8 @@ export function CreateCommunity({ onBack, onSuccess, userId, userName }: CreateC
                 type="button"
                 onClick={() => setFormData(prev => ({ ...prev, privacy: 'private' }))}
                 className={`p-4 rounded-lg border-2 transition-all ${formData.privacy === 'private'
-                    ? 'border-[#C4A672] bg-[#C4A672]/10'
-                    : 'border-gray-200 hover:border-gray-300'
+                  ? 'border-[#C4A672] bg-[#C4A672]/10'
+                  : 'border-gray-200 hover:border-gray-300'
                   }`}
               >
                 <div className="flex items-start gap-3">
@@ -278,8 +308,8 @@ export function CreateCommunity({ onBack, onSuccess, userId, userName }: CreateC
                   type="button"
                   onClick={() => toggleTopic(topic)}
                   className={`px-4 py-2 rounded-full text-sm transition-all ${selectedTopics.includes(topic)
-                      ? 'bg-[#C4A672] text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'bg-[#C4A672] text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                 >
                   {topic}
@@ -329,7 +359,7 @@ export function CreateCommunity({ onBack, onSuccess, userId, userName }: CreateC
                 />
                 <button
                   type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, image: null }))}
+                  onClick={() => setFormData(prev => ({ ...prev, image: null, imageFile: null }))}
                   className="absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
                 >
                   <X className="w-5 h-5" />

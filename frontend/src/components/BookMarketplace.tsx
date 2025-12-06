@@ -31,6 +31,14 @@ export interface Book {
   pages: number;
   type: 'sell' | 'rent' | 'exchange' | 'both';
   userId: string;
+  createdAt?: any;
+  location?: {
+    city: string;
+    state: string;
+    zipCode: string;
+    address?: string;
+    coordinates?: { lat: number; lng: number };
+  };
 }
 
 interface BookMarketplaceProps {
@@ -56,7 +64,24 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
     }
   );
 
-  const categories = ['all', 'Classic Literature', 'Science Fiction', 'Romance', 'Fantasy', 'Philosophy', 'Textbooks', 'Mystery', 'Biography'];
+  const categories = [
+    'all',
+    'Fiction',
+    'Non-Fiction',
+    'Science Fiction',
+    'Fantasy',
+    'Mystery',
+    'Romance',
+    'Biography',
+    'History',
+    'Self-Help',
+    'Business',
+    'Science',
+    'Philosophy',
+    'Classic Literature',
+    'Textbooks',
+    'Other'
+  ];
   const conditions = ['all', 'New', 'Like New', 'Good', 'Fair', 'Poor'];
 
   const books: Book[] = value?.docs.map(doc => {
@@ -89,7 +114,8 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
         return (b.seller?.rating || 0) - (a.seller?.rating || 0);
       case 'recent':
       default:
-        return 0; // In a real app, we'd sort by date
+        // Sort by createdAt if available, otherwise fallback
+        return (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0);
     }
   });
 
@@ -296,7 +322,7 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
                 </label>
                 <Slider
                   value={priceRange}
-                  onValueChange={(value) => setPriceRange(value as [number, number])}
+                  onValueChange={(value: number[]) => setPriceRange(value as [number, number])}
                   min={0}
                   max={50}
                   step={1}
