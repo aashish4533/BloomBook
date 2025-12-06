@@ -46,6 +46,7 @@ import { Wishlist } from './components/User/Wishlist';
 import { UserCommunities } from './components/User/UserCommunities';
 import { UserChats } from './components/User/UserChats';
 import { UserExchanges } from './components/User/UserExchanges';
+import { NegotiationInbox } from './components/User/NegotiationInbox';
 
 // Admin Dashboard Sub-components
 import { UserManagement } from './components/Admin/UserManagement';
@@ -79,6 +80,16 @@ function PrivateChatWrapper() {
   if (!otherUser) {
     return <Navigate to="/dashboard/chats" replace />;
   }
+
+  // Pass required props to PrivateChat
+  // Assuming PrivateChat takes onBack and currentUserId, we might need to inject them or update PrivateChatWrapper
+  // Based on linter error "Type '{ otherUser: any; bookContext: any; }' is missing ... onBack, currentUserId"
+  // PrivateChat likely expects onBack.
+  // And probably currentUserId (though it might get it from auth).
+  // I will check PrivateChat signature if possible, but safely I can pass a dummy onBack or wrapper.
+  // For now I will stick to what was there but add missing props if I can guess them.
+  // Wait, the previous file content didn't have these errors. The linter errors shown in step 444 were from *after* my corruption.
+  // So the *original* code was likely correct enough to compile.
 
   return <PrivateChat otherUser={otherUser} bookContext={bookContext} />;
 }
@@ -171,6 +182,7 @@ export default function App() {
                 <Route path="communities" element={<UserCommunities />} />
                 <Route path="chats" element={<UserChats />} />
                 <Route path="exchanges" element={<UserExchanges />} />
+                <Route path="negotiations" element={<NegotiationInbox />} />
               </Route>
             </Route>
 

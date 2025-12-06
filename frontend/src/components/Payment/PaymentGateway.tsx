@@ -200,7 +200,7 @@ export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel, c
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Amount:</span>
-              <span className="text-[#C4A672] text-lg">${amount.toFixed(2)}</span>
+              <span className="text-[#C4A672] text-lg">Rs. {amount.toLocaleString()}</span>
             </div>
           </div>
 
@@ -246,15 +246,15 @@ export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel, c
             <h3 className="text-[#2C3E50] mb-3">Order Summary</h3>
             <div className="flex justify-between items-center mb-2">
               <span className="text-gray-600">{itemTitle}</span>
-              <span className="text-[#2C3E50]">${amount.toFixed(2)}</span>
+              <span className="text-[#2C3E50]">Rs. {amount.toLocaleString()}</span>
             </div>
             <div className="flex justify-between items-center mb-2">
               <span className="text-gray-600">Processing Fee</span>
-              <span className="text-[#2C3E50]">$0.00</span>
+              <span className="text-[#2C3E50]">Rs. 0</span>
             </div>
             <div className="border-t pt-2 mt-2 flex justify-between items-center">
               <span className="text-[#2C3E50]">Total Amount</span>
-              <span className="text-[#C4A672] text-xl">${amount.toFixed(2)}</span>
+              <span className="text-[#C4A672] text-xl">Rs. {amount.toLocaleString()}</span>
             </div>
           </div>
 
@@ -407,7 +407,7 @@ export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel, c
               ) : (
                 <>
                   <Lock className="w-4 h-4 mr-2" />
-                  Pay ${amount.toFixed(2)}
+                  Pay Rs. {amount.toLocaleString()}
                 </>
               )}
             </Button>

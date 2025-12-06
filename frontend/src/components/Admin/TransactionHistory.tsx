@@ -90,19 +90,40 @@ export function TransactionHistory() {
   };
 
   const handleExport = () => {
-    // Implement CSV export
-    const csv = filteredTransactions.map(txn => ({
-      ID: txn.id,
-      Type: txn.type,
-      Book: txn.bookTitle,
-      User: txn.user,
-      Amount: txn.amount,
-      Date: txn.date,
-      Status: txn.status
-    }));
-    // Convert to CSV string and download
-    console.log('Exporting:', csv);
-    toast.success('Transactions downloaded');
+    // Define headers
+    const headers = ['Transaction ID', 'Type', 'Book', 'User', 'Amount', 'Date', 'Status'];
+
+    // Convert data to CSV rows
+    const csvContent = [
+      headers.join(','),
+      ...filteredTransactions.map(txn => {
+        const row = [
+          txn.id,
+          txn.type,
+          `"${txn.bookTitle.replace(/"/g, '""')}"`, // Escape quotes in title
+          `"${txn.user.replace(/"/g, '""')}"`, // Escape quotes in user
+          txn.amount.toFixed(2),
+          txn.date,
+          txn.status
+        ];
+        return row.join(',');
+      })
+    ].join('\n');
+
+    // Create a Blob and trigger download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'transactions.csv');
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success('Transactions downloaded successfully');
+    }
   };
 
   if (loading) return <div>Loading...</div>;

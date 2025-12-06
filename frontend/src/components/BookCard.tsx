@@ -33,7 +33,7 @@ export function BookCard({ book, onClick }: BookCardProps) {
       image: book.images?.[0] || '',
       type: book.type === 'rent' ? 'rent' : 'buy',
       sellerName: book.seller?.name || 'Unknown',
-      sellerId: 'unknown' // Book type in marketplace might not have sellerId at top level, keeping safe
+      sellerId: book.userId || 'unknown' // Book type in marketplace might not have sellerId at top level, keeping safe
     });
   };
   const getConditionColor = (condition: string) => {
@@ -102,7 +102,7 @@ export function BookCard({ book, onClick }: BookCardProps) {
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <span className="text-[#C4A672] text-xl">
-                {book.type === 'exchange' ? 'Exchange' : `$${book.price.toFixed(2)}`}
+                {book.type === 'exchange' ? 'Exchange' : `Rs. ${book.price.toLocaleString()}`}
               </span>
             </div>
             {book.type !== 'exchange' && (

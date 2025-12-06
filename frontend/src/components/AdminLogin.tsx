@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { Input } from './ui/input';
+import { useNavigate, Link } from 'react-router-dom';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth, db } from '../firebase';
 import { Button } from './ui/button';
+import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
-import { Shield, Lock, Mail, AlertCircle, ArrowLeft } from 'lucide-react';
-import { auth } from '../firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
 import { toast } from 'sonner';
-import { Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Shield, Mail, Lock, AlertCircle } from 'lucide-react';
 
 interface AdminLoginProps {
   onLogin?: () => void;
@@ -16,12 +17,12 @@ interface AdminLoginProps {
 export function AdminLogin({ onLogin }: AdminLoginProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [twoFactorCode, setTwoFactorCode] = useState('');
-  const [showTwoFactor, setShowTwoFactor] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [showTwoFactor, setShowTwoFactor] = useState(false);
   const [generatedOTP, setGeneratedOTP] = useState('');
+  const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const navigate = useNavigate();
 
   const handleInitialLogin = async (e: React.FormEvent) => {
@@ -45,8 +46,6 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
     if (Object.keys(newErrors).length === 0) {
       setIsLoading(true);
       try {
-        // Simulate backend validation against credentials.json
-        // In a real app, this would be a secure API call
         const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
         const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD;
 
@@ -55,15 +54,30 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
         }
 
         try {
+          // 1. Try to Login
           await signInWithEmailAndPassword(auth, email, password);
         } catch (error: any) {
-          // If user not found but credentials match hardcoded admin, create the user
+          // 2. If user doesn't exist (or password changed in env), try to Register
           if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
             try {
               const { createUserWithEmailAndPassword } = await import('firebase/auth');
-              await createUserWithEmailAndPassword(auth, email, password);
+              // Create the Authentication User
+              const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+
+              // 3. CRITICAL FIX: Create the Database Document immediately
+              await setDoc(doc(db, 'users', userCredential.user.uid), {
+                email: email,
+                name: 'Admin',
+                role: 'admin', // This grants access to the dashboard
+                createdAt: serverTimestamp(),
+                verified: true
+              });
+
+              toast.success("Admin account created and linked to database.");
+
             } catch (createError: any) {
-              // If creation fails, throw original error
+              console.error("Creation failed:", createError);
+              // If creation failed (e.g., email taken), throw the original login error
               throw error;
             }
           } else {
@@ -72,16 +86,34 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
         }
 
         // Success - Generate OTP and show 2FA
+        // (Make sure your backend server is running for this to work!)
         const code = Math.floor(100000 + Math.random() * 900000).toString();
-        setGeneratedOTP(code);
-        setShowTwoFactor(true);
-        setIsLoading(false);
-        toast.success('Please verify your identity');
+
+        try {
+          // Send OTP via Backend
+          const response = await fetch('http://localhost:3001/api/send-otp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, otp: code }),
+          });
+
+          if (!response.ok) throw new Error('Failed to send email');
+
+          setGeneratedOTP(code);
+          setShowTwoFactor(true);
+          toast.success('Verification code sent to your email');
+        } catch (mailError) {
+          console.error("Email failed, falling back to demo mode", mailError);
+          setGeneratedOTP(code);
+          setShowTwoFactor(true);
+          toast.warning('Email service unavailable. Check console for OTP code.');
+        }
 
       } catch (error: any) {
-        setIsLoading(false);
         toast.error(error.message);
         setErrors({ ...newErrors, form: error.message });
+      } finally {
+        setIsLoading(false);
       }
     }
   };

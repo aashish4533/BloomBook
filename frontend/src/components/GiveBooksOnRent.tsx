@@ -335,7 +335,7 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
                 </Select>
               </div>
               <div>
-                <Label htmlFor="pricePerWeek">Price Per Week (₹) *</Label>
+                <Label htmlFor="pricePerWeek">Price Per Week (PKR) *</Label>
                 <Input
                   id="pricePerWeek"
                   type="number"
@@ -345,17 +345,17 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
                   className="mt-1 focus-glow"
                 />
                 <p className="text-sm text-gray-500 mt-1">
-                  Suggested: ₹30-100 per week based on book condition
+                  Suggested: Rs. 100-500 per week based on book condition
                 </p>
               </div>
               <div>
-                <Label htmlFor="deposit">Security Deposit (₹) *</Label>
+                <Label htmlFor="deposit">Security Deposit (PKR) *</Label>
                 <Input
                   id="deposit"
                   type="number"
                   value={formData.securityDeposit}
                   onChange={(e) => updateFormData('securityDeposit', e.target.value)}
-                  placeholder="e.g., 200"
+                  placeholder="e.g., 1500"
                   className="mt-1 focus-glow"
                 />
                 <p className="text-sm text-gray-500 mt-1">
@@ -443,8 +443,8 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
               </div>
               <div className="border-b pb-4">
                 <h3 className="text-sm text-gray-500 mb-2">Pricing</h3>
-                <p className="text-gray-900">₹{formData.pricePerWeek || '0'} per week</p>
-                <p className="text-sm text-gray-600">Security Deposit: ₹{formData.securityDeposit || '0'}</p>
+                <p className="text-gray-900">Rs. {formData.pricePerWeek || '0'} per week</p>
+                <p className="text-sm text-gray-600">Security Deposit: Rs. {formData.securityDeposit || '0'}</p>
                 <p className="text-sm text-gray-600">Max Period: {formData.rentalPeriod || 'Not selected'}</p>
               </div>
               <div>

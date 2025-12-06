@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BookCard } from './BookCard';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
@@ -7,8 +7,7 @@ import { Slider } from './ui/slider';
 import { Search, SlidersHorizontal, Plus, MapPin, ArrowLeft } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
-import { collection } from 'firebase/firestore';
-import { useCollection } from 'react-firebase-hooks/firestore';
+import { collection, query, orderBy, limit, startAfter, where, getDocs, DocumentSnapshot, QueryConstraint } from 'firebase/firestore';
 
 export interface Book {
   id: string;
@@ -23,6 +22,7 @@ export interface Book {
     rating: number;
     totalSales: number;
     avatar: string;
+    id?: string; // Added optional id to fix linter
   };
   images: string[];
   publishedYear: number;
@@ -46,23 +46,22 @@ interface BookMarketplaceProps {
 }
 
 export function BookMarketplace({ onBack }: BookMarketplaceProps) {
+  const [books, setBooks] = useState<Book[]>([]);
+  const [lastDoc, setLastDoc] = useState<DocumentSnapshot | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [conditionFilter, setConditionFilter] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
   const [isbnFilter, setIsbnFilter] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 50]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 5000]);
   const [sortBy, setSortBy] = useState('recent');
   const [listingType, setListingType] = useState<'all' | 'sell' | 'rent' | 'exchange'>('all');
   const navigate = useNavigate();
-
-  const [value, loading, error] = useCollection(
-    collection(db, 'books'),
-    {
-      snapshotListenOptions: { includeMetadataChanges: true },
-    }
-  );
 
   const categories = [
     'all',
@@ -84,39 +83,80 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
   ];
   const conditions = ['all', 'New', 'Like New', 'Good', 'Fair', 'Poor'];
 
-  const books: Book[] = value?.docs.map(doc => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      ...data
-    } as Book;
-  }) || [];
+  const fetchBooks = async (isLoadMore = false) => {
+    try {
+      if (isLoadMore) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
 
+      const booksRef = collection(db, 'books');
+      let constraints: QueryConstraint[] = [];
+
+      // Backend Filtering
+      if (categoryFilter !== 'all') {
+        constraints.push(where('category', '==', categoryFilter));
+      }
+
+      // Sorting
+      // Note: 'price' sort requires an index if combined with 'category' filter
+      if (sortBy === 'recent') {
+        constraints.push(orderBy('createdAt', 'desc'));
+      } else if (sortBy === 'price-low') {
+        constraints.push(orderBy('price', 'asc'));
+      } else if (sortBy === 'price-high') {
+        constraints.push(orderBy('price', 'desc'));
+      }
+
+      // Pagination
+      if (isLoadMore && lastDoc) {
+        constraints.push(startAfter(lastDoc));
+      }
+
+      constraints.push(limit(20));
+
+      const q = query(booksRef, ...constraints);
+      const snapshot = await getDocs(q);
+
+      const newBooks = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Book));
+
+      if (isLoadMore) {
+        setBooks(prev => [...prev, ...newBooks]);
+      } else {
+        setBooks(newBooks);
+      }
+
+      setLastDoc(snapshot.docs[snapshot.docs.length - 1] || null);
+      setHasMore(snapshot.docs.length === 20);
+
+    } catch (error) {
+      console.error("Error fetching books:", error);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  // Initial fetch and when core backend filters change
+  useEffect(() => {
+    fetchBooks(false);
+  }, [categoryFilter, sortBy]);
+
+  // Client-side filtering for fields that are too complex for simple Firestore queries without many indexes
+  // or text search (which Firestore doesn't natively support well for partial matches)
   const filteredBooks = books.filter(book => {
     const matchesSearch = book.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       book.author?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = categoryFilter === 'all' || book.category === categoryFilter;
     const matchesCondition = conditionFilter === 'all' || book.condition === conditionFilter;
     const matchesIsbn = !isbnFilter || book.isbn?.includes(isbnFilter);
     const matchesPrice = book.price >= priceRange[0] && book.price <= priceRange[1];
     const matchesType = listingType === 'all' || book.type === listingType || book.type === 'both' || (listingType === 'exchange' && book.type === 'exchange');
 
-    return matchesSearch && matchesCategory && matchesCondition && matchesIsbn && matchesPrice && matchesType;
-  });
-
-  const sortedBooks = [...filteredBooks].sort((a, b) => {
-    switch (sortBy) {
-      case 'price-low':
-        return a.price - b.price;
-      case 'price-high':
-        return b.price - a.price;
-      case 'rating':
-        return (b.seller?.rating || 0) - (a.seller?.rating || 0);
-      case 'recent':
-      default:
-        // Sort by createdAt if available, otherwise fallback
-        return (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0);
-    }
+    return matchesSearch && matchesCondition && matchesIsbn && matchesPrice && matchesType;
   });
 
   const activeFiltersCount = [
@@ -124,7 +164,7 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
     conditionFilter !== 'all',
     isbnFilter !== '',
     locationFilter !== '',
-    priceRange[0] > 0 || priceRange[1] < 50
+    priceRange[0] > 0 || priceRange[1] < 5000
   ].filter(Boolean).length;
 
   const clearAllFilters = () => {
@@ -132,17 +172,14 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
     setConditionFilter('all');
     setIsbnFilter('');
     setLocationFilter('');
-    setPriceRange([0, 50]);
+    setPriceRange([0, 5000]);
     setSearchQuery('');
     setListingType('all');
+    setSortBy('recent');
   };
 
-  if (loading) {
+  if (loading && !loadingMore && books.length === 0) {
     return <div className="min-h-screen flex items-center justify-center">Loading books...</div>;
-  }
-
-  if (error) {
-    return <div className="min-h-screen flex items-center justify-center text-red-500">Error loading books: {error.message}</div>;
   }
 
   return (
@@ -178,34 +215,16 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
         {/* Listing Type Tabs */}
         <div className="flex justify-center mb-6">
           <div className="bg-white p-1 rounded-lg border border-gray-200 inline-flex">
-            <button
-              onClick={() => setListingType('all')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${listingType === 'all' ? 'bg-[#C4A672] text-white' : 'text-gray-600 hover:bg-gray-50'
-                }`}
-            >
-              All Books
-            </button>
-            <button
-              onClick={() => setListingType('sell')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${listingType === 'sell' ? 'bg-[#C4A672] text-white' : 'text-gray-600 hover:bg-gray-50'
-                }`}
-            >
-              For Sale
-            </button>
-            <button
-              onClick={() => setListingType('rent')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${listingType === 'rent' ? 'bg-[#C4A672] text-white' : 'text-gray-600 hover:bg-gray-50'
-                }`}
-            >
-              For Rent
-            </button>
-            <button
-              onClick={() => setListingType('exchange')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${listingType === 'exchange' ? 'bg-[#C4A672] text-white' : 'text-gray-600 hover:bg-gray-50'
-                }`}
-            >
-              Exchange
-            </button>
+            {['all', 'sell', 'rent', 'exchange'].map((type) => (
+              <button
+                key={type}
+                onClick={() => setListingType(type as any)}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${listingType === type ? 'bg-[#C4A672] text-white' : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+              >
+                {type === 'all' ? 'All Books' : type.charAt(0).toUpperCase() + type.slice(1) + (type === 'sell' ? ' (Sale)' : '')}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -318,19 +337,19 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
               {/* Price Range Slider */}
               <div className="space-y-2">
                 <label className="text-sm text-gray-700">
-                  Price Range: ${priceRange[0]} - ${priceRange[1]}
+                  Price Range: Rs. {priceRange[0]} - Rs. {priceRange[1]}
                 </label>
                 <Slider
                   value={priceRange}
                   onValueChange={(value: number[]) => setPriceRange(value as [number, number])}
                   min={0}
-                  max={50}
-                  step={1}
+                  max={5000}
+                  step={100}
                   className="w-full"
                 />
                 <div className="flex justify-between text-xs text-gray-500">
-                  <span>$0</span>
-                  <span>$50+</span>
+                  <span>Rs. 0</span>
+                  <span>Rs. 5000+</span>
                 </div>
               </div>
             </div>
@@ -339,7 +358,7 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
           {/* Sort and Results Count */}
           <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
             <p className="text-gray-600">
-              {sortedBooks.length} {sortedBooks.length === 1 ? 'book' : 'books'} found
+              {filteredBooks.length} {filteredBooks.length === 1 ? 'book' : 'books'} found
             </p>
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600">Sort by:</span>
@@ -351,7 +370,6 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
                   <SelectItem value="recent">Most Recent</SelectItem>
                   <SelectItem value="price-low">Price: Low to High</SelectItem>
                   <SelectItem value="price-high">Price: High to Low</SelectItem>
-                  <SelectItem value="rating">Seller Rating</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -359,27 +377,36 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
         </div>
 
         {/* Book Grid */}
-        {sortedBooks.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {sortedBooks.map(book => (
-              <div key={book.id} onClick={() => navigate(`/book/${book.id}`)} className="cursor-pointer">
-                <BookCard
-                  book={book}
-                  onClick={() => navigate(`/book/${book.id}`)}
-                />
+        {filteredBooks.length > 0 ? (
+          <div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredBooks.map(book => (
+                <div key={book.id} onClick={() => navigate(`/book/${book.id}`)} className="cursor-pointer">
+                  <BookCard
+                    book={book}
+                    onClick={() => navigate(`/book/${book.id}`)}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {hasMore && (
+              <div className="mt-8 text-center">
+                <Button
+                  onClick={() => fetchBooks(true)}
+                  disabled={loadingMore}
+                  className="bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+                >
+                  {loadingMore ? 'Loading more...' : 'Load More'}
+                </Button>
               </div>
-            ))}
+            )}
           </div>
         ) : (
           <div className="bg-white rounded-xl shadow-sm p-12 text-center">
             <p className="text-gray-500">No books found matching your criteria</p>
             <Button
-              onClick={() => {
-                setSearchQuery('');
-                setCategoryFilter('all');
-                setConditionFilter('all');
-                setListingType('all');
-              }}
+              onClick={clearAllFilters}
               variant="outline"
               className="mt-4"
             >

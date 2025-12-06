@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
 import { ChangePasswordSuccess } from './ChangePasswordSuccess';
 import { Button } from './ui/button';
-import { User, ShoppingBag, DollarSign, Calendar, Heart, BookOpen, LogOut, Users, MessageCircle, ArrowLeftRight } from 'lucide-react';
+import { User, ShoppingBag, DollarSign, Calendar, Heart, BookOpen, LogOut, Users, MessageCircle, ArrowLeftRight, Gavel } from 'lucide-react';
 import { auth } from '../firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 
@@ -24,6 +24,7 @@ export function UserDashboard({ onLogout }: UserDashboardProps) {
     { id: 'communities', label: 'Communities', icon: Users, path: '/dashboard/communities' },
     { id: 'chats', label: 'Chats', icon: MessageCircle, path: '/dashboard/chats' },
     { id: 'exchanges', label: 'Exchanges', icon: ArrowLeftRight, path: '/dashboard/exchanges' },
+    { id: 'negotiations', label: 'Negotiations', icon: Gavel, path: '/dashboard/negotiations' },
   ];
 
   if (loading) {

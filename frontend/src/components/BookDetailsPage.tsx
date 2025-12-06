@@ -77,23 +77,26 @@ export function BookDetailsPage() {
             return;
         }
 
-        if (auth.currentUser.uid === book.seller.id) { // Assuming book.seller has an id, if not we might need to fetch it or store it on the book object
+        const sellerId = book.userId || book.seller?.id;
+        console.log("Seller ID:", sellerId);
+
+        if (!sellerId) {
+            toast.error("Unable to contact seller: Seller ID missing");
+            return;
+        }
+
+        if (auth.currentUser.uid === sellerId) {
             toast.error("You cannot chat with yourself");
             return;
         }
 
-        // We need the seller's ID. The current Book interface in BookMarketplace.tsx has seller: { name, rating, ... } but maybe not ID.
-        // Let's check the Book interface again or assume we need to add sellerId to the book document.
-        // Looking at SellBookFlow, we added `userId` to the book document. 
-        // So `book.userId` should be the seller's ID.
-
         navigate('/chat', {
             state: {
                 otherUser: {
-                    id: book.userId, // Use book.userId as seller ID
+                    id: sellerId,
                     name: book.seller.name,
                     avatar: book.seller.avatar || 'S',
-                    online: false // We don't track online status yet
+                    online: false
                 },
                 bookContext: {
                     id: book.id,
@@ -142,7 +145,7 @@ export function BookDetailsPage() {
 
                         {/* Price and Condition */}
                         <div className="flex items-center gap-4">
-                            <div className="text-4xl text-[#C4A672]">${book.price.toFixed(2)}</div>
+                            <div className="text-4xl text-[#C4A672]">Rs. {book.price.toLocaleString()}</div>
                             <Badge className={`${getConditionColor(book.condition)} text-sm px-3 py-1`}>
                                 {book.condition}
                             </Badge>
@@ -228,7 +231,18 @@ export function BookDetailsPage() {
                                     variant="outline"
                                     size="sm"
                                     className="w-full"
-                                    onClick={() => alert('This would open directions to the pickup location')}
+                                    onClick={() => {
+                                        const destination = `${book.location?.address || ''}, ${book.location?.city || ''}`;
+                                        const query = book.location?.coordinates
+                                            ? `${book.location.coordinates.lat},${book.location.coordinates.lng}`
+                                            : encodeURIComponent(destination);
+
+                                        if (!query || query === ', ') {
+                                            toast.error("Seller location not available");
+                                            return;
+                                        }
+                                        window.open(`https://www.google.com/maps/dir/?api=1&destination=${query}`, '_blank');
+                                    }}
                                 >
                                     <Navigation className="w-4 h-4 mr-2" />
                                     Get Directions
@@ -309,9 +323,10 @@ function NegotiateDialog({ book, onClose }: { book: Book; onClose: () => void })
             await addDoc(collection(db, 'negotiations'), {
                 buyerId: user.uid,
                 buyerName: user.displayName || 'Anonymous',
+                sellerId: book.userId || book.seller?.id, // Added sellerId
                 bookId: book.id,
                 bookTitle: book.title,
-                sellerName: book.seller.name, // In real app, use sellerId
+                sellerName: book.seller.name,
                 offerPrice: parseFloat(offerPrice),
                 message: message,
                 status: 'pending',
@@ -333,13 +348,13 @@ function NegotiateDialog({ book, onClose }: { book: Book; onClose: () => void })
             <div className="bg-white rounded-lg p-6 max-w-md w-full">
                 <h3 className="text-[#2C3E50] mb-4">Negotiate Price</h3>
                 <p className="text-gray-600 text-sm mb-4">
-                    Current asking price: ${book.price.toFixed(2)}
+                    Current asking price: Rs. {book.price.toLocaleString()}
                 </p>
                 <div className="space-y-4">
                     <div>
                         <label className="text-sm text-gray-700 block mb-2">Your Offer</label>
                         <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">Rs.</span>
                             <input
                                 type="number"
                                 step="0.01"

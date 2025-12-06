@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { toast } from 'sonner';
+import { db, auth } from '../firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 export interface CartItem {
     id: string;
@@ -27,8 +29,48 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return saved ? JSON.parse(saved) : [];
     });
 
+    // Sync with Firestore on Auth Change
+    useEffect(() => {
+        const unsubscribe = auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                try {
+                    const docRef = doc(db, 'carts', user.uid);
+                    const docSnap = await getDoc(docRef);
+                    if (docSnap.exists()) {
+                        const remoteItems = docSnap.data().items as CartItem[];
+                        // Merge remote items with local items, avoiding duplicates
+                        setItems(prev => {
+                            const combined = [...prev, ...remoteItems];
+                            const uniqueItems = Array.from(new Map(combined.map(item => [item.id + item.type, item])).values());
+                            return uniqueItems;
+                        });
+                    } else if (items.length > 0) {
+                        // If no remote cart but local has items, sync local to remote
+                        await setDoc(docRef, { items });
+                    }
+                } catch (error) {
+                    console.error("Error fetching cart from Firestore:", error);
+                }
+            }
+        });
+        return () => unsubscribe();
+    }, []);
+
+    // Save to LocalStorage and Firestore on change
     useEffect(() => {
         localStorage.setItem('cart', JSON.stringify(items));
+
+        const user = auth.currentUser;
+        if (user) {
+            const saveToFirestore = async () => {
+                try {
+                    await setDoc(doc(db, 'carts', user.uid), { items });
+                } catch (error) {
+                    console.error("Error saving cart to Firestore:", error);
+                }
+            };
+            saveToFirestore();
+        }
     }, [items]);
 
     const totalAmount = items.reduce((sum, item) => sum + item.price, 0);

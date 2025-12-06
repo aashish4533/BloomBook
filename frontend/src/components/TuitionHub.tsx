@@ -338,13 +338,13 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                       />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="rate">Hourly Rate ($)</Label>
+                      <Label htmlFor="rate">Hourly Rate (PKR)</Label>
                       <Input
                         id="rate"
                         type="number"
                         value={tutorForm.hourlyRate}
                         onChange={(e) => setTutorForm({ ...tutorForm, hourlyRate: e.target.value })}
-                        placeholder="45"
+                        placeholder="1500"
                       />
                     </div>
                     <div className="grid gap-2">
@@ -492,36 +492,40 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                   <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                     <div>
                       <p className="text-xs text-gray-500">Starting at</p>
-                      <p className="text-[#C4A672] text-xl">${tutor.hourlyRate}/hr</p>
+                      <p className="text-[#C4A672] text-xl">Rs. {tutor.hourlyRate}/hr</p>
                     </div>
-                    {isLoggedIn ? (
-                      <div className="flex gap-2">
-                        <Button size="sm" className="bg-[#C4A672] hover:bg-[#8B7355] text-white">
-                          Book Session
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-[#C4A672] text-[#C4A672] hover:bg-[#C4A672]/10"
-                          onClick={() => {
-                            navigate('/chat', {
-                              state: {
-                                otherUser: {
-                                  id: tutor.userId,
-                                  name: tutor.name,
-                                  avatar: tutor.avatar,
-                                  online: true
-                                }
-                              }
-                            });
-                          }}
-                        >
-                          Hire Tutor
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button disabled variant="outline">Login to Book</Button>
-                    )}
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        className="bg-[#C4A672] hover:bg-[#8B7355] text-white"
+                        onClick={() => {
+                          if (!isLoggedIn) {
+                            toast.error("Please login to book a session");
+                            navigate('/login');
+                            return;
+                          }
+                          // Placeholder for booking logic
+                          toast.info("Booking flow coming soon!");
+                        }}
+                      >
+                        Book Session
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-[#C4A672] text-[#C4A672] hover:bg-[#C4A672]/10"
+                        onClick={() => {
+                          if (isLoggedIn) {
+                            navigate('/chat', { state: { otherUser: { id: tutor.userId, name: tutor.name, avatar: tutor.avatar, online: true } } });
+                          } else {
+                            toast.error("Please login to hire a tutor");
+                            navigate('/login');
+                          }
+                        }}
+                      >
+                        Hire Tutor
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </Card>
