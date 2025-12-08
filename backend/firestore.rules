@@ -4,6 +4,10 @@ service cloud.firestore {
     function isAuthenticated() { return request.auth != null; }
     function isOwner(userId) { return request.auth.uid == userId; }
 
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
     match /users/{userId} {
       allow read: if true;
       allow write: if isAuthenticated() && isOwner(userId);
@@ -18,7 +22,7 @@ service cloud.firestore {
       allow create: if isAuthenticated();
     }
     match /transactions/{transactionId} {
-      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || request.auth.token.admin == true);
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
     match /carts/{userId} {
       allow read, write: if isAuthenticated() && isOwner(userId);

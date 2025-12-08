@@ -96,6 +96,9 @@ app.post('/api/send-otp', async (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`Backend server running on http://localhost:${PORT}`);
-});
+// app.listen(PORT, () => {
+//     console.log(`Backend server running on http://localhost:${PORT}`);
+// });
+
+const functions = require('firebase-functions');
+exports.api = functions.https.onRequest(app);

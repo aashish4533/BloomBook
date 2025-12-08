@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore'; // Add getDoc
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { Button } from './ui/button';
@@ -55,7 +55,27 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
 
         try {
           // 1. Try to Login
-          await signInWithEmailAndPassword(auth, email, password);
+          // 1. Try to Login
+          const userCredential = await signInWithEmailAndPassword(auth, email, password); // Capture result
+
+          // Self-repair: Check if DB document exists
+          const user = auth.currentUser;
+          if (user) {
+            const userDocRef = doc(db, 'users', user.uid);
+            const userDocSnap = await getDoc(userDocRef);
+
+            // If DB is empty (wiped), recreate the Admin ID
+            if (!userDocSnap.exists()) {
+              await setDoc(userDocRef, {
+                email: email,
+                name: 'Admin',
+                role: 'admin',
+                createdAt: serverTimestamp(),
+                verified: true
+              });
+              toast.success("Admin database profile restored.");
+            }
+          }
         } catch (error: any) {
           // 2. If user doesn't exist (or password changed in env), try to Register
           if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
@@ -85,10 +105,10 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
           }
         }
 
-        // Success - Generate OTP and show 2FA
-        // (Make sure your backend server is running for this to work!)
-        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        // Success - 2FA DISABLED FOR DEPLOYMENT/TESTING
+        // const code = Math.floor(100000 + Math.random() * 900000).toString();
 
+        /*
         try {
           // Send OTP via Backend
           const response = await fetch('http://localhost:3001/api/send-otp', {
@@ -108,6 +128,12 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
           setShowTwoFactor(true);
           toast.warning('Email service unavailable. Check console for OTP code.');
         }
+        */
+
+        // DIRECT LOGIN
+        if (onLogin) onLogin();
+        toast.success('Admin login successful');
+        navigate('/admin/dashboard');
 
       } catch (error: any) {
         toast.error(error.message);

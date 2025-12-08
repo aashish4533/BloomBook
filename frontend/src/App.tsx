@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from './firebase';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth, db } from './firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import { CartProvider } from './context/CartContext';
 
 // Layouts
@@ -63,35 +65,100 @@ function SellBookFlowWrapper() {
   return <SellBookFlow onClose={() => navigate('/')} />;
 }
 
-function RentBookFlowWrapper() {
-  const navigate = useNavigate();
-  return <RentBookFlow onClose={() => navigate('/')} />;
-}
-
 function ExchangeBookFlowWrapper() {
   const navigate = useNavigate();
   return <ExchangeBookFlow onClose={() => navigate('/')} />;
 }
 
+function RentBookFlowWrapper() {
+  const navigate = useNavigate();
+  return <RentBookFlow onClose={() => navigate('/')} />;
+}
+
 function PrivateChatWrapper() {
+  const navigate = useNavigate();
   const location = useLocation();
   const { otherUser, bookContext } = location.state || {};
+  const [user] = useAuthState(auth);
 
   if (!otherUser) {
     return <Navigate to="/dashboard/chats" replace />;
   }
 
-  // Pass required props to PrivateChat
-  // Assuming PrivateChat takes onBack and currentUserId, we might need to inject them or update PrivateChatWrapper
-  // Based on linter error "Type '{ otherUser: any; bookContext: any; }' is missing ... onBack, currentUserId"
-  // PrivateChat likely expects onBack.
-  // And probably currentUserId (though it might get it from auth).
-  // I will check PrivateChat signature if possible, but safely I can pass a dummy onBack or wrapper.
-  // For now I will stick to what was there but add missing props if I can guess them.
-  // Wait, the previous file content didn't have these errors. The linter errors shown in step 444 were from *after* my corruption.
-  // So the *original* code was likely correct enough to compile.
+  return (
+    <PrivateChat
+      otherUser={otherUser}
+      bookContext={bookContext}
+      onBack={() => navigate(-1)}
+      currentUserId={user?.uid || ''}
+    />
+  );
+}
 
-  return <PrivateChat otherUser={otherUser} bookContext={bookContext} />;
+function AboutPageWrapper() {
+  const navigate = useNavigate();
+  return <AboutPage onBack={() => navigate('/')} />;
+}
+
+function CommunitiesBrowseWrapper() {
+  const navigate = useNavigate();
+  const [user] = useAuthState(auth);
+  return (
+    <CommunitiesBrowse
+      isLoggedIn={!!user}
+      onNavigateToDetail={(id) => navigate(`/communities/${id}`)}
+      onNavigateToCreate={() => navigate('/communities/create')}
+    />
+  );
+}
+
+function CreateCommunityWrapper() {
+  const navigate = useNavigate();
+  const [user] = useAuthState(auth);
+  return (
+    <CreateCommunity
+      userId={user?.uid || ''}
+      userName={user?.displayName || ''}
+      onBack={() => navigate('/communities')}
+      onSuccess={() => navigate('/communities')}
+    />
+  );
+}
+
+function GroupChatWrapper() {
+  const navigate = useNavigate();
+  const [user] = useAuthState(auth);
+  const { id } = useParams();
+  return <GroupChat currentUserId={user?.uid || ''} communityId={id || ''} communityName="Community" onBack={() => navigate('/communities/' + id)} />;
+}
+
+function DashboardWishlistWrapper() {
+  const navigate = useNavigate();
+  return <Wishlist onNavigateToMarketplace={() => navigate('/marketplace')} />;
+}
+
+function AdvancedSearchWrapper() {
+  const navigate = useNavigate();
+  return <AdvancedSearch onBack={() => navigate('/')} />;
+}
+
+function WishlistPageWrapper() {
+  const navigate = useNavigate();
+  return <WishlistPage onBack={() => navigate('/')} onNavigateToMarketplace={() => navigate('/marketplace')} />;
+}
+
+function TuitionHubWrapper() {
+  const navigate = useNavigate();
+  const [user] = useAuthState(auth);
+  return <TuitionHub isLoggedIn={!!user} onBack={() => navigate('/')} />;
+}
+
+function NotesHubWrapper() {
+  return <NotesHub />;
+}
+
+function DeliveryTrackingWrapper() {
+  return <DeliveryTracking />;
 }
 
 function AdminAnnouncementsWrapper() {
@@ -113,10 +180,22 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        if (!userRole) setUserRole('user');
         setCurrentUser(user);
+        try {
+          // Fetch role from Firestore
+          const docRef = doc(db, 'users', user.uid);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            setUserRole(docSnap.data().role as 'user' | 'admin');
+          } else {
+            setUserRole('user');
+          }
+        } catch (e) {
+          console.error("Error fetching role", e);
+          setUserRole('user');
+        }
       } else {
         setUserRole(null);
         setCurrentUser(null);
@@ -124,7 +203,7 @@ export default function App() {
       setIsLoading(false);
     });
     return () => unsubscribe();
-  }, [userRole]);
+  }, []);
 
   const handleLogout = () => {
     auth.signOut();
@@ -149,36 +228,39 @@ export default function App() {
 
           {/* Main App Routes */}
           <Route element={<MainLayout isLoggedIn={!!currentUser} onLogout={handleLogout} />}>
+            {/* Public Routes */}
             <Route path="/" element={<HomeScreen isLoggedIn={!!currentUser} />} />
-            <Route path="/marketplace" element={<BookMarketplace />} />
-            <Route path="/book/:id" element={<BookDetailsPage />} />
-            <Route path="/sell" element={<SellBookFlowWrapper />} />
-            <Route path="/rent" element={<RentBookFlowWrapper />} />
-            <Route path="/exchange" element={<ExchangeBookFlowWrapper />} />
-
-            <Route path="/communities" element={<CommunitiesBrowse isLoggedIn={!!currentUser} />} />
-            <Route path="/communities/create" element={<CreateCommunity userId={currentUser?.uid} userName={currentUser?.displayName} />} />
-            <Route path="/communities/:id" element={<CommunityDetails userId={currentUser?.uid} />} />
-            <Route path="/communities/:id/chat" element={<GroupChat currentUserId={currentUser?.uid} />} />
-
-            <Route path="/chat" element={<PrivateChatWrapper />} />
-
-            <Route path="/announcements" element={<AnnouncementsPage isAdmin={userRole === 'admin'} />} />
-            <Route path="/about" element={<AboutPage />} />
-            <Route path="/search" element={<AdvancedSearch />} />
-            <Route path="/wishlist" element={<WishlistPage />} />
-            <Route path="/tuition" element={<TuitionHub isLoggedIn={!!currentUser} />} />
-            <Route path="/notes" element={<NotesHub />} />
-            <Route path="/tracking/:orderId" element={<DeliveryTracking />} />
+            <Route path="/about" element={<AboutPageWrapper />} />
 
             {/* Protected User Routes */}
             <Route element={<ProtectedRoute isLoggedIn={!!currentUser} />}>
+              <Route path="/marketplace" element={<BookMarketplace />} />
+              <Route path="/book/:id" element={<BookDetailsPage />} />
+              <Route path="/sell" element={<SellBookFlowWrapper />} />
+              <Route path="/rent" element={<RentBookFlowWrapper />} />
+              <Route path="/exchange" element={<ExchangeBookFlowWrapper />} />
+
+              <Route path="/communities" element={<CommunitiesBrowseWrapper />} />
+              <Route path="/communities/create" element={<CreateCommunityWrapper />} />
+              <Route path="/communities/:id" element={<CommunityDetails userId={currentUser?.uid} />} />
+              <Route path="/communities/:id/chat" element={<GroupChatWrapper />} />
+
+              <Route path="/chat" element={<PrivateChatWrapper />} />
+
+              <Route path="/announcements" element={<AnnouncementsPage isAdmin={userRole === 'admin'} />} />
+              <Route path="/search" element={<AdvancedSearchWrapper />} />
+              <Route path="/wishlist" element={<WishlistPageWrapper />} />
+
+              <Route path="/tuition" element={<TuitionHubWrapper />} />
+              <Route path="/notes" element={<NotesHub />} />
+              <Route path="/tracking/:orderId" element={<DeliveryTracking />} />
+
               <Route path="/dashboard" element={<UserDashboard onLogout={handleLogout} />}>
                 <Route index element={<UserProfile />} />
                 <Route path="purchases" element={<PurchaseHistory />} />
                 <Route path="sales" element={<SalesHistory />} />
                 <Route path="rentals" element={<RentalHistory />} />
-                <Route path="wishlist" element={<Wishlist />} />
+                <Route path="wishlist" element={<DashboardWishlistWrapper />} />
                 <Route path="communities" element={<UserCommunities />} />
                 <Route path="chats" element={<UserChats />} />
                 <Route path="exchanges" element={<UserExchanges />} />
@@ -204,6 +286,6 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>
-    </CartProvider>
+    </CartProvider >
   );
 }
