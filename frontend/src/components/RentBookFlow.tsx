@@ -34,11 +34,14 @@ export interface RentalBook {
 
 interface RentBookFlowProps {
   onClose: () => void;
+  preSelectedBook?: RentalBook;
 }
 
-export function RentBookFlow({ onClose }: RentBookFlowProps) {
-  const [currentStep, setCurrentStep] = useState<'selection' | 'browse' | 'lend' | 'details' | 'confirm' | 'success'>('selection');
-  const [selectedBook, setSelectedBook] = useState<RentalBook | null>(null);
+export function RentBookFlow({ onClose, preSelectedBook }: RentBookFlowProps) {
+  const [currentStep, setCurrentStep] = useState<'selection' | 'browse' | 'lend' | 'details' | 'confirm' | 'success'>(
+    preSelectedBook ? 'details' : 'selection'
+  );
+  const [selectedBook, setSelectedBook] = useState<RentalBook | null>(preSelectedBook || null);
   const [rentalPeriod, setRentalPeriod] = useState<'weekly' | 'monthly' | 'yearly'>('monthly');
 
   const handleSelectBook = (book: RentalBook) => {

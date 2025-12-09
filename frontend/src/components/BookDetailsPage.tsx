@@ -8,6 +8,8 @@ import { Avatar, AvatarFallback } from './ui/avatar';
 import { Book as BookIcon, Calendar, FileText, Languages, Package, Star, MapPin, Navigation, ShoppingCart, MessageCircle, ArrowLeft } from 'lucide-react';
 import { ImageWithFallback } from './ImageWithFallback';
 import { PurchaseConfirmation } from './PurchaseConfirmation';
+import { RentBookFlow } from './RentBookFlow';
+import { ExchangeOfferModal } from './Exchange/ExchangeOfferModal';
 import { db, auth } from '../firebase';
 import { collection, addDoc, serverTimestamp, doc } from 'firebase/firestore';
 import { toast } from 'sonner';
@@ -27,6 +29,8 @@ export function BookDetailsPage() {
 
     const [showPurchase, setShowPurchase] = useState(false);
     const [showNegotiate, setShowNegotiate] = useState(false);
+    const [showRentModal, setShowRentModal] = useState(false);
+    const [showExchangeModal, setShowExchangeModal] = useState(false);
 
     if (loading) {
         return <div className="min-h-screen flex items-center justify-center">Loading book details...</div>;
@@ -48,6 +52,17 @@ export function BookDetailsPage() {
     }
 
     const book = { id: value.id, ...value.data() } as Book;
+
+    // Backward compatibility shim for 'availableFor' if missing
+    if (!book.availableFor && book.type) {
+        if (book.type === 'sell') book.availableFor = ['sale'];
+        else if (book.type === 'rent') book.availableFor = ['rent'];
+        else if (book.type === 'exchange') book.availableFor = ['exchange'];
+        else if (book.type === 'both') book.availableFor = ['sale', 'rent'];
+        else book.availableFor = [];
+    }
+    // Ensure array exists
+    if (!book.availableFor) book.availableFor = [];
 
     const getConditionColor = (condition: string) => {
         switch (condition) {
@@ -252,13 +267,43 @@ export function BookDetailsPage() {
 
                         {/* Action Buttons */}
                         <div className="space-y-3 pt-4">
-                            <Button
-                                onClick={handleBuyNow}
-                                className="w-full h-12 bg-[#C4A672] hover:bg-[#8B7355] text-white"
-                            >
-                                <ShoppingCart className="w-5 h-5 mr-2" />
-                                Buy Now
-                            </Button>
+                            <div className="flex flex-col gap-3">
+                                {/* Buy Button */}
+                                {book.availableFor?.includes('sale') && (
+                                    <Button
+                                        onClick={handleBuyNow}
+                                        disabled={book.isSold}
+                                        className="w-full h-12 bg-[#C4A672] hover:bg-[#8B7355] text-white disabled:opacity-50"
+                                    >
+                                        <ShoppingCart className="w-5 h-5 mr-2" />
+                                        {book.isSold ? 'Sold' : `Buy Now (Rs. ${book.price?.toLocaleString()})`}
+                                    </Button>
+                                )}
+
+                                {/* Rent Button */}
+                                {book.availableFor?.includes('rent') && (
+                                    <Button
+                                        onClick={() => setShowRentModal(true)}
+                                        disabled={book.isRented}
+                                        className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+                                    >
+                                        <Calendar className="w-5 h-5 mr-2" />
+                                        {book.isRented ? 'Rented' : `Rent (Rs. ${book.rentPrice || 'N/A'}/${book.rentDuration || 'term'})`}
+                                    </Button>
+                                )}
+
+                                {/* Exchange Button */}
+                                {book.availableFor?.includes('exchange') && (
+                                    <Button
+                                        onClick={() => setShowExchangeModal(true)}
+                                        className="w-full h-12 bg-purple-600 hover:bg-purple-700 text-white"
+                                    >
+                                        <Package className="w-5 h-5 mr-2" />
+                                        Propose Exchange
+                                    </Button>
+                                )}
+                            </div>
+
                             <div className="grid grid-cols-2 gap-3">
                                 <Button
                                     onClick={handleNegotiate}
@@ -297,6 +342,43 @@ export function BookDetailsPage() {
                     <NegotiateDialog
                         book={book}
                         onClose={() => setShowNegotiate(false)}
+                    />
+                )}
+
+                {/* Rent Modal */}
+                {showRentModal && (
+                    <RentBookFlow
+                        onClose={() => setShowRentModal(false)}
+                        preSelectedBook={{
+                            id: book.id,
+                            isbn: book.isbn,
+                            title: book.title,
+                            author: book.author,
+                            condition: book.condition,
+                            category: book.category,
+                            images: book.images,
+                            description: book.description,
+                            seller: {
+                                name: book.seller?.name || 'Unknown',
+                                rating: book.seller?.rating || 0,
+                                location: 'Unknown'
+                            },
+                            rentalOptions: {
+                                weekly: book.rentPrice ? book.rentPrice : 0,
+                                monthly: book.rentPrice ? book.rentPrice * 4 : 0,
+                                yearly: book.rentPrice ? book.rentPrice * 48 : 0
+                            },
+                            deliveryMethods: ['pickup']
+                        }}
+                    />
+                )}
+
+                {/* Exchange Modal */}
+                {showExchangeModal && (
+                    <ExchangeOfferModal
+                        requestedBook={book}
+                        isOpen={showExchangeModal}
+                        onClose={() => setShowExchangeModal(false)}
                     />
                 )}
             </div>

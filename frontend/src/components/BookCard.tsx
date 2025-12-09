@@ -52,19 +52,33 @@ export function BookCard({ book, onClick }: BookCardProps) {
     }
   };
 
-  const getTypeBadge = (type: string) => {
-    switch (type) {
-      case 'sell':
-        return <Badge className="bg-blue-100 text-blue-800">For Sale</Badge>;
-      case 'rent':
-        return <Badge className="bg-purple-100 text-purple-800">For Rent</Badge>;
-      case 'exchange':
-        return <Badge className="bg-orange-100 text-orange-800">Exchange</Badge>;
-      case 'both':
-        return <Badge className="bg-teal-100 text-teal-800">Sale & Rent</Badge>;
-      default:
-        return null;
+  const getTypeBadge = (book: Book) => {
+    const badges = [];
+    if (book.availableFor?.includes('sale')) {
+      badges.push(<Badge key="sale" className="bg-blue-100 text-blue-800 absolute top-2 right-2">For Sale</Badge>);
     }
+    if (book.availableFor?.includes('rent')) {
+      badges.push(<Badge key="rent" className="bg-purple-100 text-purple-800 absolute top-2 right-20">Rent</Badge>); // Adjust positioning if needed or stack them
+    }
+    if (book.availableFor?.includes('exchange')) {
+      badges.push(<Badge key="exchange" className="bg-orange-100 text-orange-800 absolute top-2 right-2">Exchange</Badge>);
+    }
+
+    // Fallback if availableFor is not set but type is
+    if (!book.availableFor || book.availableFor.length === 0) {
+      if (book.type === 'sell') return <Badge className="bg-blue-100 text-blue-800 absolute top-2 right-2">For Sale</Badge>;
+      if (book.type === 'rent') return <Badge className="bg-purple-100 text-purple-800 absolute top-2 right-2">For Rent</Badge>;
+      if (book.type === 'exchange') return <Badge className="bg-orange-100 text-orange-800 absolute top-2 right-2">Exchange</Badge>;
+    }
+
+    // For now, let's just show the primary one or stack them properly? 
+    // Simplified: Just show primary badge based on priority or a simplified "Multiple" badge?
+    // Let's stack them horizontally or just show the most relevant one for now to avoid UI clutter
+    if (book.availableFor?.includes('sale')) return <Badge className="bg-blue-100 text-blue-800 absolute top-2 right-2">For Sale</Badge>;
+    if (book.availableFor?.includes('rent')) return <Badge className="bg-purple-100 text-purple-800 absolute top-2 right-2">For Rent</Badge>;
+    if (book.availableFor?.includes('exchange')) return <Badge className="bg-orange-100 text-orange-800 absolute top-2 right-2">Exchange</Badge>;
+
+    return null;
   };
 
   return (
@@ -79,8 +93,17 @@ export function BookCard({ book, onClick }: BookCardProps) {
           alt={book.title}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
         />
-        <div className="absolute top-2 right-2">
-          {getTypeBadge(book.type)}
+        <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
+          {book.availableFor?.includes('sale') && <Badge className="bg-blue-100 text-blue-800 shadow-sm">Sale</Badge>}
+          {book.availableFor?.includes('rent') && <Badge className="bg-purple-100 text-purple-800 shadow-sm">Rent</Badge>}
+          {book.availableFor?.includes('exchange') && <Badge className="bg-orange-100 text-orange-800 shadow-sm">Exchange</Badge>}
+
+          {/* Fallback */}
+          {(!book.availableFor || book.availableFor.length === 0) && (
+            book.type === 'sell' ? <Badge className="bg-blue-100 text-blue-800 shadow-sm">Sale</Badge> :
+              book.type === 'rent' ? <Badge className="bg-purple-100 text-purple-800 shadow-sm">Rent</Badge> :
+                book.type === 'exchange' ? <Badge className="bg-orange-100 text-orange-800 shadow-sm">Exchange</Badge> : null
+          )}
         </div>
       </div>
 
@@ -101,11 +124,13 @@ export function BookCard({ book, onClick }: BookCardProps) {
         <div className="pt-3 border-t border-gray-100">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <span className="text-[#C4A672] text-xl">
-                {book.type === 'exchange' ? 'Exchange' : `Rs. ${book.price.toLocaleString()}`}
+              <span className="text-[#C4A672] text-xl font-bold">
+                {book.availableFor?.includes('sale') ? `Rs. ${book.price.toLocaleString()}` :
+                  book.availableFor?.includes('rent') ? `Rs. ${book.rentPrice || '?'}/term` :
+                    'Exchange Only'}
               </span>
             </div>
-            {book.type !== 'exchange' && (
+            {book.availableFor?.includes('sale') && (
               <Button
                 size="sm"
                 variant="outline"

@@ -5,11 +5,12 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Avatar } from '../ui/avatar';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { CreatePost } from './CreatePost';
 import { PostDetail } from './PostDetail';
 import { toast } from 'sonner';
 import { db, auth } from '../../firebase';
-import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, deleteDoc, onSnapshot, collection, query, orderBy, increment, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, deleteDoc, onSnapshot, collection, query, orderBy, increment, addDoc, serverTimestamp, deleteField } from 'firebase/firestore';
 
 interface Post {
   id: string;
@@ -41,6 +42,15 @@ interface CommunityDetailsProps {
   userId?: string;
 }
 
+// Helper to safely format timestamps
+const formatTimestamp = (timestamp: any) => {
+  if (!timestamp) return '';
+  if (typeof timestamp === 'string') return timestamp;
+  if (timestamp?.toDate) return timestamp.toDate().toLocaleString();
+  if (timestamp?.seconds) return new Date(timestamp.seconds * 1000).toLocaleString();
+  return '';
+};
+
 export function CommunityDetails({ userId }: CommunityDetailsProps) {
   const { id: communityId } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -59,60 +69,89 @@ export function CommunityDetails({ userId }: CommunityDetailsProps) {
   const onNavigateToChat = (id: string) => navigate(`/communities/${id}/chat`);
 
   useEffect(() => {
-    const fetchCommunity = async () => {
-      setLoading(true);
-      try {
-        if (!communityId) return;
-        const commDoc = await getDoc(doc(db, 'communities', communityId));
-        if (commDoc.exists()) {
-          const data = commDoc.data();
-          setCommunity({ id: commDoc.id, ...data });
+    if (!communityId) return;
 
-          if (userId) {
-            setIsAdmin(data.adminId === userId);
-            setIsMember(data.members?.includes(userId) || false);
-          }
+    setLoading(true);
+
+    // 1. Real-time listener for the Community Document
+    // This ensures that if you join/leave, the UI updates instantly
+    const commUnsub = onSnapshot(doc(db, 'communities', communityId), (docSnapshot) => {
+      if (docSnapshot.exists()) {
+        const data = docSnapshot.data();
+        setCommunity({ id: docSnapshot.id, ...data });
+
+        // Check membership using the current authenticated user
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+          setIsAdmin(data.adminId === currentUser.uid);
+          // Check if the 'members' array exists and contains your ID
+          setIsMember(data.members?.includes(currentUser.uid) || false);
         }
-
-        // Real-time posts
-        const postsUnsub = onSnapshot(
-          query(collection(db, 'communities', communityId, 'posts'), orderBy('createdAt', 'desc')),
-          (snapshot) => {
-            setPosts(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Post)));
-          }
-        );
-
-        // Real-time members and pending
-        const membersUnsub = onSnapshot(
-          collection(db, 'communities', communityId, 'members'),
-          (snapshot) => {
-            const membersData = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Member));
-            setMembers(membersData);
-          }
-        );
-
-        const pendingUnsub = onSnapshot(
-          collection(db, 'communities', communityId, 'pending'),
-          (snapshot) => {
-            const pendingData = snapshot.docs.map(d => ({ id: d.id, ...d.data(), status: 'pending' } as Member));
-            setMembers(prev => [...prev.filter(m => !m.status), ...pendingData]);
-          }
-        );
-
-        return () => {
-          postsUnsub();
-          membersUnsub();
-          pendingUnsub();
-        };
-      } catch (err) {
-        toast.error('Failed to load community');
-        console.error(err);
-      } finally {
-        setLoading(false);
       }
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching community:", error);
+      // toast.error('Failed to load community'); // Optional: uncomment if you want errors shown
+      setLoading(false);
+    });
+
+    // 2. Real-time posts listener (Keep this as is)
+    const postsUnsub = onSnapshot(
+      query(collection(db, 'communities', communityId, 'posts'), orderBy('createdAt', 'desc')),
+      (snapshot) => {
+        setPosts(snapshot.docs.map(d => {
+          const data = d.data();
+          return {
+            id: d.id,
+            ...data,
+            createdAt: formatTimestamp(data.createdAt)
+          } as Post;
+        }));
+      }
+    );
+
+    // 3. Real-time members listener (Keep this as is)
+    const membersUnsub = onSnapshot(
+      collection(db, 'communities', communityId, 'members'),
+      (snapshot) => {
+        const membersData = snapshot.docs.map(d => {
+          const data = d.data();
+          return {
+            id: d.id,
+            ...data,
+            joinedAt: formatTimestamp(data.joinedAt)
+          } as Member;
+        });
+        setMembers(membersData);
+      }
+    );
+
+    // 4. Pending members listener (Keep this as is)
+    const pendingUnsub = onSnapshot(
+      collection(db, 'communities', communityId, 'pending'),
+      (snapshot) => {
+        const pendingData = snapshot.docs.map(d => {
+          const data = d.data();
+          return {
+            id: d.id,
+            ...data,
+            joinedAt: formatTimestamp(data.joinedAt),
+            status: 'pending'
+          } as Member;
+        });
+        setMembers(prev => [...prev.filter(m => !m.status), ...pendingData]);
+      }
+    );
+
+
+    // Cleanup listeners when leaving the page
+    return () => {
+      commUnsub();
+      postsUnsub();
+      membersUnsub();
+      pendingUnsub();
     };
-    fetchCommunity();
-  }, [communityId]);
+  }, [communityId]); // We only need to restart if the community ID changes
 
   const handleJoin = async () => {
     if (!communityId || !auth.currentUser?.uid) return;
@@ -146,6 +185,7 @@ export function CommunityDetails({ userId }: CommunityDetailsProps) {
       });
       setIsMember(false);
       toast.info('You left the community');
+      navigate('/communities');
     } catch (err) {
       toast.error('Failed to leave');
     }
@@ -153,35 +193,55 @@ export function CommunityDetails({ userId }: CommunityDetailsProps) {
 
   const handleReact = async (postId: string, reaction: 'like' | 'love' | 'insightful') => {
     if (!communityId) return;
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+
     try {
       const postRef = doc(db, 'communities', communityId, 'posts', postId);
-      // Update reactions in DB - assuming reactions field is a map
-      await updateDoc(postRef, {
-        [`reactions.${reaction}`]: increment(1),
-        userReaction: reaction  // Or handle toggle
-      });
+      const currentReaction = post.userReaction;
+
+      if (currentReaction === reaction) {
+        // Toggle OFF
+        await updateDoc(postRef, {
+          [`reactions.${reaction}`]: increment(-1),
+          userReaction: deleteField()
+        });
+      } else {
+        // Swap or Add
+        const batchUpdates: any = {
+          [`reactions.${reaction}`]: increment(1),
+          userReaction: reaction
+        };
+        if (currentReaction) {
+          batchUpdates[`reactions.${currentReaction}`] = increment(-1);
+        }
+        await updateDoc(postRef, batchUpdates);
+      }
+
       setPosts(prev =>
-        prev.map(post => {
-          if (post.id !== postId) return post;
+        prev.map(p => {
+          if (p.id !== postId) return p;
 
-          const currentReaction = post.userReaction;
-          const reactions = { ...post.reactions };
+          const reactions = { ...p.reactions };
 
-          // Remove old reaction
-          if (currentReaction) {
-            reactions[currentReaction]--;
+          // Toggle Off
+          if (p.userReaction === reaction) {
+            reactions[reaction]--;
+            return { ...p, reactions, userReaction: undefined };
           }
 
-          // Add new reaction or toggle off
-          if (currentReaction === reaction) {
-            return { ...post, reactions, userReaction: undefined };
-          } else {
-            reactions[reaction]++;
-            return { ...post, reactions, userReaction: reaction };
+          // Remove old
+          if (p.userReaction) {
+            reactions[p.userReaction]--;
           }
+
+          // Add new
+          reactions[reaction]++;
+          return { ...p, reactions, userReaction: reaction };
         })
       );
     } catch (err) {
+      console.error(err);
       toast.error('Failed to react');
     }
   };
@@ -365,9 +425,30 @@ export function CommunityDetails({ userId }: CommunityDetailsProps) {
               <Badge key={topic} variant="outline">{topic}</Badge>
             ))}
             {isAdmin && (
-              <Button variant="ghost" size="sm">
-                <Settings className="w-4 h-4" />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <Settings className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => toast.info('Edit functionality coming soon')}>
+                    <Edit2 className="w-4 h-4 mr-2" />
+                    Edit Community
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      if (confirm('Are you sure you want to delete this community?')) {
+                        toast.error('Delete functionality coming soon');
+                      }
+                    }}
+                    className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Community
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
         </div>

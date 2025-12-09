@@ -14,6 +14,7 @@ export interface BookFormData {
   bookName: string;
   author: string;
   price: string;
+  originalPrice?: string;
   condition: string;
   category: string;
   description: string;
@@ -50,6 +51,7 @@ export function SellBookFlow({ onClose }: SellBookFlowProps) {
     bookName: '',
     author: '',
     price: '',
+    originalPrice: '',
     condition: 'Good',
     category: 'Fiction',
     description: '',
@@ -109,6 +111,12 @@ export function SellBookFlow({ onClose }: SellBookFlowProps) {
         throw new Error("Invalid price. Please enter a valid number greater than 0.");
       }
 
+      const originalPrice = bookData.originalPrice ? parseFloat(bookData.originalPrice) : 0;
+      if (bookData.originalPrice && (isNaN(originalPrice) || originalPrice < 0)) {
+        // Should have been caught by validation steps but good to safeguard
+        throw new Error("Invalid original price.");
+      }
+
       const pages = parseInt(bookData.pages);
       const publishedYear = parseInt(bookData.publishedYear);
 
@@ -153,6 +161,7 @@ export function SellBookFlow({ onClose }: SellBookFlowProps) {
       const listingData = {
         ...bookData,
         price: price,
+        originalPrice: originalPrice > 0 ? originalPrice : undefined,
         pages: isNaN(pages) ? 0 : pages,
         publishedYear: isNaN(publishedYear) ? 0 : publishedYear,
         location: cleanLocation,
@@ -266,6 +275,7 @@ export function SellBookFlow({ onClose }: SellBookFlowProps) {
                   bookName: '',
                   author: '',
                   price: '',
+                  originalPrice: '',
                   condition: 'Good',
                   category: 'Fiction',
                   description: '',

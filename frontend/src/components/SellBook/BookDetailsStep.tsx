@@ -160,6 +160,15 @@ export function BookDetailsStep({ initialData, onNext, onCancel, isExchange = fa
       } else if (parseFloat(formData.price) > 50000) {
         newErrors.price = 'Price seems unreasonably high';
       }
+
+      if (formData.originalPrice && formData.price) {
+        const resalePrice = parseFloat(formData.price);
+        const origPrice = parseFloat(formData.originalPrice);
+
+        if (origPrice > 0 && resalePrice > origPrice) {
+          newErrors.price = 'Resale price cannot be higher than original price';
+        }
+      }
     } else {
       if (!formData.exchangePreferences?.trim()) {
         newErrors.exchangePreferences = 'Please specify what you want in exchange';
@@ -284,27 +293,50 @@ export function BookDetailsStep({ initialData, onNext, onCancel, isExchange = fa
 
           {/* Price or Exchange Preferences */}
           {!isExchange ? (
-            <div className="space-y-2">
-              <Label htmlFor="price">Resale Price (PKR) *</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">Rs.</span>
-                <Input
-                  id="price"
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={formData.price}
-                  onChange={(e) => {
-                    setFormData({ ...formData, price: e.target.value });
-                    setErrors({ ...errors, price: '' });
-                  }}
-                  className={`pl-7 ${errors.price ? 'border-red-500' : ''}`}
-                />
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="price">Resale Price (PKR) *</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-500">Rs.</span>
+                  <Input
+                    id="price"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={formData.price}
+                    onChange={(e) => {
+                      setFormData({ ...formData, price: e.target.value });
+                      setErrors({ ...errors, price: '' });
+                    }}
+                    className={`pl-7 ${errors.price ? 'border-red-500' : ''}`}
+                  />
+                </div>
+                {errors.price && (
+                  <p className="text-sm text-red-500">{errors.price}</p>
+                )}
               </div>
-              {errors.price && (
-                <p className="text-sm text-red-500">{errors.price}</p>
-              )}
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="originalPrice">Original Price (Optional)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">Rs.</span>
+                  <Input
+                    id="originalPrice"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={formData.originalPrice || ''}
+                    onChange={(e) => {
+                      setFormData({ ...formData, originalPrice: e.target.value });
+                      setErrors({ ...errors, originalPrice: '' });
+                    }}
+                    className={`pl-7 ${errors.originalPrice ? 'border-red-500' : ''}`}
+                  />
+                </div>
+                {errors.originalPrice && (
+                  <p className="text-sm text-red-500">{errors.originalPrice}</p>
+                )}
+              </div>
+            </>
           ) : (
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="exchangePreferences">Exchange Preferences *</Label>
@@ -481,14 +513,15 @@ export function BookDetailsStep({ initialData, onNext, onCancel, isExchange = fa
             Next: Location & Delivery
           </Button>
         </div>
-      </form>
+      </form >
 
       {showScanner && (
         <BarcodeScanner
           onScanComplete={handleScanComplete}
           onCancel={() => setShowScanner(false)}
         />
-      )}
+      )
+      }
     </>
   );
 }

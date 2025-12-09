@@ -86,6 +86,48 @@ export function UserProfile() {
     navigate('/admin/login');
   };
 
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by your browser');
+      return;
+    }
+
+    const toastId = toast.loading('Fetching location...');
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          // Use OpenStreetMap Nominatim for reverse geocoding
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+          );
+          const data = await response.json();
+
+          if (data.address) {
+            setProfile((prev) => ({
+              ...prev,
+              address: `${data.address.house_number || ''} ${data.address.road || ''}`.trim(),
+              city: data.address.city || data.address.town || data.address.village || '',
+              state: data.address.state || '',
+              zipCode: data.address.postcode || '',
+            }));
+            toast.success('Location updated', { id: toastId });
+          } else {
+            toast.error('Could not determine address', { id: toastId });
+          }
+        } catch (error) {
+          console.error('Error fetching address:', error);
+          toast.error('Failed to fetching address', { id: toastId });
+        }
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        toast.error('Failed to get location: ' + error.message, { id: toastId });
+      }
+    );
+  };
+
   if (loading) return <div>Loading profile...</div>;
   if (error) return <div>Error loading profile: {error.message}</div>;
 
@@ -160,9 +202,22 @@ export function UserProfile() {
 
       {/* Location */}
       <div className="bg-white rounded-xl shadow-sm p-6">
-        <h3 className="text-[#2C3E50] mb-6 flex items-center gap-2">
-          <MapPin className="w-5 h-5" />
-          Location
+        <h3 className="text-[#2C3E50] mb-6 flex items-center gap-2 justify-between">
+          <div className="flex items-center gap-2">
+            <MapPin className="w-5 h-5" />
+            Location
+          </div>
+          {isEditing && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleUseCurrentLocation}
+              type="button"
+              className="text-xs"
+            >
+              Use Current Location
+            </Button>
+          )}
         </h3>
 
         <div className="grid grid-cols-2 gap-6">

@@ -29,7 +29,14 @@ export interface Book {
   isbn: string;
   language: string;
   pages: number;
+
   type: 'sell' | 'rent' | 'exchange' | 'both';
+  availableFor: ('sale' | 'rent' | 'exchange')[];
+  rentPrice?: number;
+  rentDuration?: string;
+  exchangePreferences?: string[];
+  isSold?: boolean;
+  isRented?: boolean;
   userId: string;
   createdAt?: any;
   location?: {
@@ -154,7 +161,11 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
     const matchesCondition = conditionFilter === 'all' || book.condition === conditionFilter;
     const matchesIsbn = !isbnFilter || book.isbn?.includes(isbnFilter);
     const matchesPrice = book.price >= priceRange[0] && book.price <= priceRange[1];
-    const matchesType = listingType === 'all' || book.type === listingType || book.type === 'both' || (listingType === 'exchange' && book.type === 'exchange');
+
+    // Updated filtering logic using availableFor
+    const matchesType = listingType === 'all'
+      ? true
+      : book.availableFor?.includes(listingType === 'sell' ? 'sale' : listingType);
 
     return matchesSearch && matchesCondition && matchesIsbn && matchesPrice && matchesType;
   });

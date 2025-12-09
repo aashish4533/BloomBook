@@ -1,31 +1,122 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isAuthenticated() { return request.auth != null; }
-    function isOwner(userId) { return request.auth.uid == userId; }
-
+    
+    // --- Helper Functions ---
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    // Check if the user has the 'admin' role in their user document
     function isAdmin() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    // --- Users Collection ---
     match /users/{userId} {
+      // Allow anyone to read user profiles (needed for posts, comments, etc.)
       allow read: if true;
-      allow write: if isAuthenticated() && isOwner(userId);
+      // Only the user themselves or an admin can edit the profile
+      allow write: if isAuthenticated() && (isOwner(userId) || isAdmin());
     }
+
+    // --- Notifications ---
+    match /notifications/{notificationId} {
+      // Users can only read/write their own notifications
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // Allow creation if authenticated (system triggers usually handle this, but for client-side logic):
+      allow create: if isAuthenticated();
+      // Allow users to mark their own notifications as read (update)
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    // --- Announcements ---
+    match /announcements/{announcementId} {
+      // Public read access
+      allow read: if true;
+      // Only admins can create/update/delete announcements
+      allow write: if isAdmin();
+    }
+
+    // --- Books ---
     match /books/{bookId} {
       allow read: if true;
       allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
     }
+
+    // --- Communities ---
+    match /communities/{communityId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      // Admin of the community OR System Admin can update/delete
+      allow update: if isAuthenticated(); // Needed for the 'members' array update to work
+
+      // Community Subcollections
+      match /members/{memberId} {
+        allow read: if true;
+        allow write: if isAuthenticated();
+      }
+      match /posts/{postId} {
+        allow read: if true;
+        allow write: if isAuthenticated();
+
+        // Comments on posts
+        match /comments/{commentId} {
+          allow read: if true;
+          allow write: if isAuthenticated();
+
+          // Replies to comments
+          match /replies/{replyId} {
+            allow read: if true;
+            allow write: if isAuthenticated();
+          }
+        }
+      }
+      match /pending/{userId} {
+         allow read, write: if isAuthenticated();
+      }
+    }
+
+    // --- Global Posts (if used outside communities) ---
+    match /posts/{postId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+       match /comments/{commentId} {
+          allow read: if true;
+          allow write: if isAuthenticated();
+          match /replies/{replyId} {
+            allow read: if true;
+            allow write: if isAuthenticated();
+          }
+       }
+    }
+
+    // --- Market & Transactions ---
     match /negotiations/{negotiationId} {
       allow read: if isAuthenticated() && (resource.data.buyerId == request.auth.uid || resource.data.sellerId == request.auth.uid);
       allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (resource.data.buyerId == request.auth.uid || resource.data.sellerId == request.auth.uid);
     }
+
     match /transactions/{transactionId} {
       allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated();
+      allow update: if isAdmin();
     }
+
     match /carts/{userId} {
       allow read, write: if isAuthenticated() && isOwner(userId);
+    }
+    
+    // --- Rentals ---
+    match /rentals/{rentalId} {
+      allow read: if isAuthenticated() && (resource.data.renterId == request.auth.uid || resource.data.ownerId == request.auth.uid || isAdmin());
+      allow write: if isAuthenticated();
     }
   }
 }

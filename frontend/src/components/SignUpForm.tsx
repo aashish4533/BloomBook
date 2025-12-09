@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
-import { Eye, EyeOff, Mail, Lock, Home, CheckCircle2 } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, Home, CheckCircle2, User, Phone } from 'lucide-react';
 import { auth, googleProvider, db } from '../firebase';
 import { signInWithPopup } from 'firebase/auth';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
@@ -21,6 +21,8 @@ export function SignUpForm({ onSignUp }: SignUpFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const navigate = useNavigate();
@@ -45,8 +47,9 @@ export function SignUpForm({ onSignUp }: SignUpFormProps) {
         try {
           await setDoc(doc(db, 'users', user.uid), {
             email: user.email,
-            displayName: email.split('@')[0],
-            photoURL: 'https://ui-avatars.com/api/?name=' + email.split('@')[0],
+            displayName: fullName || email.split('@')[0],
+            phoneNumber: phoneNumber || '',
+            photoURL: 'https://ui-avatars.com/api/?name=' + (fullName || email.split('@')[0]),
             role: 'user',
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
@@ -71,6 +74,14 @@ export function SignUpForm({ onSignUp }: SignUpFormProps) {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(email)) {
       newErrors.email = 'Email is invalid';
+    }
+
+    if (!fullName.trim()) {
+      newErrors.fullName = 'Full Name is required';
+    }
+
+    if (phoneNumber && !/^\+?[\d\s-]{10,}$/.test(phoneNumber)) {
+      newErrors.phoneNumber = 'Please enter a valid phone number';
     }
 
     if (!password) {
@@ -191,6 +202,56 @@ export function SignUpForm({ onSignUp }: SignUpFormProps) {
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Full Name Field */}
+              <div className="space-y-2">
+                <label htmlFor="fullName" className="text-sm text-gray-700">
+                  Full Name
+                </label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <Input
+                    id="fullName"
+                    type="text"
+                    placeholder="John Doe"
+                    value={fullName}
+                    onChange={(e) => {
+                      setFullName(e.target.value);
+                      setErrors({ ...errors, fullName: '' });
+                    }}
+                    className={`pl-10 h-12 bg-gray-50 border-gray-200 focus:border-[#C4A672] focus:ring-[#C4A672] ${errors.fullName ? 'border-red-500' : ''
+                      }`}
+                  />
+                </div>
+                {errors.fullName && (
+                  <p className="text-sm text-red-500">{errors.fullName}</p>
+                )}
+              </div>
+
+              {/* Phone Number Field */}
+              <div className="space-y-2">
+                <label htmlFor="phoneNumber" className="text-sm text-gray-700">
+                  Phone Number (Optional)
+                </label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <Input
+                    id="phoneNumber"
+                    type="tel"
+                    placeholder="+1 234 567 8900"
+                    value={phoneNumber}
+                    onChange={(e) => {
+                      setPhoneNumber(e.target.value);
+                      setErrors({ ...errors, phoneNumber: '' });
+                    }}
+                    className={`pl-10 h-12 bg-gray-50 border-gray-200 focus:border-[#C4A672] focus:ring-[#C4A672] ${errors.phoneNumber ? 'border-red-500' : ''
+                      }`}
+                  />
+                </div>
+                {errors.phoneNumber && (
+                  <p className="text-sm text-red-500">{errors.phoneNumber}</p>
+                )}
+              </div>
+
               {/* Email Field */}
               <div className="space-y-2">
                 <label htmlFor="email" className="text-sm text-gray-700">

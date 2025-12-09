@@ -1,5 +1,4 @@
 // Updated src/components/AdminDashboard.tsx
-import { useState } from 'react';
 import { UserManagement } from './Admin/UserManagement';
 import { BookInventory } from './Admin/BookInventory';
 import { RentalManagement } from './Admin/RentalManagement';
@@ -9,8 +8,9 @@ import { CommunityManagement } from './Admin/CommunityManagement';
 import { Button } from './ui/button';
 import { Users, BookOpen, Calendar, DollarSign, Settings, LogOut, BarChart3, Shield, MessageCircle, Bell } from 'lucide-react';
 import { Outlet, NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
-import { auth } from '../firebase';
-import { useEffect } from 'react';
+import { auth, db } from '../firebase'; // Ensure db is imported
+import { collection, getAggregateFromServer, sum, count, doc, getDoc } from 'firebase/firestore';
+import { useEffect, useState } from 'react'; // Consolidated imports
 import { toast } from 'sonner';
 
 interface AdminDashboardProps {
@@ -21,9 +21,10 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const currentPath = location.pathname;
+  const [stats, setStats] = useState({ revenue: 0, users: 0, loading: true });
 
   useEffect(() => {
-    const checkAdminAuth = async () => {
+    const init = async () => {
       const user = auth.currentUser;
       if (!user) {
         navigate('/admin/login');
@@ -32,18 +33,51 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
 
       try {
         const tokenResult = await user.getIdTokenResult();
-        // Check for custom claim 'admin' or specific email
-        if (tokenResult.claims.role !== 'admin' && user.email !== 'admin@bookbloom.com') {
+        let isAdmin = tokenResult.claims.role === 'admin' || user.email === 'aashish.maheshwari65@gmail.com';
+
+        if (!isAdmin) {
+          // Fallback: Check Firestore Document
+          // This is critical for local dev or when custom claims aren't synced via Cloud Functions
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists() && userDoc.data().role === 'admin') {
+            isAdmin = true;
+          }
+        }
+
+        if (!isAdmin) {
           toast.error('Unauthorized access: Admin privileges required');
           navigate('/');
+          return;
         }
+
+        // Fetch Stats
+        const usersColl = collection(db, 'users');
+        const txnsColl = collection(db, 'transactions');
+
+        try {
+          const [userSnapshot, txnSnapshot] = await Promise.all([
+            getAggregateFromServer(usersColl, { count: count() }),
+            getAggregateFromServer(txnsColl, { revenue: sum('amount') })
+          ]);
+
+          setStats({
+            users: userSnapshot.data().count,
+            revenue: txnSnapshot.data().revenue || 0,
+            loading: false
+          });
+        } catch (error) {
+          console.error("Stats fetch failed", error);
+          // Fallback or just stop loading
+          setStats(prev => ({ ...prev, loading: false }));
+        }
+
       } catch (error) {
         console.error('Error verifying admin status:', error);
         navigate('/admin/login');
       }
     };
 
-    checkAdminAuth();
+    init();
   }, [navigate]);
 
   const tabs = [
@@ -112,7 +146,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
           <Button
             onClick={onLogout}
             variant="outline"
-            className="w-full border-white/20 text-white hover:bg-white/10"
+            className="w-full border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300 hover:border-red-500/50"
           >
             <LogOut className="w-4 h-4 mr-2" />
             Logout
@@ -136,11 +170,15 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
             <div className="flex items-center gap-4">
               <div className="text-right">
                 <p className="text-sm text-gray-600">Total Revenue</p>
-                <p className="text-xl text-[#C4A672]">$12,450</p>
+                <p className="text-xl text-[#C4A672]">
+                  {stats.loading ? '...' : `$${stats.revenue.toLocaleString()}`}
+                </p>
               </div>
               <div className="text-right">
                 <p className="text-sm text-gray-600">Active Users</p>
-                <p className="text-xl text-[#2C3E50]">1,234</p>
+                <p className="text-xl text-[#2C3E50]">
+                  {stats.loading ? '...' : stats.users.toLocaleString()}
+                </p>
               </div>
             </div>
           </div>

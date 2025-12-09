@@ -8,7 +8,7 @@ import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { toast } from 'sonner';
 import { db } from '../../firebase';
-import { doc, setDoc, addDoc, collection } from 'firebase/firestore';
+import { doc, setDoc, addDoc, deleteDoc, collection } from 'firebase/firestore';
 
 interface Announcement {
   id: string;
@@ -45,19 +45,21 @@ export function AnnouncementForm({ announcement, onClose, onSave }: Announcement
 
     if (!formData.title.trim()) {
       newErrors.title = 'Title is required';
-    } else if (formData.title.length < 5) {
-      newErrors.title = 'Title must be at least 5 characters';
-    } else if (formData.title.length > 100) {
+    }
+    // Removed min-length check to unblock user
+    else if (formData.title.length > 100) {
       newErrors.title = 'Title must be less than 100 characters';
     }
 
     if (!formData.content.trim()) {
       newErrors.content = 'Content is required';
-    } else if (formData.content.length < 20) {
-      newErrors.content = 'Content must be at least 20 characters';
-    } else if (formData.content.length > 2000) {
+    }
+    // Removed min-length check to unblock user
+    else if (formData.content.length > 2000) {
       newErrors.content = 'Content must be less than 2000 characters';
     }
+
+    console.log("Validation Errors:", newErrors); // Debug log
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -83,6 +85,7 @@ export function AnnouncementForm({ announcement, onClose, onSave }: Announcement
     e.preventDefault();
 
     if (!validate()) {
+      console.log("Submit failed: Validation errors exist");
       toast.error('Please fix the errors before submitting');
       return;
     }
@@ -218,7 +221,7 @@ export function AnnouncementForm({ announcement, onClose, onSave }: Announcement
           {/* Image Upload */}
           <div>
             <Label className="text-[#2C3E50] mb-2">Cover Image (Optional)</Label>
-            
+
             {formData.image ? (
               <div className="relative">
                 <img
@@ -340,8 +343,8 @@ export function AnnouncementForm({ announcement, onClose, onSave }: Announcement
                 {isSubmitting
                   ? 'Saving...'
                   : announcement
-                  ? 'Update'
-                  : 'Create'}
+                    ? 'Update'
+                    : 'Create'}
               </Button>
             </div>
           </div>

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Home, ShoppingBag, Calendar, DollarSign, User, LogIn, UserPlus, LogOut, ChevronDown, UserCircle2, History, Heart, Settings, Users, Search } from 'lucide-react';
+import { Home, ShoppingBag, Calendar, DollarSign, User, LogIn, UserPlus, LogOut, ChevronDown, UserCircle2, History, Heart, Settings, Users, Search, ArrowLeftRight } from 'lucide-react';
 import { Button } from './ui/button';
 import { NotificationBell } from './NotificationBell';
 import { CartDrawer } from './Cart/CartDrawer';
@@ -35,6 +35,7 @@ export function Navbar({
     { id: 'home', label: 'Home', icon: Home, path: '/' },
     { id: 'buy', label: 'Buy', icon: ShoppingBag, path: '/marketplace' },
     { id: 'rent', label: 'Rent', icon: Calendar, path: '/rent' },
+    { id: 'exchange', label: 'Exchange', icon: ArrowLeftRight, path: '/exchange' },
     { id: 'sell', label: 'Sell', icon: DollarSign, path: '/sell' },
     { id: 'communities', label: 'Communities', icon: Users, path: '/communities' },
   ];

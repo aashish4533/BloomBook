@@ -43,6 +43,15 @@ interface PostDetailProps {
   userId: string;
 }
 
+// Helper to safely format timestamps
+const formatTimestamp = (timestamp: any) => {
+  if (!timestamp) return '';
+  if (typeof timestamp === 'string') return timestamp;
+  if (timestamp?.toDate) return timestamp.toDate().toLocaleString();
+  if (timestamp?.seconds) return new Date(timestamp.seconds * 1000).toLocaleString();
+  return '';
+};
+
 export function PostDetail({ post, onClose, isAdmin, userId }: PostDetailProps) {
   const [comments, setComments] = useState<Comment[]>([]);
 
@@ -56,7 +65,14 @@ export function PostDetail({ post, onClose, isAdmin, userId }: PostDetailProps) 
       orderBy('createdAt', 'asc')
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Comment));
+      const data = snapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          ...d,
+          createdAt: formatTimestamp(d.createdAt) // FIX applied here
+        } as Comment;
+      });
       setComments(data);
     });
     return () => unsubscribe();
@@ -148,9 +164,8 @@ export function PostDetail({ post, onClose, isAdmin, userId }: PostDetailProps) 
           <div className="flex items-center gap-4 mt-2 text-sm">
             <button
               onClick={() => handleLikeComment(comment.id, isReply, parentId)}
-              className={`flex items-center gap-1 ${
-                comment.userLiked ? 'text-[#C4A672]' : 'text-gray-500 hover:text-[#C4A672]'
-              } transition-colors`}
+              className={`flex items-center gap-1 ${comment.userLiked ? 'text-[#C4A672]' : 'text-gray-500 hover:text-[#C4A672]'
+                } transition-colors`}
             >
               <ThumbsUp className="w-4 h-4" />
               {comment.likes > 0 && comment.likes}

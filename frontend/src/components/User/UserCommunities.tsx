@@ -5,13 +5,22 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { db, auth } from '../../firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { toast } from 'sonner';
 
 interface UserCommunitiesProps {
   onNavigateToCommunity?: (communityId: string) => void;
   onNavigateToCreate?: () => void;
 }
+
+// Helper to safely format timestamps
+const formatTimestamp = (timestamp: any) => {
+  if (!timestamp) return '';
+  if (typeof timestamp === 'string') return timestamp;
+  if (timestamp?.toDate) return timestamp.toDate().toLocaleString();
+  if (timestamp?.seconds) return new Date(timestamp.seconds * 1000).toLocaleString();
+  return '';
+};
 
 export function UserCommunities({ onNavigateToCommunity, onNavigateToCreate }: UserCommunitiesProps) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -32,7 +41,14 @@ export function UserCommunities({ onNavigateToCommunity, onNavigateToCreate }: U
             where('members', 'array-contains', user.uid)
           );
           const commSnap = await getDocs(commQuery);
-          const commData = commSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          const commData = commSnap.docs.map(doc => {
+            const d = doc.data();
+            return {
+              id: doc.id,
+              ...d,
+              lastActive: formatTimestamp(d.lastActive) // Ensure this is a string
+            };
+          });
           setMyCommunities(commData);
         }
 
@@ -53,10 +69,10 @@ export function UserCommunities({ onNavigateToCommunity, onNavigateToCreate }: U
 
   const filteredCommunities = myCommunities.filter(community => {
     const matchesSearch = community.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         community.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = activeFilter === 'all' || 
-                         (activeFilter === 'created' && community.role === 'admin') ||
-                         (activeFilter === 'joined' && community.role === 'member');
+      community.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesFilter = activeFilter === 'all' ||
+      (activeFilter === 'created' && community.role === 'admin') ||
+      (activeFilter === 'joined' && community.role === 'member');
     return matchesSearch && matchesFilter;
   });
 

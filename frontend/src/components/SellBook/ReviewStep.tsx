@@ -108,7 +108,7 @@ export function ReviewStep({ bookData, locationData, onSubmit, onBack, onEdit, i
           </div>
           <div>
             <p className="text-sm text-gray-500">Price</p>
-            <p className="text-2xl text-[#C4A672]">${parseFloat(bookData.price).toFixed(2)}</p>
+            <p className="text-2xl text-[#C4A672]">Rs. {parseFloat(bookData.price).toFixed(2)}</p>
           </div>
         </div>
 
@@ -188,7 +188,7 @@ export function ReviewStep({ bookData, locationData, onSubmit, onBack, onEdit, i
           </div>
           <div className="flex justify-between">
             <span className="text-gray-600">Price:</span>
-            <span className="text-[#2C3E50]">${parseFloat(bookData.price).toFixed(2)}</span>
+            <span className="text-[#2C3E50]">Rs. {parseFloat(bookData.price).toFixed(2)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-600">Condition:</span>
