@@ -4,7 +4,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 import { Separator } from '../ui/separator';
-import { User, Mail, MapPin, CreditCard, Lock, Trash2, Save, Shield } from 'lucide-react';
+import { User, Mail, MapPin, CreditCard, Lock, Trash2, Save, Shield, ShoppingBag, DollarSign, Calendar, Heart, Users, MessageCircle, ArrowLeftRight, Gavel } from 'lucide-react';
 import { ChangePasswordModal } from './ChangePasswordModal';
 import { DeleteAccountModal } from './DeleteAccountModal';
 import { toast } from 'sonner';
@@ -57,11 +57,16 @@ export function UserProfile() {
       setProfile(prev => ({
         ...prev,
         ...data,
-        name: data.displayName || prev.name, // Map displayName to name if needed
-        email: data.email || prev.email
+        name: data.displayName || prev.name,
+        email: auth.currentUser?.email || prev.email,
+        phone: data.phoneNumber || data.personalInfo?.phoneNumber || data.phone || prev.phone,
+        address: data.streetAddress || data.address || prev.address,
+        state: data.state || prev.state
       }));
+    } else if (auth.currentUser?.email) {
+      setProfile(prev => ({ ...prev, email: auth.currentUser!.email! }));
     }
-  }, [value]);
+  }, [value, auth.currentUser]);
 
   const handleSave = async () => {
     if (!user) return;
@@ -69,7 +74,12 @@ export function UserProfile() {
     try {
       await updateDoc(doc(db, 'users', user.uid), {
         ...profile,
-        displayName: profile.name // Sync name back to displayName
+        displayName: profile.name,
+        personalInfo: {
+          phoneNumber: profile.phone
+        }, // Update nested object
+        streetAddress: profile.address, // Save as streetAddress as requested implies distinction, but UI uses 'address'
+        state: profile.state
       });
       setIsEditing(false);
       toast.success('Profile updated successfully!', {
@@ -105,9 +115,13 @@ export function UserProfile() {
           const data = await response.json();
 
           if (data.address) {
+            const street = data.address.road || '';
+            const houseNumber = data.address.house_number || '';
+            const fullStreet = `${houseNumber} ${street}`.trim();
+
             setProfile((prev) => ({
               ...prev,
-              address: `${data.address.house_number || ''} ${data.address.road || ''}`.trim(),
+              address: fullStreet || prev.address,
               city: data.address.city || data.address.town || data.address.village || '',
               state: data.address.state || '',
               zipCode: data.address.postcode || '',
@@ -161,6 +175,66 @@ export function UserProfile() {
         </div>
       </div>
 
+      {/* Dashboard Overview */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div onClick={() => navigate('/dashboard/purchases')} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all group">
+          <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+            <ShoppingBag className="w-5 h-5 text-blue-600" />
+          </div>
+          <h3 className="font-medium text-gray-900">Purchases</h3>
+          <p className="text-xs text-gray-500">View history</p>
+        </div>
+        <div onClick={() => navigate('/dashboard/sales')} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all group">
+          <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+            <DollarSign className="w-5 h-5 text-green-600" />
+          </div>
+          <h3 className="font-medium text-gray-900">Sales</h3>
+          <p className="text-xs text-gray-500">Track earnings</p>
+        </div>
+        <div onClick={() => navigate('/dashboard/rentals')} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all group">
+          <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+            <Calendar className="w-5 h-5 text-orange-600" />
+          </div>
+          <h3 className="font-medium text-gray-900">Rentals</h3>
+          <p className="text-xs text-gray-500">Active & history</p>
+        </div>
+        <div onClick={() => navigate('/dashboard/wishlist')} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all group">
+          <div className="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+            <Heart className="w-5 h-5 text-red-600" />
+          </div>
+          <h3 className="font-medium text-gray-900">Wishlist</h3>
+          <p className="text-xs text-gray-500">Saved items</p>
+        </div>
+        <div onClick={() => navigate('/dashboard/communities')} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all group">
+          <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+            <Users className="w-5 h-5 text-purple-600" />
+          </div>
+          <h3 className="font-medium text-gray-900">Communities</h3>
+          <p className="text-xs text-gray-500">Groups</p>
+        </div>
+        <div onClick={() => navigate('/dashboard/chats')} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all group">
+          <div className="w-10 h-10 bg-teal-50 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+            <MessageCircle className="w-5 h-5 text-teal-600" />
+          </div>
+          <h3 className="font-medium text-gray-900">Chats</h3>
+          <p className="text-xs text-gray-500">Messages</p>
+        </div>
+        <div onClick={() => navigate('/dashboard/exchanges')} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all group">
+          <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+            <ArrowLeftRight className="w-5 h-5 text-indigo-600" />
+          </div>
+          <h3 className="font-medium text-gray-900">Exchanges</h3>
+          <p className="text-xs text-gray-500">Swap books</p>
+        </div>
+        <div onClick={() => navigate('/dashboard/negotiations')} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all group">
+          <div className="w-10 h-10 bg-yellow-50 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+            <Gavel className="w-5 h-5 text-yellow-600" />
+          </div>
+          <h3 className="font-medium text-gray-900">Negotiations</h3>
+          <p className="text-xs text-gray-500">Offers</p>
+        </div>
+      </div>
+
       {/* Personal Information */}
       <div className="bg-white rounded-xl shadow-sm p-6">
         <h3 className="text-[#2C3E50] mb-6 flex items-center gap-2">
@@ -192,9 +266,10 @@ export function UserProfile() {
             <Input
               id="email"
               type="email"
-              value={profile.email}
-              onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-              disabled={!isEditing} // Email usually shouldn't be editable directly here without re-auth
+              value={auth.currentUser?.email || profile.email}
+              readOnly
+              className="bg-gray-50"
+              disabled
             />
           </div>
         </div>

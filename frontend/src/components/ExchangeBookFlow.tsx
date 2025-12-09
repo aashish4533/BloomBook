@@ -1,20 +1,25 @@
+
+
 // src/components/ExchangeBookFlow.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BookDetailsStep } from './SellBook/BookDetailsStep';
 import { LocationStep } from './SellBook/LocationStep';
 import { ReviewStep } from './SellBook/ReviewStep';
 import { SuccessStep } from './SellBook/SuccessStep';
-import { X } from 'lucide-react';
+import { X, Plus, ArrowLeft } from 'lucide-react';
 import { db, auth } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { toast } from 'sonner';
-import { BookFormData, LocationData } from './SellBookFlow';
+import { BookFormData, LocationData } from './SellBookFlow'; // Reuse types
+import { Button } from './ui/button';
+import { BookCard } from './BookCard';
+import { Book } from './BookMarketplace';
 
 interface ExchangeBookFlowProps {
     onClose: () => void;
 }
 
-export function ExchangeBookFlow({ onClose }: ExchangeBookFlowProps) {
+function ExchangeBookWizard({ onClose }: { onClose: () => void }) {
     const [currentStep, setCurrentStep] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -120,7 +125,8 @@ export function ExchangeBookFlow({ onClose }: ExchangeBookFlowProps) {
 
             const listingData = {
                 ...bookData,
-                price: 0, // Exchange items have 0 price or we could use estimated value
+                title: bookData.bookName,
+                price: 0, // Exchange items have 0 price
                 pages: isNaN(pages) ? 0 : pages,
                 publishedYear: isNaN(publishedYear) ? 0 : publishedYear,
                 location: cleanLocation,
@@ -133,6 +139,7 @@ export function ExchangeBookFlow({ onClose }: ExchangeBookFlowProps) {
                 },
                 images: imageUrls.length > 0 ? imageUrls : bookData.images,
                 type: 'exchange', // Explicitly 'exchange'
+                availableFor: ['exchange'],
                 status: 'active',
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp()
@@ -140,6 +147,7 @@ export function ExchangeBookFlow({ onClose }: ExchangeBookFlowProps) {
 
             // Remove imageFiles from listingData before saving to Firestore
             delete (listingData as any).imageFiles;
+            delete (listingData as any).bookName;
 
             // 4. Submit to Firestore
             await addDoc(collection(db, 'books'), listingData);
@@ -159,8 +167,8 @@ export function ExchangeBookFlow({ onClose }: ExchangeBookFlowProps) {
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col relative my-8">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-[#C4A672] to-[#8B7355] px-6 py-4 flex items-center justify-between">
                     <div>
@@ -256,6 +264,103 @@ export function ExchangeBookFlow({ onClose }: ExchangeBookFlowProps) {
                     )}
                 </div>
             </div>
+        </div>
+    );
+}
+
+export function ExchangeBookFlow({ onClose }: ExchangeBookFlowProps) {
+    const [showWizard, setShowWizard] = useState(false);
+    const [userListings, setUserListings] = useState<Book[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    // Fetch Listings
+    useEffect(() => {
+        const fetchListings = async () => {
+            const user = auth.currentUser;
+            if (!user) {
+                setLoading(false);
+                return;
+            }
+
+            try {
+                // Fetch books where type is exchange or availableFor contains exchange
+                // Note: availableFor is easier to check if we always set it.
+                // Let's stick to 'type' == 'exchange' for now for simplicity, 
+                // or check both if we implemented a composite index.
+                // Assuming 'type' is the primary classifier for now as per my previous implementations.
+                const q = query(
+                    collection(db, 'books'),
+                    where('userId', '==', user.uid),
+                    where('type', '==', 'exchange')
+                );
+                const snapshot = await getDocs(q);
+                const books = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Book));
+                setUserListings(books);
+            } catch (error) {
+                console.error("Error fetching user listings:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (!showWizard) {
+            fetchListings();
+        }
+    }, [showWizard]);
+
+    return (
+        <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-7xl mx-auto">
+                <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-4">
+                        <Button variant="ghost" size="icon" onClick={onClose} className="-ml-2">
+                            <ArrowLeft className="w-6 h-6" />
+                        </Button>
+                        <div>
+                            <h1 className="text-3xl font-bold text-[#2C3E50]">My Exchange Listings</h1>
+                            <p className="text-gray-600">List books you want to trade with others</p>
+                        </div>
+                    </div>
+                    <Button
+                        onClick={() => setShowWizard(true)}
+                        className="bg-[#C4A672] hover:bg-[#8B7355] text-white transition-smooth btn-scale"
+                    >
+                        <Plus className="w-5 h-5 mr-2" />
+                        Add Book for Exchange
+                    </Button>
+                </div>
+
+                {loading ? (
+                    <div className="flex justify-center py-12">Loading listings...</div>
+                ) : userListings.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {userListings.map(book => (
+                            <div key={book.id} className="relative group">
+                                <BookCard book={book} onClick={() => { }} />
+                                {/* Overlay button for Exchange specific action if needed, or just let BookCard handle it */}
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+                        <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Plus className="w-8 h-8 text-blue-500" />
+                        </div>
+                        <h3 className="text-xl font-medium text-gray-900 mb-2">No exchange listings found</h3>
+                        <p className="text-gray-500 mb-6">Start a trade by listing a book you'd like to exchange.</p>
+                        <Button
+                            onClick={() => setShowWizard(true)}
+                            className="bg-[#C4A672] hover:bg-[#8B7355] text-white"
+                        >
+                            List Book for Exchange
+                        </Button>
+                    </div>
+                )}
+            </div>
+
+            {showWizard && (
+                <ExchangeBookWizard onClose={() => setShowWizard(false)} />
+            )}
         </div>
     );
 }

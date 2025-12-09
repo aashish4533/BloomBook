@@ -17,13 +17,13 @@ export function SystemSettings() {
     minBookPrice: 1.00,
     maxBookPrice: 500.00,
     defaultRentalDuration: 30,
-    
+
     // Notifications
     emailNotifications: true,
     smsNotifications: false,
     overdueReminders: true,
     newListingAlerts: true,
-    
+
     // Security
     requireEmailVerification: true,
     twoFactorForAdmins: true,
@@ -39,11 +39,15 @@ export function SystemSettings() {
         const docRef = doc(db, 'settings', 'system');
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          setSettings(docSnap.data());
+          setSettings(docSnap.data() as any);
         }
-      } catch (err) {
-        toast.error('Failed to fetch settings');
-        console.error(err);
+      } catch (err: any) {
+        console.error("Settings fetch error:", err);
+        if (err.code === 'permission-denied') {
+          toast.error('Permission denied. Please check your admin privileges or Firestore rules.');
+        } else {
+          toast.error(`Failed to fetch settings: ${err.message}`);
+        }
       } finally {
         setLoading(false);
       }
@@ -105,7 +109,7 @@ export function SystemSettings() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="minPrice">Minimum Book Price ($)</Label>
+            <Label htmlFor="minPrice">Minimum Book Price (Rs.)</Label>
             <Input
               id="minPrice"
               type="number"
@@ -119,7 +123,7 @@ export function SystemSettings() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="maxPrice">Maximum Book Price ($)</Label>
+            <Label htmlFor="maxPrice">Maximum Book Price (Rs.)</Label>
             <Input
               id="maxPrice"
               type="number"
@@ -154,7 +158,7 @@ export function SystemSettings() {
             <Switch
               id="emailNotif"
               checked={settings.emailNotifications}
-              onCheckedChange={(checked) => setSettings({
+              onCheckedChange={(checked: boolean) => setSettings({
                 ...settings,
                 emailNotifications: checked
               })}
@@ -171,7 +175,7 @@ export function SystemSettings() {
             <Switch
               id="smsNotif"
               checked={settings.smsNotifications}
-              onCheckedChange={(checked) => setSettings({
+              onCheckedChange={(checked: boolean) => setSettings({
                 ...settings,
                 smsNotifications: checked
               })}
@@ -188,7 +192,7 @@ export function SystemSettings() {
             <Switch
               id="overdueNotif"
               checked={settings.overdueReminders}
-              onCheckedChange={(checked) => setSettings({
+              onCheckedChange={(checked: boolean) => setSettings({
                 ...settings,
                 overdueReminders: checked
               })}
@@ -205,7 +209,7 @@ export function SystemSettings() {
             <Switch
               id="newListingNotif"
               checked={settings.newListingAlerts}
-              onCheckedChange={(checked) => setSettings({
+              onCheckedChange={(checked: boolean) => setSettings({
                 ...settings,
                 newListingAlerts: checked
               })}
@@ -234,7 +238,7 @@ export function SystemSettings() {
             <Switch
               id="emailVerif"
               checked={settings.requireEmailVerification}
-              onCheckedChange={(checked) => setSettings({
+              onCheckedChange={(checked: boolean) => setSettings({
                 ...settings,
                 requireEmailVerification: checked
               })}
@@ -251,7 +255,7 @@ export function SystemSettings() {
             <Switch
               id="twoFactor"
               checked={settings.twoFactorForAdmins}
-              onCheckedChange={(checked) => setSettings({
+              onCheckedChange={(checked: boolean) => setSettings({
                 ...settings,
                 twoFactorForAdmins: checked
               })}

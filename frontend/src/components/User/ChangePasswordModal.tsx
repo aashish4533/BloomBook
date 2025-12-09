@@ -5,6 +5,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 import { Lock, Eye, EyeOff } from 'lucide-react';
+import { ChangePasswordSuccess } from '../ChangePasswordSuccess';
 import { auth } from '../../firebase';
 import { reauthenticateWithCredential, EmailAuthProvider, updatePassword } from 'firebase/auth';
 import { toast } from 'sonner';
@@ -27,6 +28,7 @@ export function ChangePasswordModal({ onClose, onSuccess }: ChangePasswordModalP
     confirm: false
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   const togglePasswordVisibility = (field: 'current' | 'new' | 'confirm') => {
     setShowPasswords(prev => ({
@@ -69,9 +71,9 @@ export function ChangePasswordModal({ onClose, onSuccess }: ChangePasswordModalP
 
       // Update password
       await updatePassword(user, passwords.new);
-      
+
       toast.success('Password updated successfully');
-      onClose();
+      setIsSuccess(true);
       if (onSuccess) onSuccess();
     } catch (err: any) {
       let errorMessage = 'Failed to update password';
@@ -86,6 +88,12 @@ export function ChangePasswordModal({ onClose, onSuccess }: ChangePasswordModalP
       setIsSubmitting(false);
     }
   };
+
+  if (isSuccess) {
+    return (
+      <ChangePasswordSuccess onReturnToProfile={onClose} />
+    );
+  }
 
   return (
     <Dialog open={true} onOpenChange={onClose}>

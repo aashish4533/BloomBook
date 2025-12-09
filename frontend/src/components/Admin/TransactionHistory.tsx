@@ -134,7 +134,7 @@ export function TransactionHistory() {
       <div className="grid grid-cols-4 gap-6">
         <div className="bg-white rounded-xl shadow-sm p-6">
           <p className="text-gray-600 text-sm">Total Revenue</p>
-          <p className="text-3xl text-[#C4A672] mt-2">${totalRevenue.toFixed(2)}</p>
+          <p className="text-3xl text-[#C4A672] mt-2">Rs. {totalRevenue.toFixed(2)}</p>
         </div>
         <div className="bg-white rounded-xl shadow-sm p-6">
           <p className="text-gray-600 text-sm">Purchases</p>

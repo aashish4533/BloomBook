@@ -1,5 +1,5 @@
 // Updated src/components/Admin/AnnouncementForm.tsx
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { X, Upload } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -39,27 +39,21 @@ export function AnnouncementForm({ announcement, onClose, onSave }: Announcement
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const titleRef = useRef<HTMLInputElement>(null);
 
   const validate = () => {
     const newErrors: { [key: string]: string } = {};
+    const currentTitle = titleRef.current?.value || formData.title;
 
-    if (!formData.title.trim()) {
+    console.log("Validating with Title Ref:", currentTitle);
+
+    if (!currentTitle) {
       newErrors.title = 'Title is required';
     }
-    // Removed min-length check to unblock user
-    else if (formData.title.length > 100) {
-      newErrors.title = 'Title must be less than 100 characters';
-    }
 
-    if (!formData.content.trim()) {
+    if (!formData.content) {
       newErrors.content = 'Content is required';
     }
-    // Removed min-length check to unblock user
-    else if (formData.content.length > 2000) {
-      newErrors.content = 'Content must be less than 2000 characters';
-    }
-
-    console.log("Validation Errors:", newErrors); // Debug log
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -93,8 +87,9 @@ export function AnnouncementForm({ announcement, onClose, onSave }: Announcement
     setIsSubmitting(true);
 
     try {
+      const currentTitle = titleRef.current?.value || formData.title;
       const dataToSave = {
-        title: formData.title,
+        title: currentTitle,
         content: formData.content,
         type: formData.type,
         image: formData.image,
@@ -155,16 +150,18 @@ export function AnnouncementForm({ announcement, onClose, onSave }: Announcement
             <Label htmlFor="title" className="text-[#2C3E50] mb-2">
               Title *
             </Label>
-            <Input
+            <input
               id="title"
+              ref={titleRef}
               type="text"
-              value={formData.title}
+              defaultValue={announcement?.title || ''}
               onChange={(e) => {
+                // Update state for Preview only
                 setFormData(prev => ({ ...prev, title: e.target.value }));
-                setErrors(prev => ({ ...prev, title: '' }));
+                if (e.target.value) setErrors(prev => ({ ...prev, title: '' }));
               }}
               placeholder="e.g., New Feature Launch!"
-              className={errors.title ? 'border-red-500' : ''}
+              className={`flex h-12 w-full rounded-md border border-gray-300 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C4A672] disabled:cursor-not-allowed disabled:opacity-50 ${errors.title ? 'border-red-500' : ''}`}
             />
             {errors.title && (
               <p className="text-sm text-red-500 mt-1">{errors.title}</p>

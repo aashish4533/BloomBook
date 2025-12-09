@@ -8,7 +8,7 @@ import { Search, Bell } from 'lucide-react';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { db, auth } from '../firebase';
-import { collection, query, where, orderBy, getDocs, doc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, doc, deleteDoc, updateDoc, getCountFromServer } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 
 interface Notification {
@@ -28,8 +28,31 @@ export function HomeScreen({ isLoggedIn }: HomeScreenProps) {
   const [activeTab, setActiveTab] = useState<'buy' | 'sell' | 'rent'>('buy');
   const [searchQuery, setSearchQuery] = useState('');
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [stats, setStats] = useState({ books: 0, users: 0, communities: 0, readers: 0 });
   const user = auth.currentUser;
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const booksCount = await getCountFromServer(collection(db, 'books'));
+        const usersCount = await getCountFromServer(collection(db, 'users'));
+        const communitiesCount = await getCountFromServer(collection(db, 'communities'));
+        // Assuming 'transactions' represents completed deals/happy readers
+        const readersCount = await getCountFromServer(collection(db, 'transactions'));
+
+        setStats({
+          books: booksCount.data().count,
+          users: usersCount.data().count,
+          communities: communitiesCount.data().count,
+          readers: readersCount.data().count
+        });
+      } catch (error) {
+        console.error("Error fetching stats:", error);
+      }
+    };
+    fetchStats();
+  }, []);
 
   useEffect(() => {
     if (!isLoggedIn || !user) return;
@@ -106,20 +129,21 @@ export function HomeScreen({ isLoggedIn }: HomeScreenProps) {
         </div>
 
         {/* Quick Filters */}
+        {/* Quick Filters */}
         <div className="flex gap-2 mt-4 flex-wrap">
-          <Button variant="outline" size="sm" className="rounded-full hover:bg-blue-50 transition-smooth">
+          <Button variant="outline" size="sm" onClick={() => navigate('/marketplace', { state: { category: 'Fiction' } })} className="rounded-full hover:bg-blue-50 transition-smooth">
             📚 Fiction
           </Button>
-          <Button variant="outline" size="sm" className="rounded-full hover:bg-blue-50 transition-smooth">
+          <Button variant="outline" size="sm" onClick={() => navigate('/marketplace', { state: { category: 'Science' } })} className="rounded-full hover:bg-blue-50 transition-smooth">
             🔬 Science
           </Button>
-          <Button variant="outline" size="sm" className="rounded-full hover:bg-blue-50 transition-smooth">
+          <Button variant="outline" size="sm" onClick={() => navigate('/marketplace', { state: { category: 'Business' } })} className="rounded-full hover:bg-blue-50 transition-smooth">
             💼 Business
           </Button>
-          <Button variant="outline" size="sm" className="rounded-full hover:bg-blue-50 transition-smooth">
+          <Button variant="outline" size="sm" onClick={() => navigate('/marketplace', { state: { category: 'Art' } })} className="rounded-full hover:bg-blue-50 transition-smooth">
             🎨 Art
           </Button>
-          <Button variant="outline" size="sm" className="rounded-full hover:bg-blue-50 transition-smooth">
+          <Button variant="outline" size="sm" onClick={() => navigate('/marketplace', { state: { category: 'Textbooks' } })} className="rounded-full hover:bg-blue-50 transition-smooth">
             📖 Textbooks
           </Button>
         </div>
@@ -139,23 +163,23 @@ export function HomeScreen({ isLoggedIn }: HomeScreenProps) {
           </div>
           <div className="flex gap-2">
             <Button
-              variant={activeTab === 'buy' ? 'default' : 'outline'}
-              onClick={() => setActiveTab('buy')}
-              className={activeTab === 'buy' ? 'bg-blue-600 hover:bg-blue-700 transition-smooth btn-scale' : 'hover:bg-gray-50'}
+              variant="outline"
+              onClick={() => navigate('/marketplace')}
+              className="hover:bg-blue-50 border-blue-200 text-blue-700"
             >
               Buy
             </Button>
             <Button
-              variant={activeTab === 'sell' ? 'default' : 'outline'}
-              onClick={() => setActiveTab('sell')}
-              className={activeTab === 'sell' ? 'bg-blue-600 hover:bg-blue-700 transition-smooth btn-scale' : 'hover:bg-gray-50'}
+              variant="outline"
+              onClick={() => navigate('/sell')}
+              className="hover:bg-blue-50 border-blue-200 text-blue-700"
             >
               Sell
             </Button>
             <Button
-              variant={activeTab === 'rent' ? 'default' : 'outline'}
-              onClick={() => setActiveTab('rent')}
-              className={activeTab === 'rent' ? 'bg-blue-600 hover:bg-blue-700 transition-smooth btn-scale' : 'hover:bg-gray-50'}
+              variant="outline"
+              onClick={() => navigate('/rent')}
+              className="hover:bg-blue-50 border-blue-200 text-blue-700"
             >
               Rent
             </Button>
@@ -165,6 +189,11 @@ export function HomeScreen({ isLoggedIn }: HomeScreenProps) {
         <FeaturedBooks
           activeTab={activeTab}
           onNavigateToBook={(id) => navigate(`/book/${id}`)}
+          onExplore={() => {
+            if (activeTab === 'buy') navigate('/marketplace');
+            else if (activeTab === 'sell') navigate('/sell');
+            else if (activeTab === 'rent') navigate('/rent');
+          }}
         />
       </div>
 
@@ -195,19 +224,19 @@ export function HomeScreen({ isLoggedIn }: HomeScreenProps) {
       <div className="max-w-7xl mx-auto px-4 py-12">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           <div className="text-center p-6 bg-white rounded-xl shadow-card border border-gray-100 transition-smooth hover:shadow-hover">
-            <div className="text-4xl text-blue-600 mb-2">15K+</div>
+            <div className="text-4xl text-blue-600 mb-2">{stats.books.toLocaleString()}+</div>
             <div className="text-gray-600">Books Listed</div>
           </div>
           <div className="text-center p-6 bg-white rounded-xl shadow-card border border-gray-100 transition-smooth hover:shadow-hover">
-            <div className="text-4xl text-blue-600 mb-2">8K+</div>
+            <div className="text-4xl text-blue-600 mb-2">{stats.users.toLocaleString()}+</div>
             <div className="text-gray-600">Active Users</div>
           </div>
           <div className="text-center p-6 bg-white rounded-xl shadow-card border border-gray-100 transition-smooth hover:shadow-hover">
-            <div className="text-4xl text-blue-600 mb-2">120+</div>
+            <div className="text-4xl text-blue-600 mb-2">{stats.communities.toLocaleString()}+</div>
             <div className="text-gray-600">Communities</div>
           </div>
           <div className="text-center p-6 bg-white rounded-xl shadow-card border border-gray-100 transition-smooth hover:shadow-hover">
-            <div className="text-4xl text-blue-600 mb-2">5K+</div>
+            <div className="text-4xl text-blue-600 mb-2">{stats.readers.toLocaleString()}+</div>
             <div className="text-gray-600">Happy Readers</div>
           </div>
         </div>

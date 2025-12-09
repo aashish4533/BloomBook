@@ -24,9 +24,10 @@ interface Book {
 interface FeaturedBooksProps {
   activeTab: 'buy' | 'sell' | 'rent';
   onNavigateToBook: (bookId: string) => void;
+  onExplore?: () => void;
 }
 
-export function FeaturedBooks({ activeTab, onNavigateToBook }: FeaturedBooksProps) {
+export function FeaturedBooks({ activeTab, onNavigateToBook, onExplore }: FeaturedBooksProps) {
   const [books, setBooks] = useState<Book[]>([]);
 
   useEffect(() => {
@@ -97,7 +98,10 @@ export function FeaturedBooks({ activeTab, onNavigateToBook }: FeaturedBooksProp
       ))}
 
       {/* View All Card */}
-      <div className="bg-gradient-to-br from-[#C4A672] to-[#8B7355] rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-shadow cursor-pointer flex items-center justify-center min-h-[320px] group">
+      <div
+        onClick={onExplore}
+        className="bg-gradient-to-br from-[#C4A672] to-[#8B7355] rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-shadow cursor-pointer flex items-center justify-center min-h-[320px] group"
+      >
         <div className="text-center text-white p-6">
           <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-white/30 transition-colors">
             {activeTab === 'buy' && <BookOpen className="w-8 h-8" />}

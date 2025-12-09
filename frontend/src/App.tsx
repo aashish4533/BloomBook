@@ -108,6 +108,7 @@ function CommunitiesBrowseWrapper() {
       isLoggedIn={!!user}
       onNavigateToDetail={(id) => navigate(`/communities/${id}`)}
       onNavigateToCreate={() => navigate('/communities/create')}
+      onBack={() => navigate('/')}
     />
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { RentalBook } from '../RentBookFlow';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
@@ -6,93 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Slider } from '../ui/slider';
 import { Search, SlidersHorizontal, X, MapPin, Calendar, Image as ImageIcon } from 'lucide-react';
 import { Badge } from '../ui/badge';
-
-const mockRentalBooks: RentalBook[] = [
-  {
-    id: '1',
-    isbn: '978-3-16-148410-0',
-    title: 'To Kill a Mockingbird',
-    author: 'Harper Lee',
-    condition: 'Good',
-    category: 'Classic Literature',
-    images: ['https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400', 'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=400'],
-    description: 'A classic American novel about justice and racial inequality in the Deep South.',
-    seller: {
-      name: 'John Doe',
-      rating: 4.8,
-      location: 'San Francisco, CA'
-    },
-    rentalOptions: {
-      weekly: 2.99,
-      monthly: 5.99,
-      yearly: 49.99
-    },
-    deliveryMethods: ['pickup', 'shipping']
-  },
-  {
-    id: '2',
-    isbn: '978-0-06-112008-4',
-    title: '1984',
-    author: 'George Orwell',
-    condition: 'New',
-    category: 'Fiction',
-    images: ['https://images.unsplash.com/photo-1495446815901-a7297e633e8d?w=400', 'https://images.unsplash.com/photo-1524578271613-d550eacf6090?w=400'],
-    description: 'A dystopian social science fiction novel and cautionary tale.',
-    seller: {
-      name: 'Jane Smith',
-      rating: 4.9,
-      location: 'San Francisco, CA'
-    },
-    rentalOptions: {
-      weekly: 3.99,
-      monthly: 7.99,
-      yearly: 59.99
-    },
-    deliveryMethods: ['pickup', 'shipping']
-  },
-  {
-    id: '3',
-    isbn: '978-0-7432-7356-5',
-    title: 'The Great Gatsby',
-    author: 'F. Scott Fitzgerald',
-    condition: 'Fair',
-    category: 'Classic Literature',
-    images: ['https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=400'],
-    description: 'The story of the mysteriously wealthy Jay Gatsby and his love for Daisy Buchanan.',
-    seller: {
-      name: 'Mike Johnson',
-      rating: 4.5,
-      location: 'Oakland, CA'
-    },
-    rentalOptions: {
-      weekly: 1.99,
-      monthly: 3.99,
-      yearly: 29.99
-    },
-    deliveryMethods: ['pickup']
-  },
-  {
-    id: '4',
-    isbn: '978-0-452-28423-4',
-    title: 'Pride and Prejudice',
-    author: 'Jane Austen',
-    condition: 'Good',
-    category: 'Romance',
-    images: ['https://images.unsplash.com/photo-1589998059171-988d887df646?w=400', 'https://images.unsplash.com/photo-1491841573634-28140fc7ced7?w=400'],
-    description: 'A romantic novel of manners set in Georgian England.',
-    seller: {
-      name: 'Sarah Williams',
-      rating: 5.0,
-      location: 'San Jose, CA'
-    },
-    rentalOptions: {
-      weekly: 2.49,
-      monthly: 4.99,
-      yearly: 39.99
-    },
-    deliveryMethods: ['pickup', 'shipping']
-  },
-];
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../../firebase';
+import { RentalBookDetails } from './RentalBookDetails';
 
 interface RentalBrowseProps {
   onSelectBook: (book: RentalBook) => void;
@@ -109,9 +25,66 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
   const [locationFilter, setLocationFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [showPhotoPreviews, setShowPhotoPreviews] = useState(true);
+  const [books, setBooks] = useState<RentalBook[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedBook, setSelectedBook] = useState<RentalBook | null>(null);
+
+  useEffect(() => {
+    const fetchBooks = async () => {
+      try {
+        const q = query(
+          collection(db, 'books'),
+          where('availableFor', 'array-contains', 'rent'),
+          where('status', '==', 'active')
+        );
+        const querySnapshot = await getDocs(q);
+        const fetchedBooks: RentalBook[] = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          const pricePerWeek = Number(data.pricePerWeek) || 0;
+          return {
+            id: doc.id,
+            isbn: data.isbn || '',
+            title: data.title || 'Untitled',
+            author: data.author || 'Unknown Author',
+            condition: data.condition || 'Good',
+            category: data.category || 'General',
+            images: data.images || [],
+            description: data.description || 'No description available.',
+            seller: {
+              name: data.seller?.name || 'Unknown Seller',
+              rating: data.seller?.rating || 4.5,
+              location: data.location?.city || 'Unknown Location'
+            },
+            rentalOptions: {
+              weekly: pricePerWeek,
+              monthly: pricePerWeek * 4, // Approximation
+              yearly: pricePerWeek * 52 // Approximation
+            },
+            deliveryMethods: data.deliveryMethods || ['pickup'],
+            // Additional fields from the instruction's RentalBook mapping
+            cover: data.images?.[0] || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&q=80&w=300',
+            rating: data.seller?.rating || 4.5, // Default rating if missing
+            reviews: 0, // Default
+            distance: '5 miles', // Placeholder distance
+            originalPrice: data.originalPrice || 0,
+            securityDeposit: data.securityDeposit || 0,
+            available: true, // Assuming active status means available
+            availableFor: data.availableFor || []
+          };
+        });
+
+        setBooks(fetchedBooks);
+      } catch (error) {
+        console.error("Error fetching rental books:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchBooks();
+  }, []);
 
   // Filter books based on all criteria
-  const filteredBooks = mockRentalBooks.filter(book => {
+  const filteredBooks = books.filter(book => {
     // Text search (title, author, ISBN)
     const searchLower = searchQuery.toLowerCase();
     const matchesSearch = searchQuery === '' ||

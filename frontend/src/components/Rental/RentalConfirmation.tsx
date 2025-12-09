@@ -15,6 +15,8 @@ import {
   AlertCircle
 } from 'lucide-react';
 
+import { useNavigate } from 'react-router-dom';
+
 interface RentalConfirmationProps {
   book: RentalBook;
   rentalPeriod: 'weekly' | 'monthly' | 'yearly';
@@ -23,6 +25,7 @@ interface RentalConfirmationProps {
 }
 
 export function RentalConfirmation({ book, rentalPeriod, onBack, onConfirm }: RentalConfirmationProps) {
+  const navigate = useNavigate();
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -247,11 +250,10 @@ export function RentalConfirmation({ book, rentalPeriod, onBack, onConfirm }: Re
               </Button>
 
               <Button
-                variant="outline"
-                onClick={onBack}
-                className="w-full"
+                onClick={() => navigate('/rental-history')}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white transition-smooth btn-scale"
               >
-                Cancel
+                View My Rentals
               </Button>
 
               {/* Security Note */}

@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { NotificationBell } from './NotificationBell';
 import { CartDrawer } from './Cart/CartDrawer';
 import { Link, useLocation } from 'react-router-dom';
+import { auth } from '../firebase';
 
 interface NavbarProps {
   isLoggedIn: boolean;
@@ -91,11 +92,10 @@ export function Navbar({
 
             {/* Auth Section */}
             <div className="flex items-center gap-3">
+              {/* Cart Drawer */}
+              <CartDrawer />
               {isLoggedIn ? (
                 <>
-                  {/* Cart Drawer */}
-                  <CartDrawer />
-
                   {/* Notification Bell */}
                   <NotificationBell />
 
@@ -118,7 +118,7 @@ export function Navbar({
                         {/* User Info */}
                         <div className="px-4 py-3 border-b border-gray-200">
                           <p className="text-sm text-gray-500">Signed in as</p>
-                          <p className="text-[#2C3E50]">user@example.com</p>
+                          <p className="text-[#2C3E50] truncate">{auth.currentUser?.email}</p>
                         </div>
 
                         {/* Quick Links */}
@@ -136,7 +136,7 @@ export function Navbar({
                           </Link>
 
                           <Link
-                            to="/dashboard/orders"
+                            to="/dashboard/purchases"
                             onClick={() => setShowProfileDropdown(false)}
                             className="w-full flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
                           >
@@ -160,7 +160,7 @@ export function Navbar({
                           </Link>
 
                           <Link
-                            to="/dashboard/settings"
+                            to="/dashboard"
                             onClick={() => setShowProfileDropdown(false)}
                             className="w-full flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
                           >
@@ -179,7 +179,7 @@ export function Navbar({
                               onLogout();
                               setShowProfileDropdown(false);
                             }}
-                            className="w-full flex items-center gap-3 px-4 py-2 text-red-600 hover:bg-red-50 transition-colors"
+                            className="w-full flex items-center gap-3 px-4 py-2 text-white bg-red-600 hover:bg-red-700 transition-colors"
                           >
                             <LogOut className="w-5 h-5" />
                             <span className="text-sm">Sign Out</span>

@@ -1,13 +1,16 @@
 // src/components/SellBookFlow.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BookDetailsStep } from './SellBook/BookDetailsStep';
 import { LocationStep } from './SellBook/LocationStep';
 import { ReviewStep } from './SellBook/ReviewStep';
 import { SuccessStep } from './SellBook/SuccessStep';
-import { X } from 'lucide-react';
+import { X, Plus, ArrowLeft } from 'lucide-react';
 import { db, auth } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { toast } from 'sonner';
+import { Button } from './ui/button';
+import { BookCard } from './BookCard';
+import { Book } from './BookMarketplace';
 
 export interface BookFormData {
   isbn: string;
@@ -42,10 +45,11 @@ interface SellBookFlowProps {
   onClose: () => void;
 }
 
-export function SellBookFlow({ onClose }: SellBookFlowProps) {
+function SellBookWizard({ onClose }: { onClose: () => void }) {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // ... (Keep existing state and handlers: bookData, locationData, handleBookDetailsNext, etc.)
   const [bookData, setBookData] = useState<BookFormData>({
     isbn: '',
     bookName: '',
@@ -113,7 +117,6 @@ export function SellBookFlow({ onClose }: SellBookFlowProps) {
 
       const originalPrice = bookData.originalPrice ? parseFloat(bookData.originalPrice) : 0;
       if (bookData.originalPrice && (isNaN(originalPrice) || originalPrice < 0)) {
-        // Should have been caught by validation steps but good to safeguard
         throw new Error("Invalid original price.");
       }
 
@@ -153,13 +156,13 @@ export function SellBookFlow({ onClose }: SellBookFlowProps) {
           } catch (uploadErr) {
             console.error("Error uploading file:", file.name, uploadErr);
             toast.error(`Failed to upload ${file.name}`);
-            // Decide if we want to stop or continue. Continuing for now but user should know.
           }
         }
       }
 
       const listingData = {
         ...bookData,
+        title: bookData.bookName, // Map bookName to title for DB consistency
         price: price,
         originalPrice: originalPrice > 0 ? originalPrice : undefined,
         pages: isNaN(pages) ? 0 : pages,
@@ -168,21 +171,21 @@ export function SellBookFlow({ onClose }: SellBookFlowProps) {
         userId: user.uid,
         seller: {
           name: user.displayName || 'Anonymous',
-          rating: 0, // Default for new seller
+          rating: 0,
           totalSales: 0,
           avatar: user.photoURL || ''
         },
         images: imageUrls.length > 0 ? imageUrls : bookData.images,
-        type: 'sell', // Explicitly 'sell' for this flow
+        type: 'sell',
+        availableFor: ['sale'], // Explicit availableFor
         status: 'active',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
 
-      // Remove imageFiles from listingData before saving to Firestore
       delete (listingData as any).imageFiles;
+      delete (listingData as any).bookName; // Cleanup
 
-      // 4. Submit to Firestore
       await addDoc(collection(db, 'books'), listingData);
 
       toast.success('Listing created successfully!');
@@ -200,8 +203,8 @@ export function SellBookFlow({ onClose }: SellBookFlowProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col relative my-8">
         {/* Header */}
         <div className="bg-gradient-to-r from-[#C4A672] to-[#8B7355] px-6 py-4 flex items-center justify-between">
           <div>
@@ -296,6 +299,97 @@ export function SellBookFlow({ onClose }: SellBookFlowProps) {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+export function SellBookFlow({ onClose }: SellBookFlowProps) {
+  const [showWizard, setShowWizard] = useState(false);
+  const [userListings, setUserListings] = useState<Book[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch Listings
+  useEffect(() => {
+    const fetchListings = async () => {
+      const user = auth.currentUser;
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const q = query(
+          collection(db, 'books'),
+          where('userId', '==', user.uid),
+          where('type', '==', 'sell')
+        );
+        const snapshot = await getDocs(q);
+        const books = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Book));
+        setUserListings(books);
+      } catch (error) {
+        console.error("Error fetching user listings:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (!showWizard) {
+      fetchListings();
+    }
+  }, [showWizard]); // Refetch when closing wizard
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
+      {/* List View */}
+      <div className="max-w-7xl mx-auto">
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={onClose} className="-ml-2">
+              <ArrowLeft className="w-6 h-6" />
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold text-[#2C3E50]">My Sell Listings</h1>
+              <p className="text-gray-600">Prepare your books for their new homes</p>
+            </div>
+          </div>
+          <Button
+            onClick={() => setShowWizard(true)}
+            className="bg-[#C4A672] hover:bg-[#8B7355] text-white transition-smooth btn-scale"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Sell a Book
+          </Button>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-12">Loading listings...</div>
+        ) : userListings.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {userListings.map(book => (
+              <BookCard key={book.id} book={book} onClick={() => { }} />
+            ))}
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+            <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Plus className="w-8 h-8 text-blue-500" />
+            </div>
+            <h3 className="text-xl font-medium text-gray-900 mb-2">No books listed for sale</h3>
+            <p className="text-gray-500 mb-6">Start earning by listing your pre-loved books.</p>
+            <Button
+              onClick={() => setShowWizard(true)}
+              className="bg-[#C4A672] hover:bg-[#8B7355] text-white"
+            >
+              List Your First Book
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Render Wizard as Modal */}
+      {showWizard && (
+        <SellBookWizard onClose={() => setShowWizard(false)} />
+      )}
     </div>
   );
 }

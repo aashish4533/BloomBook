@@ -5,7 +5,7 @@ import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Slider } from './ui/slider';
 import { Search, SlidersHorizontal, Plus, MapPin, ArrowLeft } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { db } from '../firebase';
 import { collection, query, orderBy, limit, startAfter, where, getDocs, DocumentSnapshot, QueryConstraint } from 'firebase/firestore';
 
@@ -22,7 +22,7 @@ export interface Book {
     rating: number;
     totalSales: number;
     avatar: string;
-    id?: string; // Added optional id to fix linter
+    id?: string;
   };
   images: string[];
   publishedYear: number;
@@ -53,6 +53,8 @@ interface BookMarketplaceProps {
 }
 
 export function BookMarketplace({ onBack }: BookMarketplaceProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [books, setBooks] = useState<Book[]>([]);
   const [lastDoc, setLastDoc] = useState<DocumentSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
@@ -60,7 +62,7 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
   const [hasMore, setHasMore] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState(location.state?.category || 'all');
   const [conditionFilter, setConditionFilter] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
   const [isbnFilter, setIsbnFilter] = useState('');
@@ -68,7 +70,6 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 5000]);
   const [sortBy, setSortBy] = useState('recent');
   const [listingType, setListingType] = useState<'all' | 'sell' | 'rent' | 'exchange'>('all');
-  const navigate = useNavigate();
 
   const categories = [
     'all',
@@ -208,10 +209,10 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
             <p className="text-gray-600">Buy and sell textbooks and literature within your community</p>
           </div>
           <div className="flex gap-2">
-            <Link to="/sell">
+            <Link to="/rent">
               <Button className="bg-[#C4A672] hover:bg-[#8B7355] text-white">
                 <Plus className="w-4 h-4 mr-2" />
-                Sell
+                Rent
               </Button>
             </Link>
             <Link to="/exchange">

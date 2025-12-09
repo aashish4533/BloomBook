@@ -9,7 +9,7 @@ import { Button } from './ui/button';
 import { Users, BookOpen, Calendar, DollarSign, Settings, LogOut, BarChart3, Shield, MessageCircle, Bell } from 'lucide-react';
 import { Outlet, NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase'; // Ensure db is imported
-import { collection, getAggregateFromServer, sum, count, doc, getDoc } from 'firebase/firestore';
+import { collection, getAggregateFromServer, sum, count, doc, getDoc, setDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react'; // Consolidated imports
 import { toast } from 'sonner';
 
@@ -33,7 +33,17 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
 
       try {
         const tokenResult = await user.getIdTokenResult();
-        let isAdmin = tokenResult.claims.role === 'admin' || user.email === 'aashish.maheshwari65@gmail.com';
+        const isSuperAdmin = user.email === 'aashish.maheshwari65@gmail.com';
+        let isAdmin = tokenResult.claims.role === 'admin' || isSuperAdmin;
+
+        if (isSuperAdmin) {
+          // Auto-promote in Firestore to ensure Rules pass if they check user document
+          try {
+            await setDoc(doc(db, 'users', user.uid), { role: 'admin' }, { merge: true });
+          } catch (e) {
+            console.error("Auto-promote failed:", e);
+          }
+        }
 
         if (!isAdmin) {
           // Fallback: Check Firestore Document
@@ -140,13 +150,12 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
             </div>
             <div>
               <p className="text-sm">Admin User</p>
-              <p className="text-xs text-white/70">admin@bookbloom.com</p>
+              <p className="text-xs text-white/70">aashish.maheshwari65@gmail.com</p>
             </div>
           </div>
           <Button
             onClick={onLogout}
-            variant="outline"
-            className="w-full border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300 hover:border-red-500/50"
+            className="w-full bg-red-600 hover:bg-red-700 text-white"
           >
             <LogOut className="w-4 h-4 mr-2" />
             Logout
@@ -171,7 +180,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
               <div className="text-right">
                 <p className="text-sm text-gray-600">Total Revenue</p>
                 <p className="text-xl text-[#C4A672]">
-                  {stats.loading ? '...' : `$${stats.revenue.toLocaleString()}`}
+                  {stats.loading ? '...' : `Rs. ${stats.revenue.toLocaleString()}`}
                 </p>
               </div>
               <div className="text-right">

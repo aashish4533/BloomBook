@@ -25,7 +25,7 @@ const mockAnnouncements: Announcement[] = [
     content: 'We\'re excited to announce our new Communities feature! Join communities, discuss your favorite books, and connect with fellow readers. You can now create or join public and private communities, share posts, and engage in group chats. This is a major step forward in making BookBloom the ultimate platform for book lovers.',
     type: 'update',
     image: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=1200&h=400&fit=crop',
-    date: new Date('2024-11-14'),
+    date: new Date('2025-11-14'),
     published: true,
     views: 1234
   },
@@ -35,7 +35,7 @@ const mockAnnouncements: Announcement[] = [
     content: 'Get 20% off all textbook purchases this week! Whether you\'re a student looking for course materials or just expanding your knowledge, now\'s the perfect time to save. Use code BOOKS20 at checkout. Offer valid until November 20th. Limited stock available on popular titles.',
     type: 'promo',
     image: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=1200&h=400&fit=crop',
-    date: new Date('2024-11-13'),
+    date: new Date('2025-11-13'),
     published: true,
     views: 856
   },
@@ -45,7 +45,7 @@ const mockAnnouncements: Announcement[] = [
     content: 'Great news! All active rentals have been automatically extended by 7 days at no additional charge. We understand that sometimes you need a bit more time to finish a good book. This extension applies to all rentals active as of November 12th. Enjoy your reading!',
     type: 'info',
     image: 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=1200&h=400&fit=crop',
-    date: new Date('2024-11-12'),
+    date: new Date('2025-11-12'),
     published: true,
     views: 567
   },
@@ -55,7 +55,7 @@ const mockAnnouncements: Announcement[] = [
     content: 'This month we\'re highlighting Science Fiction! Explore our curated collection of classic and modern sci-fi novels. From Asimov to Liu Cixin, discover worlds beyond imagination. Check out our featured communities like "Science Fiction Lovers" for discussions and recommendations.',
     type: 'info',
     image: 'https://images.unsplash.com/photo-1516979187457-637abb4f9353?w=1200&h=400&fit=crop',
-    date: new Date('2024-11-10'),
+    date: new Date('2025-11-10'),
     published: true,
     views: 432
   },
@@ -64,16 +64,16 @@ const mockAnnouncements: Announcement[] = [
     title: '🎁 Referral Program Launch',
     content: 'Invite your friends to BookBloom and earn rewards! For every friend who signs up and makes a purchase, you\'ll both receive a $10 credit. The more friends you refer, the more you save. Start sharing the love of reading today!',
     type: 'promo',
-    date: new Date('2024-11-08'),
+    date: new Date('2025-11-08'),
     published: true,
     views: 298
   },
   {
     id: '6',
     title: '🛠️ Platform Maintenance Scheduled',
-    content: 'We\'ll be performing routine maintenance on November 20th from 2 AM to 4 AM EST. The platform may be temporarily unavailable during this time. We apologize for any inconvenience and appreciate your patience as we work to improve your experience.',
+    content: 'We\'ll be performing routine maintenance on December 20th from 2 AM to 4 AM EST. The platform may be temporarily unavailable during this time. We apologize for any inconvenience and appreciate your patience as we work to improve your experience.',
     type: 'info',
-    date: new Date('2024-11-07'),
+    date: new Date('2025-11-07'),
     published: true,
     views: 189
   }
@@ -87,7 +87,7 @@ interface AnnouncementsPageProps {
 export function AnnouncementsPage({ isAdmin = false, onBack }: AnnouncementsPageProps) {
   const [announcements, setAnnouncements] = useState(mockAnnouncements);
   const [searchQuery, setSearchQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
 
@@ -95,7 +95,7 @@ export function AnnouncementsPage({ isAdmin = false, onBack }: AnnouncementsPage
     .filter(a => {
       const matchesSearch = a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         a.content.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesType = typeFilter === 'all' || a.type === typeFilter;
+      const matchesType = !typeFilter || typeFilter === 'all' || a.type === typeFilter;
       return matchesSearch && matchesType;
     })
     .sort((a, b) => b.date.getTime() - a.date.getTime());
@@ -224,8 +224,8 @@ export function AnnouncementsPage({ isAdmin = false, onBack }: AnnouncementsPage
               )}
             </div>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-48 h-12 bg-white shadow-subtle">
-                <SelectValue />
+              <SelectTrigger className={`w-48 h-12 bg-white shadow-subtle ${!typeFilter ? 'text-gray-400' : 'text-gray-900'}`}>
+                <SelectValue placeholder="Select Type" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>

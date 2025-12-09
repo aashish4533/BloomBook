@@ -27,7 +27,29 @@ export function AnnouncementCarousel({ onViewAll }: AnnouncementCarouselProps) {
     const fetchAnnouncements = async () => {
       const q = query(collection(db, 'announcements'), orderBy('date', 'desc'), limit(3));
       const snapshot = await getDocs(q);
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Announcement));
+      const data = snapshot.docs.map(doc => {
+        const d = doc.data();
+        let dateStr = '';
+        // Handle Firestore Timestamp (has seconds/nanoseconds & toDate method)
+        if (d.date && typeof d.date.toDate === 'function') {
+          dateStr = d.date.toDate().toLocaleDateString();
+        } else if (d.date instanceof Date) {
+          dateStr = d.date.toLocaleDateString();
+        } else if (d.date) {
+          // Fallback for strings or numbers
+          try {
+            dateStr = new Date(d.date).toLocaleDateString();
+          } catch (e) {
+            dateStr = 'Unknown Date';
+          }
+        }
+
+        return {
+          id: doc.id,
+          ...d,
+          date: dateStr
+        } as Announcement;
+      });
       setAnnouncements(data);
     };
     fetchAnnouncements();
@@ -73,20 +95,19 @@ export function AnnouncementCarousel({ onViewAll }: AnnouncementCarouselProps) {
         {announcements.map((announcement, index) => (
           <div
             key={announcement.id}
-            className={`absolute inset-0 transition-opacity duration-500 ${
-              index === currentIndex ? 'opacity-100' : 'opacity-0'
-            }`}
+            className={`absolute inset-0 transition-opacity duration-500 ${index === currentIndex ? 'opacity-100' : 'opacity-0'
+              }`}
           >
             {/* Background Image (if available) */}
             {announcement.image && (
-              <div 
+              <div
                 className="absolute inset-0 bg-cover bg-center"
                 style={{ backgroundImage: `url(${announcement.image})` }}
               >
                 <div className={`absolute inset-0 bg-gradient-to-r ${getBgColor(announcement.type)} opacity-90`} />
               </div>
             )}
-            
+
             {/* Content */}
             <div className={`relative h-full ${!announcement.image ? `bg-gradient-to-r ${getBgColor(announcement.type)}` : ''}`}>
               <div className="max-w-7xl mx-auto px-4 h-full flex items-center">
@@ -135,11 +156,10 @@ export function AnnouncementCarousel({ onViewAll }: AnnouncementCarouselProps) {
               setIsAutoPlaying(false);
               setCurrentIndex(index);
             }}
-            className={`w-2 h-2 rounded-full transition-all ${
-              index === currentIndex
+            className={`w-2 h-2 rounded-full transition-all ${index === currentIndex
                 ? 'w-8 bg-white'
                 : 'bg-white/50 hover:bg-white/75'
-            }`}
+              }`}
           />
         ))}
       </div>

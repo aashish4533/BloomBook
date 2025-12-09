@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, BookOpen, Calendar, DollarSign, MapPin, Camera, Check } from 'lucide-react';
+import { ArrowLeft, BookOpen, Calendar, DollarSign, MapPin, Camera, Check, Plus, Trash2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -17,9 +17,25 @@ interface GiveBooksOnRentProps {
 
 type Step = 'details' | 'pricing' | 'location' | 'review' | 'success';
 
+interface BookData {
+  title: string;
+  author: string;
+  isbn: string;
+  condition: string;
+  description: string;
+  rentalPeriod: string;
+  pricePerWeek: string;
+  securityDeposit: string;
+  originalPrice: string;
+  imageFiles: File[];
+}
+
 export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
   const [currentStep, setCurrentStep] = useState<Step>('details');
-  const [formData, setFormData] = useState({
+  const [addedBooks, setAddedBooks] = useState<BookData[]>([]);
+
+  // Current book form data
+  const [formData, setFormData] = useState<BookData>({
     title: '',
     author: '',
     isbn: '',
@@ -28,15 +44,39 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
     rentalPeriod: '',
     pricePerWeek: '',
     securityDeposit: '',
+    originalPrice: '',
+    imageFiles: []
+  });
+
+  // Common location data (applies to all books)
+  const [locationData, setLocationData] = useState({
     address: '',
     city: '',
     state: '',
     pincode: '',
-    phone: '',
-    imageFiles: [] as File[]
+    phone: ''
   });
 
   const handleNext = () => {
+    if (currentStep === 'pricing') {
+      // Validate Pricing
+      const original = parseFloat(formData.originalPrice);
+      const rent = parseFloat(formData.pricePerWeek);
+
+      if (!original || !rent) {
+        toast.error('Please enter valid prices');
+        return;
+      }
+
+      const minPrice = original * 0.01;
+      const maxPrice = original * 0.03;
+
+      if (rent <= minPrice || rent >= maxPrice) {
+        toast.error(`Rent price must be between Rs. ${minPrice.toFixed(0)} (1%) and Rs. ${maxPrice.toFixed(0)} (3%) of Original Price`);
+        return;
+      }
+    }
+
     const steps: Step[] = ['details', 'pricing', 'location', 'review', 'success'];
     const currentIndex = steps.indexOf(currentStep);
     if (currentIndex < steps.length - 1) {
@@ -54,6 +94,29 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
     }
   };
 
+  const handleAddAnother = () => {
+    if (addedBooks.length + 1 >= 4) {
+      toast.error('Maximum 4 books allowed');
+      return;
+    }
+    setAddedBooks([...addedBooks, formData]);
+    // Reset form for next book
+    setFormData({
+      title: '',
+      author: '',
+      isbn: '',
+      condition: '',
+      description: '',
+      rentalPeriod: '',
+      pricePerWeek: '',
+      securityDeposit: '',
+      originalPrice: '',
+      imageFiles: []
+    });
+    setCurrentStep('details');
+    toast.success('Book added! Enter details for the next book.');
+  };
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async () => {
@@ -66,19 +129,21 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
     setIsSubmitting(true);
 
     try {
-      // 1. Upload Images to Cloudinary
-      const imageUrls: string[] = [];
-      if (formData.imageFiles && formData.imageFiles.length > 0) {
-        const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-        const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+      const allBooks = [...addedBooks, formData];
+      const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+      const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
-        if (!cloudName || !uploadPreset) {
-          toast.error("Configuration error: Cloudinary credentials missing");
-          return;
-        }
+      if (!cloudName || !uploadPreset) {
+        toast.error("Configuration error: Cloudinary credentials missing");
+        return;
+      }
 
-        for (const file of formData.imageFiles) {
-          try {
+      // Process each book
+      for (const book of allBooks) {
+        // Upload images
+        const imageUrls: string[] = [];
+        if (book.imageFiles && book.imageFiles.length > 0) {
+          for (const file of book.imageFiles) {
             const uploadFormData = new FormData();
             uploadFormData.append('file', file);
             uploadFormData.append('upload_preset', uploadPreset);
@@ -89,52 +154,51 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
             });
 
             if (!response.ok) throw new Error('Image upload failed');
-
             const data = await response.json();
             imageUrls.push(data.secure_url);
-          } catch (uploadErr) {
-            console.error("Error uploading file:", file.name, uploadErr);
-            toast.error(`Failed to upload ${file.name}`);
           }
         }
+
+        const listingData = {
+          ...book,
+          price: Number(book.pricePerWeek),
+          pricePerWeek: Number(book.pricePerWeek),
+          securityDeposit: Number(book.securityDeposit),
+          originalPrice: Number(book.originalPrice),
+          images: imageUrls,
+          location: {
+            address: locationData.address,
+            city: locationData.city,
+            state: locationData.state,
+            zipCode: locationData.pincode
+          },
+          contactPhone: locationData.phone,
+          userId: user.uid,
+          seller: {
+            name: user.displayName || 'Anonymous',
+            rating: 0,
+            totalSales: 0,
+            avatar: user.photoURL || ''
+          },
+          type: 'rent',
+          availableFor: ['rent'], // Explicitly set availableFor as requested
+          status: 'active',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        };
+
+        await addDoc(collection(db, 'books'), listingData);
       }
 
-      // 2. Prepare Data
-      const listingData = {
-        title: formData.title,
-        author: formData.author,
-        isbn: formData.isbn,
-        condition: formData.condition,
-        description: formData.description,
-        price: Number(formData.pricePerWeek),
-        pricePerWeek: Number(formData.pricePerWeek),
-        securityDeposit: Number(formData.securityDeposit),
-        rentalPeriod: formData.rentalPeriod,
-        images: imageUrls,
-        location: {
-          address: formData.address,
-          city: formData.city,
-          state: formData.state,
-          zipCode: formData.pincode // Mapping pincode to zipCode for consistency
-        },
-        userId: user.uid,
-        seller: {
-          name: user.displayName || 'Anonymous',
-          rating: 0,
-          totalSales: 0,
-          avatar: user.photoURL || ''
-        },
-        type: 'rent',
-        status: 'active',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      };
-
-      // 3. Submit to Firestore
-      await addDoc(collection(db, 'books'), listingData);
-
-      toast.success('Book listed for rent successfully!');
+      toast.success('Books listed for rent successfully!');
       setCurrentStep('success');
+
+      // Auto redirect after 4 seconds
+      setTimeout(() => {
+        if (onSuccess) onSuccess();
+        else onClose();
+      }, 4000);
+
     } catch (err: any) {
       console.error('Failed to submit listing:', err);
       toast.error('Failed to create listing. Please try again.');
@@ -143,8 +207,40 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
     }
   };
 
-  const updateFormData = (field: string, value: string) => {
+  const updateFormData = (field: keyof BookData, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const updateLocationData = (field: string, value: string) => {
+    setLocationData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported');
+      return;
+    }
+    const toastId = toast.loading('Fetching location...');
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      try {
+        const { latitude, longitude } = pos.coords;
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+        const data = await res.json();
+        if (data.address) {
+          const street = data.address.road || '';
+          const house = data.address.house_number || '';
+          updateLocationData('address', `${house} ${street}`.trim());
+          updateLocationData('city', data.address.city || data.address.town || '');
+          updateLocationData('state', data.address.state || '');
+          updateLocationData('pincode', data.address.postcode || '');
+          toast.success('Location updated', { id: toastId });
+        }
+      } catch (e) {
+        toast.error('Failed to fetch address', { id: toastId });
+      }
+    }, (err) => {
+      toast.error('Location error: ' + err.message, { id: toastId });
+    });
   };
 
   if (currentStep === 'success') {
@@ -154,9 +250,9 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <Check className="w-12 h-12 text-green-600" />
           </div>
-          <h2 className="text-2xl mb-3 text-gray-900">Book Listed Successfully!</h2>
+          <h2 className="text-2xl mb-3 text-gray-900">Listings Created!</h2>
           <p className="text-gray-600 mb-4">
-            Your book is now available for rent. We'll notify you when someone requests it.
+            Your books are now available for rent. Redirecting...
           </p>
         </Card>
       </div>
@@ -166,19 +262,16 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
   return (
     <div className="fixed inset-0 bg-white z-50 overflow-y-auto">
       <div className="max-w-3xl mx-auto px-4 py-6">
-        {/* Header */}
         <div className="flex items-center gap-4 mb-6">
-          <Button
-            variant="ghost"
-            onClick={handleBack}
-            className="hover:bg-gray-100"
-          >
+          <Button variant="ghost" onClick={handleBack} className="hover:bg-gray-100">
             <ArrowLeft className="w-5 h-5 mr-2" />
             Back
           </Button>
           <div className="flex-1">
             <h1 className="text-2xl text-gray-900">Give Books on Rent</h1>
-            <p className="text-sm text-gray-600">Earn money by renting out your books</p>
+            <p className="text-sm text-gray-600">
+              {addedBooks.length > 0 ? `Book ${addedBooks.length + 1} of 4` : 'Earn money by renting out your books'}
+            </p>
           </div>
         </div>
 
@@ -208,12 +301,11 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
           </div>
         </div>
 
-        {/* Step Content */}
         {currentStep === 'details' && (
           <Card className="p-6 shadow-card">
             <h2 className="text-xl mb-6 flex items-center gap-2">
               <BookOpen className="w-6 h-6 text-blue-600" />
-              Book Details
+              Book Details {addedBooks.length > 0 && `(${addedBooks.length + 1}/4)`}
             </h2>
             <div className="space-y-4">
               <div>
@@ -289,10 +381,7 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
                       multiple
                       onChange={(e) => {
                         if (e.target.files) {
-                          setFormData(prev => ({
-                            ...prev,
-                            imageFiles: Array.from(e.target.files || [])
-                          }));
+                          updateFormData('imageFiles', Array.from(e.target.files));
                         }
                       }}
                       className="focus-glow"
@@ -334,20 +423,33 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label htmlFor="pricePerWeek">Price Per Week (PKR) *</Label>
-                <Input
-                  id="pricePerWeek"
-                  type="number"
-                  value={formData.pricePerWeek}
-                  onChange={(e) => updateFormData('pricePerWeek', e.target.value)}
-                  placeholder="e.g., 50"
-                  className="mt-1 focus-glow"
-                />
-                <p className="text-sm text-gray-500 mt-1">
-                  Suggested: Rs. 100-500 per week based on book condition
-                </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="originalPrice">Original Price (PKR) *</Label>
+                  <Input
+                    id="originalPrice"
+                    type="number"
+                    value={formData.originalPrice}
+                    onChange={(e) => updateFormData('originalPrice', e.target.value)}
+                    placeholder="e.g., 2000"
+                    className="mt-1 focus-glow"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="pricePerWeek">Price Per Week (PKR) *</Label>
+                  <Input
+                    id="pricePerWeek"
+                    type="number"
+                    value={formData.pricePerWeek}
+                    onChange={(e) => updateFormData('pricePerWeek', e.target.value)}
+                    placeholder="e.g., 50"
+                    className="mt-1 focus-glow"
+                  />
+                </div>
               </div>
+              <p className="text-sm text-gray-500">
+                Rent must be between 1% and 3% of Original Price.
+              </p>
               <div>
                 <Label htmlFor="deposit">Security Deposit (PKR) *</Label>
                 <Input
@@ -368,17 +470,23 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
 
         {currentStep === 'location' && (
           <Card className="p-6 shadow-card">
-            <h2 className="text-xl mb-6 flex items-center gap-2">
-              <MapPin className="w-6 h-6 text-blue-600" />
-              Pickup Location
-            </h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl flex items-center gap-2">
+                <MapPin className="w-6 h-6 text-blue-600" />
+                Pickup Location
+              </h2>
+              <Button variant="outline" size="sm" onClick={handleUseCurrentLocation} type="button">
+                <MapPin className="w-4 h-4 mr-2" />
+                Use Current Location
+              </Button>
+            </div>
             <div className="space-y-4">
               <div>
                 <Label htmlFor="address">Address *</Label>
                 <Input
                   id="address"
-                  value={formData.address}
-                  onChange={(e) => updateFormData('address', e.target.value)}
+                  value={locationData.address}
+                  onChange={(e) => updateLocationData('address', e.target.value)}
                   placeholder="Street address"
                   className="mt-1 focus-glow"
                 />
@@ -388,8 +496,8 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
                   <Label htmlFor="city">City *</Label>
                   <Input
                     id="city"
-                    value={formData.city}
-                    onChange={(e) => updateFormData('city', e.target.value)}
+                    value={locationData.city}
+                    onChange={(e) => updateLocationData('city', e.target.value)}
                     placeholder="City"
                     className="mt-1 focus-glow"
                   />
@@ -398,8 +506,8 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
                   <Label htmlFor="state">State *</Label>
                   <Input
                     id="state"
-                    value={formData.state}
-                    onChange={(e) => updateFormData('state', e.target.value)}
+                    value={locationData.state}
+                    onChange={(e) => updateLocationData('state', e.target.value)}
                     placeholder="State"
                     className="mt-1 focus-glow"
                   />
@@ -410,8 +518,8 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
                   <Label htmlFor="pincode">PIN Code *</Label>
                   <Input
                     id="pincode"
-                    value={formData.pincode}
-                    onChange={(e) => updateFormData('pincode', e.target.value)}
+                    value={locationData.pincode}
+                    onChange={(e) => updateLocationData('pincode', e.target.value)}
                     placeholder="PIN Code"
                     className="mt-1 focus-glow"
                   />
@@ -420,8 +528,8 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
                   <Label htmlFor="phone">Phone Number *</Label>
                   <Input
                     id="phone"
-                    value={formData.phone}
-                    onChange={(e) => updateFormData('phone', e.target.value)}
+                    value={locationData.phone}
+                    onChange={(e) => updateLocationData('phone', e.target.value)}
                     placeholder="Contact number"
                     className="mt-1 focus-glow"
                   />
@@ -434,32 +542,55 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
         {currentStep === 'review' && (
           <Card className="p-6 shadow-card">
             <h2 className="text-xl mb-6">Review Your Listing</h2>
-            <div className="space-y-4">
-              <div className="border-b pb-4">
-                <h3 className="text-sm text-gray-500 mb-2">Book Details</h3>
-                <p className="text-gray-900">{formData.title || 'Not provided'}</p>
-                <p className="text-sm text-gray-600">{formData.author || 'Author not provided'}</p>
-                <p className="text-sm text-gray-600 mt-1">Condition: {formData.condition || 'Not selected'}</p>
+
+            {/* Added Books */}
+            {addedBooks.map((book, idx) => (
+              <div key={idx} className="mb-6 p-4 border rounded-lg bg-gray-50 relative">
+                <h3 className="font-medium text-lg mb-2">Book {idx + 1}: {book.title}</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+                  <p>Author: {book.author}</p>
+                  <p>Condition: {book.condition}</p>
+                  <p>Price/Week: Rs. {book.pricePerWeek}</p>
+                  <p>Deposit: Rs. {book.securityDeposit}</p>
+                </div>
               </div>
-              <div className="border-b pb-4">
-                <h3 className="text-sm text-gray-500 mb-2">Pricing</h3>
-                <p className="text-gray-900">Rs. {formData.pricePerWeek || '0'} per week</p>
-                <p className="text-sm text-gray-600">Security Deposit: Rs. {formData.securityDeposit || '0'}</p>
-                <p className="text-sm text-gray-600">Max Period: {formData.rentalPeriod || 'Not selected'}</p>
-              </div>
-              <div>
-                <h3 className="text-sm text-gray-500 mb-2">Pickup Location</h3>
-                <p className="text-gray-900">{formData.address || 'Address not provided'}</p>
-                <p className="text-sm text-gray-600">
-                  {formData.city}, {formData.state} - {formData.pincode}
-                </p>
-                <p className="text-sm text-gray-600">Phone: {formData.phone}</p>
+            ))}
+
+            {/* Current Book */}
+            <div className="mb-6 p-4 border rounded-lg bg-blue-50 border-blue-100">
+              <h3 className="font-medium text-lg mb-2 text-blue-900">Current Book: {formData.title || 'Untitled'}</h3>
+              <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+                <p>Author: {formData.author}</p>
+                <p>Condition: {formData.condition}</p>
+                <p>Price/Week: Rs. {formData.pricePerWeek}</p>
+                <p>Deposit: Rs. {formData.securityDeposit}</p>
               </div>
             </div>
+
+            <div className="border-t pt-4">
+              <h3 className="text-sm text-gray-500 mb-2">Pickup Location (All Books)</h3>
+              <p className="text-gray-900">{locationData.address || 'Address not provided'}</p>
+              <p className="text-sm text-gray-600">
+                {locationData.city}, {locationData.state} - {locationData.pincode}
+              </p>
+              <p className="text-sm text-gray-600">Phone: {locationData.phone}</p>
+            </div>
+
+            <div className="mt-6 flex justify-center">
+              <Button
+                variant="outline"
+                onClick={handleAddAnother}
+                disabled={addedBooks.length >= 3}
+                className="w-full border-dashed border-2 hover:bg-gray-50"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                {addedBooks.length >= 3 ? 'Max books reached' : 'Add Another Book'}
+              </Button>
+            </div>
+
           </Card>
         )}
 
-        {/* Action Buttons */}
         <div className="flex gap-4 mt-6">
           <Button
             variant="outline"
@@ -470,9 +601,10 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
           </Button>
           <Button
             onClick={currentStep === 'review' ? handleSubmit : handleNext}
+            disabled={isSubmitting}
             className="flex-1 bg-blue-600 hover:bg-blue-700 text-white transition-smooth btn-scale shadow-subtle"
           >
-            {currentStep === 'review' ? 'List Book for Rent' : 'Continue'}
+            {isSubmitting ? 'Listing...' : (currentStep === 'review' ? `List ${addedBooks.length + 1} Book(s)` : 'Continue')}
           </Button>
         </div>
       </div>

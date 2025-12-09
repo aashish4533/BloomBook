@@ -138,7 +138,7 @@ export function RentalManagement() {
         <div className="bg-white rounded-xl shadow-sm p-6">
           <p className="text-gray-600 text-sm">Monthly Revenue</p>
           <p className="text-3xl text-[#C4A672] mt-2">
-            ${rentals.reduce((sum, r) => sum + r.rentalPrice, 0).toFixed(2)}
+            Rs. {rentals.reduce((sum, r) => sum + r.rentalPrice, 0).toFixed(2)}
           </p>
         </div>
       </div>
