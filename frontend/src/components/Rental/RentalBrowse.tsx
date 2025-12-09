@@ -114,7 +114,7 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
   const filteredBooks = mockRentalBooks.filter(book => {
     // Text search (title, author, ISBN)
     const searchLower = searchQuery.toLowerCase();
-    const matchesSearch = searchQuery === '' || 
+    const matchesSearch = searchQuery === '' ||
       book.title.toLowerCase().includes(searchLower) ||
       book.author.toLowerCase().includes(searchLower) ||
       book.isbn.toLowerCase().includes(searchLower);
@@ -133,7 +133,7 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
     const matchesPrice = bookPrice >= priceRange[0] && bookPrice <= priceRange[1];
 
     // Location filter
-    const matchesLocation = locationFilter === '' || 
+    const matchesLocation = locationFilter === '' ||
       book.seller.location.toLowerCase().includes(locationFilter.toLowerCase());
 
     return matchesSearch && matchesISBN && matchesCategory && matchesCondition && matchesPrice && matchesLocation;
@@ -285,7 +285,7 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
               <SlidersHorizontal className="w-4 h-4 mr-2" />
               {showFilters ? 'Hide' : 'Show'} Advanced Filters
             </Button>
-            
+
             <div className="flex items-center gap-4">
               <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
                 <input
@@ -310,7 +310,7 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
                 {/* Price Range Slider */}
                 <div>
                   <label className="text-sm text-gray-700 mb-3 block">
-                    {rentalPeriod.charAt(0).toUpperCase() + rentalPeriod.slice(1)} Price Range: 
+                    {rentalPeriod.charAt(0).toUpperCase() + rentalPeriod.slice(1)} Price Range:
                     <span className="text-[#C4A672] ml-2">
                       ${priceRange[0]} - ${priceRange[1]}
                     </span>
@@ -324,8 +324,8 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
                     className="mt-2"
                   />
                   <div className="flex justify-between text-xs text-gray-500 mt-1">
-                    <span>$0</span>
-                    <span>$20</span>
+                    <span>Rs. 0</span>
+                    <span>Rs. 20</span>
                   </div>
                 </div>
 
@@ -402,7 +402,7 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
                     )}
                   </div>
                 )}
-                
+
                 <div className="p-4">
                   {/* Title and Condition */}
                   <div className="flex items-start justify-between mb-2">
@@ -412,8 +412,8 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
                     </div>
                     <Badge className={
                       book.condition === 'New' ? 'bg-green-100 text-green-800' :
-                      book.condition === 'Good' ? 'bg-blue-100 text-blue-800' :
-                      'bg-yellow-100 text-yellow-800'
+                        book.condition === 'Good' ? 'bg-blue-100 text-blue-800' :
+                          'bg-yellow-100 text-yellow-800'
                     }>
                       {book.condition}
                     </Badge>

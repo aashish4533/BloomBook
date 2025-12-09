@@ -192,7 +192,7 @@ export function RentalConfirmation({ book, rentalPeriod, onBack, onConfirm }: Re
                 <h4 className="text-[#2C3E50] mb-2">Terms and Conditions:</h4>
                 <ul className="space-y-2 list-disc list-inside">
                   <li>The book must be returned by the due date to avoid late fees</li>
-                  <li>Late fees are $2 per day after the due date</li>
+                  <li>Late fees are Rs. 2 per day after the due date</li>
                   <li>The book must be returned in the same condition as received</li>
                   <li>Any damage to the book will result in additional charges</li>
                   <li>Lost books must be paid for at full replacement value</li>
@@ -230,7 +230,7 @@ export function RentalConfirmation({ book, rentalPeriod, onBack, onConfirm }: Re
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">Tax</span>
-                  <span className="text-[#2C3E50]">$0.00</span>
+                  <span className="text-[#2C3E50]">Rs. 0.00</span>
                 </div>
                 <div className="pt-4 border-t border-gray-200 flex items-center justify-between">
                   <span className="text-[#2C3E50]">Total</span>

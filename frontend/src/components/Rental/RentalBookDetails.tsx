@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { RentalBook } from '../RentBookFlow';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { 
-  ArrowLeft, 
-  MapPin, 
-  Star, 
-  Calendar, 
-  Package, 
+import {
+  ArrowLeft,
+  MapPin,
+  Star,
+  Calendar,
+  Package,
   Truck,
   BookOpen,
   User
@@ -55,9 +55,9 @@ export function RentalBookDetails({ book, onBack, onRent }: RentalBookDetailsPro
           <div className="lg:col-span-1">
             <div className="bg-white rounded-xl shadow-sm overflow-hidden sticky top-8">
               <div className="h-96 bg-gray-200">
-                <img 
-                  src={book.images[0]} 
-                  alt={book.title} 
+                <img
+                  src={book.images[0]}
+                  alt={book.title}
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -139,11 +139,10 @@ export function RentalBookDetails({ book, onBack, onRent }: RentalBookDetailsPro
                 {book.deliveryMethods.includes('pickup') && (
                   <button
                     onClick={() => setDeliveryMethod('pickup')}
-                    className={`w-full border-2 rounded-lg p-4 flex items-center gap-3 transition-colors ${
-                      deliveryMethod === 'pickup'
+                    className={`w-full border-2 rounded-lg p-4 flex items-center gap-3 transition-colors ${deliveryMethod === 'pickup'
                         ? 'border-[#C4A672] bg-[#C4A672]/5'
                         : 'border-gray-200 hover:border-gray-300'
-                    }`}
+                      }`}
                   >
                     <Package className="w-5 h-5 text-[#C4A672]" />
                     <div className="text-left flex-1">
@@ -160,16 +159,15 @@ export function RentalBookDetails({ book, onBack, onRent }: RentalBookDetailsPro
                 {book.deliveryMethods.includes('shipping') && (
                   <button
                     onClick={() => setDeliveryMethod('shipping')}
-                    className={`w-full border-2 rounded-lg p-4 flex items-center gap-3 transition-colors ${
-                      deliveryMethod === 'shipping'
+                    className={`w-full border-2 rounded-lg p-4 flex items-center gap-3 transition-colors ${deliveryMethod === 'shipping'
                         ? 'border-[#C4A672] bg-[#C4A672]/5'
                         : 'border-gray-200 hover:border-gray-300'
-                    }`}
+                      }`}
                   >
                     <Truck className="w-5 h-5 text-[#C4A672]" />
                     <div className="text-left flex-1">
                       <p className="text-[#2C3E50]">Shipping</p>
-                      <p className="text-sm text-gray-600">$5.99 - Delivered to your door</p>
+                      <p className="text-sm text-gray-600">Rs. 5.99 - Delivered to your door</p>
                     </div>
                     {deliveryMethod === 'shipping' && (
                       <div className="w-5 h-5 rounded-full bg-[#C4A672] flex items-center justify-center">
@@ -217,7 +215,7 @@ export function RentalBookDetails({ book, onBack, onRent }: RentalBookDetailsPro
                 {deliveryMethod === 'shipping' && (
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Shipping</span>
-                    <span className="text-[#2C3E50]">$5.99</span>
+                    <span className="text-[#2C3E50]">Rs. 5.99</span>
                   </div>
                 )}
                 <div className="pt-3 border-t border-gray-200 flex items-center justify-between">
@@ -232,7 +230,7 @@ export function RentalBookDetails({ book, onBack, onRent }: RentalBookDetailsPro
                   <Calendar className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                   <div className="text-sm text-blue-900">
                     <p className="mb-1">Book must be returned by the end of the rental period</p>
-                    <p className="text-blue-700">Late fees: $2/day</p>
+                    <p className="text-blue-700">Late fees: Rs. 2/day</p>
                   </div>
                 </div>
               </div>

@@ -64,7 +64,7 @@ export function RentalBrowseShowcase() {
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
-                <span>Price range slider ($0-$20)</span>
+                <span>Price range slider (Rs. 0-Rs. 20)</span>
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
@@ -164,7 +164,7 @@ export function RentalBrowseShowcase() {
             <div className="bg-gray-50 rounded-lg p-4">
               <div className="mb-4">
                 <label className="text-sm text-gray-700 block mb-2">
-                  Monthly Price Range: <span className="text-[#C4A672]">$0 - $20</span>
+                  Monthly Price Range: <span className="text-[#C4A672]">Rs. 0 - Rs. 20</span>
                 </label>
                 <div className="h-2 bg-gray-200 rounded-full relative">
                   <div className="absolute left-0 right-0 h-full bg-[#C4A672] rounded-full"></div>
@@ -179,7 +179,7 @@ export function RentalBrowseShowcase() {
                   <Badge variant="secondary">Search: mockingbird</Badge>
                   <Badge variant="secondary">Category: Classic</Badge>
                   <Badge variant="secondary">Period: monthly</Badge>
-                  <Badge variant="secondary">Price: $3-$10</Badge>
+                  <Badge variant="secondary">Price: Rs. 3-Rs. 10</Badge>
                 </div>
               </div>
             </div>
@@ -224,15 +224,15 @@ export function RentalBrowseShowcase() {
                   <div className="space-y-1 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Weekly:</span>
-                      <span className="text-gray-800">$2.99/wk</span>
+                      <span className="text-gray-800">Rs. 2.99/wk</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Monthly:</span>
-                      <span className="text-[#C4A672] font-medium">$5.99/mo ✓</span>
+                      <span className="text-[#C4A672] font-medium">Rs. 5.99/mo ✓</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Yearly:</span>
-                      <span className="text-gray-800">$49.99/yr</span>
+                      <span className="text-gray-800">Rs. 49.99/yr</span>
                     </div>
                   </div>
                 </div>
@@ -272,15 +272,15 @@ export function RentalBrowseShowcase() {
                   <div className="space-y-1 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Weekly:</span>
-                      <span className="text-gray-800">$3.99/wk</span>
+                      <span className="text-gray-800">Rs. 3.99/wk</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Monthly:</span>
-                      <span className="text-[#C4A672] font-medium">$7.99/mo ✓</span>
+                      <span className="text-[#C4A672] font-medium">Rs. 7.99/mo ✓</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Yearly:</span>
-                      <span className="text-gray-800">$59.99/yr</span>
+                      <span className="text-gray-800">Rs. 59.99/yr</span>
                     </div>
                   </div>
                 </div>
@@ -320,15 +320,15 @@ export function RentalBrowseShowcase() {
                   <div className="space-y-1 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Weekly:</span>
-                      <span className="text-gray-800">$1.99/wk</span>
+                      <span className="text-gray-800">Rs. 1.99/wk</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Monthly:</span>
-                      <span className="text-[#C4A672] font-medium">$3.99/mo ✓</span>
+                      <span className="text-[#C4A672] font-medium">Rs. 3.99/mo ✓</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Yearly:</span>
-                      <span className="text-gray-800">$29.99/yr</span>
+                      <span className="text-gray-800">Rs. 29.99/yr</span>
                     </div>
                   </div>
                 </div>

@@ -97,7 +97,7 @@ export function RentalSuccess({ book, onClose }: RentalSuccessProps) {
                 A prepaid return label will be included with your shipment. Simply place the book back in the original packaging and drop it off at any USPS location before the due date.
               </p>
               <p className="text-sm text-yellow-700">
-                ⚠️ Late returns are subject to a $2/day late fee
+                ⚠️ Late returns are subject to a Rs. 2/day late fee
               </p>
             </div>
           </div>
