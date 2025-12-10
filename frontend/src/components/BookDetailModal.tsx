@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
 import { Book } from './BookMarketplace';
 import { Book as BookIcon, Calendar, FileText, Languages, Package, Star, MapPin, Navigation, ShoppingCart, MessageCircle, ArrowLeftRight } from 'lucide-react';
@@ -84,6 +84,12 @@ export function BookDetailModal({ book, onClose }: BookDetailModalProps) {
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0">
+        <DialogHeader className="sr-only">
+          <DialogTitle>{book.title}</DialogTitle>
+          <DialogDescription>
+            Details and purchase options for {book.title} by {book.author}.
+          </DialogDescription>
+        </DialogHeader>
         <div className="relative h-64 md:h-80 bg-gray-100">
           <ImageWithFallback
             src={book.images[0]}

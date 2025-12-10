@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from './ui/dialog';
 import { Label } from './ui/label';
 import { db, auth } from '../firebase';
 import { collection, addDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
@@ -153,6 +153,9 @@ export function NotesHub() {
                             <DialogContent>
                                 <DialogHeader>
                                     <DialogTitle>Upload Study Notes (PDF)</DialogTitle>
+                                    <DialogDescription>
+                                        Share your study materials with others.
+                                    </DialogDescription>
                                 </DialogHeader>
                                 <div className="grid gap-4 py-4">
                                     <div className="grid gap-2">

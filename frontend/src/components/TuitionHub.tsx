@@ -12,7 +12,7 @@ import { db, auth } from '../firebase';
 import { collection, addDoc, serverTimestamp, query, where } from 'firebase/firestore';
 import { useCollection } from 'react-firebase-hooks/firestore';
 import { toast } from 'sonner';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from './ui/dialog';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -326,6 +326,9 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                 <DialogContent className="sm:max-w-[425px]">
                   <DialogHeader>
                     <DialogTitle>Register as a Tutor</DialogTitle>
+                    <DialogDescription>
+                      Fill out the form below to become a tutor.
+                    </DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
@@ -402,6 +405,9 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Post Tuition Request</DialogTitle>
+                    <DialogDescription>
+                      Post a request for a tutor to help you.
+                    </DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
                     <Input placeholder="Subject (e.g. Math)" value={requestForm.subject} onChange={e => setRequestForm({ ...requestForm, subject: e.target.value })} />
