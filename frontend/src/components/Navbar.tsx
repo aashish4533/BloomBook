@@ -5,7 +5,7 @@ import { NotificationBell } from './NotificationBell';
 import { CartDrawer } from './Cart/CartDrawer';
 import { Link, useLocation } from 'react-router-dom';
 import { auth } from '../firebase';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from './ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose, SheetDescription } from './ui/sheet';
 
 interface NavbarProps {
   isLoggedIn: boolean;
@@ -35,6 +35,8 @@ export function Navbar({
 
   const navItems = [
     { id: 'home', label: 'Home', icon: Home, path: '/' },
+    { id: 'tuition', label: 'Tuition', icon: GraduationCap, path: '/tuition' },
+    { id: 'notes', label: 'Material', icon: FileText, path: '/notes' },
     { id: 'buy', label: 'Buy', icon: ShoppingBag, path: '/marketplace' },
     { id: 'rent', label: 'Rent', icon: Calendar, path: '/rent' },
     { id: 'exchange', label: 'Exchange', icon: ArrowLeftRight, path: '/exchange' },
@@ -185,6 +187,7 @@ export function Navbar({
                       </div>
                       <span className="text-[#2C3E50] font-bold">BookBloom Menu</span>
                     </SheetTitle>
+                    <SheetDescription className="sr-only">Mobile navigation menu</SheetDescription>
                   </SheetHeader>
                   <div className="py-6 space-y-2">
                     <div className="px-2 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -275,13 +278,13 @@ export function Navbar({
                   <Link
                     key={item.id}
                     to={item.path}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 font-medium ${active
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 font-medium ${active
                       ? 'bg-[#2C3E50] text-white'
                       : 'text-[#2C3E50] hover:bg-[#8B7355] hover:text-white'
                       }`}
                   >
                     <Icon className={`w-5 h-5 ${active ? 'stroke-[2.5px]' : ''}`} />
-                    <span>{item.label}</span>
+                    <span className="hidden xl:inline">{item.label}</span>
                   </Link>
                 );
               })}

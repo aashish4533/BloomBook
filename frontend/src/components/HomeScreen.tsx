@@ -8,7 +8,7 @@ import { Search, Bell, BookOpen } from 'lucide-react';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { db, auth } from '../firebase';
-import { collection, query, where, orderBy, getDocs, doc, deleteDoc, updateDoc, getCountFromServer } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, doc, deleteDoc, updateDoc, getCountFromServer, onSnapshot } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 
 interface Notification {
@@ -33,25 +33,29 @@ export function HomeScreen({ isLoggedIn }: HomeScreenProps) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const booksCount = await getCountFromServer(collection(db, 'books'));
-        const usersCount = await getCountFromServer(collection(db, 'users'));
-        const communitiesCount = await getCountFromServer(collection(db, 'communities'));
-        // Assuming 'transactions' represents completed deals/happy readers
-        const readersCount = await getCountFromServer(collection(db, 'transactions'));
+    // Real-time listeners for stats
+    const unsubBooks = onSnapshot(collection(db, 'books'), (snap) => {
+      setStats(prev => ({ ...prev, books: snap.size }));
+    });
 
-        setStats({
-          books: booksCount.data().count,
-          users: usersCount.data().count,
-          communities: communitiesCount.data().count,
-          readers: readersCount.data().count
-        });
-      } catch (error) {
-        console.error("Error fetching stats:", error);
-      }
+    const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
+      setStats(prev => ({ ...prev, users: snap.size }));
+    });
+
+    const unsubCommunities = onSnapshot(collection(db, 'communities'), (snap) => {
+      setStats(prev => ({ ...prev, communities: snap.size }));
+    });
+
+    const unsubReaders = onSnapshot(collection(db, 'users'), (snap) => {
+      setStats(prev => ({ ...prev, readers: snap.size }));
+    });
+
+    return () => {
+      unsubBooks();
+      unsubUsers();
+      unsubCommunities();
+      unsubReaders();
     };
-    fetchStats();
   }, []);
 
   useEffect(() => {
@@ -116,7 +120,7 @@ export function HomeScreen({ isLoggedIn }: HomeScreenProps) {
           <div className="grid md:grid-cols-2 gap-12 items-center relative z-10">
             {/* Left Column */}
             <div className="space-y-6">
-              <h1 className="text-4xl md:text-5xl font-extrabold text-white leading-tight">
+              <h1 className="text-3xl md:text-5xl font-extrabold text-white leading-tight">
                 Knowledge that <span className="text-[#C4A672] inline-block animate-pulse-slow">Grows</span>
               </h1>
               <p className="text-lg text-gray-300 max-w-lg">

@@ -30,11 +30,21 @@ export function AddBookModal({ onClose }: AddBookModalProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+
+    const price = parseFloat(formData.price) || 0;
+    const rentalPrice = parseFloat(formData.rentalPrice) || 0;
+
+    if (price < 0 || rentalPrice < 0) {
+      toast.error('Prices cannot be negative');
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       await addDoc(collection(db, 'books'), {
         ...formData,
-        price: parseFloat(formData.price) || 0,
-        rentalPrice: parseFloat(formData.rentalPrice) || 0,
+        price,
+        rentalPrice,
         createdAt: new Date()
       });
       toast.success('Book added successfully');
@@ -127,10 +137,11 @@ export function AddBookModal({ onClose }: AddBookModalProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="price">Sale Price ($)</Label>
+              <Label htmlFor="price">Sale Price (Rs.)</Label>
               <Input
                 id="price"
                 type="number"
+                min="0"
                 step="0.01"
                 value={formData.price}
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
@@ -139,10 +150,11 @@ export function AddBookModal({ onClose }: AddBookModalProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="rentalPrice">Rental Price ($/month)</Label>
+              <Label htmlFor="rentalPrice">Rental Price (Rs./month)</Label>
               <Input
                 id="rentalPrice"
                 type="number"
+                min="0"
                 step="0.01"
                 value={formData.rentalPrice}
                 onChange={(e) => setFormData({ ...formData, rentalPrice: e.target.value })}

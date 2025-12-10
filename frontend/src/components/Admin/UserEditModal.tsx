@@ -68,6 +68,8 @@ export function UserEditModal({ user, onClose, onSave }: UserEditModalProps) {
                 id="email"
                 type="email"
                 value={editedUser.email}
+                disabled
+                className="bg-gray-100 text-gray-500 cursor-not-allowed"
                 onChange={(e) => setEditedUser({ ...editedUser, email: e.target.value })}
               />
             </div>

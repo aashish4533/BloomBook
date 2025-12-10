@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Search, Edit, Ban, Shield } from 'lucide-react';
+import { Search, Edit, Ban, Shield, Trash2 } from 'lucide-react';
 import { UserEditModal } from './UserEditModal';
 import { db } from '../../firebase';
-import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
 
 interface User {
@@ -78,6 +78,17 @@ export function UserManagement() {
       } catch (err) {
         toast.error('Failed to update user role');
       }
+    }
+  };
+
+  const handleDeleteUser = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'users', id));
+      setUsers(prev => prev.filter(u => u.id !== id));
+      toast.success('User deleted successfully');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to delete user');
     }
   };
 
@@ -199,6 +210,26 @@ export function UserManagement() {
                       onClick={() => handleBan(user.id)}
                     >
                       <Ban className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => {
+                        if (confirm('Are you sure you want to permanently delete this user? This action cannot be undone.')) {
+                          // Implement delete logic here or add a function for it
+                          // Since direct deletion might require more complex logic (auth + firestore), 
+                          // I'll assume just Firestore doc deletion for now as per "admin can delete user".
+                          // I'll add the function `handleDeleteUser` above and call it here.
+                          // But wait, I need to define `handleDeleteUser` first.
+                          // I will insert the call here and define the function in another edit to the main component body.
+                          // Actually, I can inline the logic if it's simple or just call a new function `handleDelete`.
+                          handleDeleteUser(user.id);
+                        }
+                      }}
+                      title="Delete User"
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </Button>
                     {user.role !== 'admin' && (
                       <Button

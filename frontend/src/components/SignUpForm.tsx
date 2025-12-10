@@ -80,8 +80,30 @@ export function SignUpForm({ onSignUp }: SignUpFormProps) {
       newErrors.fullName = 'Full Name is required';
     }
 
-    if (phoneNumber && !/^\+?[\d\s-]{10,}$/.test(phoneNumber)) {
-      newErrors.phoneNumber = 'Please enter a valid phone number';
+    if (phoneNumber) {
+      if (phoneNumber.startsWith('0')) {
+        if (!/^0\d{10}$/.test(phoneNumber)) {
+          newErrors.phoneNumber = 'Phone number starting with 0 must be 11 digits';
+        }
+      } else if (phoneNumber.startsWith('+92')) {
+        if (!/^\+92\d{10}$/.test(phoneNumber)) {
+          newErrors.phoneNumber = 'Phone number starting with +92 must be 13 characters total';
+        }
+      } else {
+        // Optional: Allow other formats or enforce one of the above?
+        // User request was specific about 'starts with 0' and '+92'.
+        // I'll add a generic fallback or just restrict to these two if "validate phone number" implies strictness.
+        // Given the specific rules, I will restrict to these types to be safe, or just basic length if neither used.
+        // Let's stick to the user's specific rules as primary, and generic validation otherwise?
+        // User said: "validate phone number to 11 digit if starts with 0 and 12 digits at +92"
+        // Implicitly, if it doesn't match these prefixes, is it valid?
+        // I'll be strict. If it doesn't start with 0 or +92, it might be invalid for this specific Pakistani context.
+        // But for safety, I'll valid generic only if it fails the specific prefix checks.
+        // Actually, let's just implement the requested specific logic.
+
+        // If it starts with neither, I'll error saying "Please enter a valid format (03xx... or +923xx...)"
+        newErrors.phoneNumber = 'Phone number must start with 0 (11 digits) or +92 (13 digits)';
+      }
     }
 
     if (!password) {

@@ -32,26 +32,22 @@ export function AnnouncementForm({ announcement, onClose, onSave }: Announcement
     title: announcement?.title || '',
     content: announcement?.content || '',
     type: announcement?.type || 'info' as 'info' | 'promo' | 'update',
-    image: announcement?.image || null as string | null,
+    image: announcement?.image || undefined,
     date: announcement?.date || new Date(),
     published: announcement?.published ?? true
   });
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const titleRef = useRef<HTMLInputElement>(null);
 
   const validate = () => {
     const newErrors: { [key: string]: string } = {};
-    const currentTitle = titleRef.current?.value || formData.title;
 
-    console.log("Validating with Title Ref:", currentTitle);
-
-    if (!currentTitle) {
+    if (!formData.title.trim()) {
       newErrors.title = 'Title is required';
     }
 
-    if (!formData.content) {
+    if (!formData.content.trim()) {
       newErrors.content = 'Content is required';
     }
 
@@ -79,7 +75,6 @@ export function AnnouncementForm({ announcement, onClose, onSave }: Announcement
     e.preventDefault();
 
     if (!validate()) {
-      console.log("Submit failed: Validation errors exist");
       toast.error('Please fix the errors before submitting');
       return;
     }
@@ -87,9 +82,8 @@ export function AnnouncementForm({ announcement, onClose, onSave }: Announcement
     setIsSubmitting(true);
 
     try {
-      const currentTitle = titleRef.current?.value || formData.title;
       const dataToSave = {
-        title: currentTitle,
+        title: formData.title,
         content: formData.content,
         type: formData.type,
         image: formData.image,
@@ -105,9 +99,10 @@ export function AnnouncementForm({ announcement, onClose, onSave }: Announcement
         await addDoc(collection(db, 'announcements'), dataToSave);
         toast.success('Announcement created');
       }
+      onSave(dataToSave); // Trigger parent update
       onClose();
-    } catch (err) {
-      toast.error('Failed to save announcement');
+    } catch (err: any) {
+      toast.error('Failed to save announcement: ' + (err.message || 'Unknown error'));
       console.error(err);
     } finally {
       setIsSubmitting(false);
@@ -150,18 +145,15 @@ export function AnnouncementForm({ announcement, onClose, onSave }: Announcement
             <Label htmlFor="title" className="text-[#2C3E50] mb-2">
               Title *
             </Label>
-            <input
+            <Input
               id="title"
-              ref={titleRef}
-              type="text"
-              defaultValue={announcement?.title || ''}
+              value={formData.title}
               onChange={(e) => {
-                // Update state for Preview only
                 setFormData(prev => ({ ...prev, title: e.target.value }));
                 if (e.target.value) setErrors(prev => ({ ...prev, title: '' }));
               }}
               placeholder="e.g., New Feature Launch!"
-              className={`flex h-12 w-full rounded-md border border-gray-300 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C4A672] disabled:cursor-not-allowed disabled:opacity-50 ${errors.title ? 'border-red-500' : ''}`}
+              className={errors.title ? 'border-red-500' : ''}
             />
             {errors.title && (
               <p className="text-sm text-red-500 mt-1">{errors.title}</p>
