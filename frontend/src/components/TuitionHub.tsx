@@ -233,25 +233,34 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Stats Banner */}
+        {/* Stats Banner */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <Card className="p-6 text-center">
-            <GraduationCap className="w-8 h-8 mx-auto mb-2 text-[#C4A672]" />
-            <div className="text-2xl text-[#2C3E50] mb-1">500+</div>
+          <Card className="p-6 text-center hover:scale-105 transition-transform duration-300">
+            <div className="w-16 h-16 bg-[#C4A672]/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <GraduationCap className="w-8 h-8 text-[#C4A672]" />
+            </div>
+            <div className="text-2xl font-bold text-[#2C3E50] mb-1">500+</div>
             <div className="text-sm text-gray-600">Expert Tutors</div>
           </Card>
-          <Card className="p-6 text-center">
-            <Users className="w-8 h-8 mx-auto mb-2 text-[#C4A672]" />
-            <div className="text-2xl text-[#2C3E50] mb-1">10K+</div>
+          <Card className="p-6 text-center hover:scale-105 transition-transform duration-300">
+            <div className="w-16 h-16 bg-[#C4A672]/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Users className="w-8 h-8 text-[#C4A672]" />
+            </div>
+            <div className="text-2xl font-bold text-[#2C3E50] mb-1">10K+</div>
             <div className="text-sm text-gray-600">Active Students</div>
           </Card>
-          <Card className="p-6 text-center">
-            <BookOpen className="w-8 h-8 mx-auto mb-2 text-[#C4A672]" />
-            <div className="text-2xl text-[#2C3E50] mb-1">50+</div>
+          <Card className="p-6 text-center hover:scale-105 transition-transform duration-300">
+            <div className="w-16 h-16 bg-[#C4A672]/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <BookOpen className="w-8 h-8 text-[#C4A672]" />
+            </div>
+            <div className="text-2xl font-bold text-[#2C3E50] mb-1">50+</div>
             <div className="text-sm text-gray-600">Subjects</div>
           </Card>
-          <Card className="p-6 text-center">
-            <Star className="w-8 h-8 mx-auto mb-2 text-[#C4A672]" />
-            <div className="text-2xl text-[#2C3E50] mb-1">4.8</div>
+          <Card className="p-6 text-center hover:scale-105 transition-transform duration-300">
+            <div className="w-16 h-16 bg-[#C4A672]/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Star className="w-8 h-8 text-[#C4A672]" />
+            </div>
+            <div className="text-2xl font-bold text-[#2C3E50] mb-1">4.8</div>
             <div className="text-sm text-gray-600">Average Rating</div>
           </Card>
         </div>
@@ -537,29 +546,29 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
         < div className="mt-16" >
           <h2 className="text-[#2C3E50] text-2xl text-center mb-8">How It Works</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <Card className="p-6 text-center">
+            <Card className="p-6 text-center hover:scale-105 transition-transform duration-300">
               <div className="w-16 h-16 bg-[#C4A672]/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Search className="w-8 h-8 text-[#C4A672]" />
               </div>
-              <h3 className="text-[#2C3E50] mb-2">1. Find Your Tutor</h3>
+              <h3 className="text-[#2C3E50] font-semibold mb-2">1. Find Your Tutor</h3>
               <p className="text-gray-600 text-sm">
                 Browse through our verified tutors and find the perfect match for your learning needs
               </p>
             </Card>
-            <Card className="p-6 text-center">
+            <Card className="p-6 text-center hover:scale-105 transition-transform duration-300">
               <div className="w-16 h-16 bg-[#C4A672]/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Calendar className="w-8 h-8 text-[#C4A672]" />
               </div>
-              <h3 className="text-[#2C3E50] mb-2">2. Book a Session</h3>
+              <h3 className="text-[#2C3E50] font-semibold mb-2">2. Book a Session</h3>
               <p className="text-gray-600 text-sm">
                 Schedule a convenient time slot and choose between one-on-one or group sessions
               </p>
             </Card>
-            <Card className="p-6 text-center">
+            <Card className="p-6 text-center hover:scale-105 transition-transform duration-300">
               <div className="w-16 h-16 bg-[#C4A672]/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Video className="w-8 h-8 text-[#C4A672]" />
               </div>
-              <h3 className="text-[#2C3E50] mb-2">3. Start Learning</h3>
+              <h3 className="text-[#2C3E50] font-semibold mb-2">3. Start Learning</h3>
               <p className="text-gray-600 text-sm">
                 Join live video sessions and get personalized guidance from expert tutors
               </p>

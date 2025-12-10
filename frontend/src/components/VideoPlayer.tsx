@@ -39,9 +39,9 @@ export function VideoPlayer({ title, description, duration = '15:30', onClose, d
         <Card className="bg-black overflow-hidden">
           <div className="relative" style={{ aspectRatio: '16/9' }}>
             {/* Video Placeholder */}
-            <div className="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
+            <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-[#1a252f] to-gray-900 flex items-center justify-center">
               <div className="text-center">
-                <div className="w-24 h-24 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4 cursor-pointer hover:bg-white/20 transition-colors"
+                <div className="w-24 h-24 bg-[#C4A672] rounded-full flex items-center justify-center mx-auto mb-4 cursor-pointer hover:bg-[#8B7355] transition-all shadow-lg hover:shadow-[#C4A672]/50 hover:scale-110"
                   onClick={() => setIsPlaying(!isPlaying)}
                 >
                   {isPlaying ? (
@@ -163,7 +163,7 @@ export function VideoPlayer({ title, description, duration = '15:30', onClose, d
         {/* Action Buttons */}
         {downloadable && (
           <div className="mt-4 flex gap-3">
-            <Button className="flex-1 bg-[#C4A672] hover:bg-[#8B7355] text-white">
+            <Button className="flex-1 bg-[#C4A672] hover:bg-[#8B7355] text-white shadow-md">
               <Download className="w-4 h-4 mr-2" />
               Download Video
             </Button>

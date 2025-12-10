@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 
 interface Notification {
   id: string;
-  type: 'order' | 'message' | 'community' | 'system';
+  type: 'order' | 'message' | 'community' | 'system' | 'community_approved' | 'community_rejected';
   title: string;
   message: string;
   timestamp: any;
@@ -136,6 +136,10 @@ export function NotificationBell() {
         return 'bg-purple-100 text-purple-600';
       case 'system':
         return 'bg-orange-100 text-orange-600';
+      case 'community_approved':
+        return 'bg-green-100 text-green-600';
+      case 'community_rejected':
+        return 'bg-red-100 text-red-600';
       default:
         return 'bg-gray-100 text-gray-600';
     }
@@ -205,6 +209,8 @@ export function NotificationBell() {
                           {notification.type === 'message' && '💬'}
                           {notification.type === 'community' && '👥'}
                           {notification.type === 'system' && '🔔'}
+                          {notification.type === 'community_approved' && '✅'}
+                          {notification.type === 'community_rejected' && '❌'}
                         </div>
 
                         {/* Content */}

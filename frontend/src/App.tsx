@@ -33,6 +33,9 @@ import { GroupChat } from './components/Communities/GroupChat';
 import { PrivateChat } from './components/Chat/PrivateChat';
 import { AnnouncementsPage } from './components/AnnouncementsPage';
 import { AboutPage } from './components/AboutPage';
+import { ContactPage } from './components/ContactPage';
+import { HelpPage } from './components/HelpPage';
+import { TermsPage } from './components/TermsPage';
 import { AdvancedSearch } from './components/AdvancedSearch';
 import { WishlistPage } from './components/WishlistPage';
 import { TuitionHub } from './components/TuitionHub';
@@ -85,8 +88,11 @@ function PrivateChatWrapper() {
     return <Navigate to="/dashboard/chats" replace />;
   }
 
+  const chatId = [user?.uid, otherUser.id].sort().join('_');
+
   return (
     <PrivateChat
+      chatId={chatId}
       otherUser={otherUser}
       bookContext={bookContext}
       onBack={() => navigate(-1)}
@@ -232,6 +238,9 @@ export default function App() {
             {/* Public Routes */}
             <Route path="/" element={<HomeScreen isLoggedIn={!!currentUser} />} />
             <Route path="/about" element={<AboutPageWrapper />} />
+            <Route path="/contact" element={<ContactPage />} />
+            <Route path="/help" element={<HelpPage />} />
+            <Route path="/terms" element={<TermsPage />} />
 
             {/* Protected User Routes */}
             <Route element={<ProtectedRoute isLoggedIn={!!currentUser} />}>

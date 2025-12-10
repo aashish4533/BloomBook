@@ -1,4 +1,4 @@
-import { X, Trash2, ShoppingBag } from 'lucide-react';
+import { X, Trash2, ShoppingBag, BookX, Sprout } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useCart } from '../../context/CartContext';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../ui/sheet';
@@ -38,10 +38,10 @@ export function CartDrawer() {
     return (
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
             <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative">
-                    <ShoppingBag className="h-5 w-5 text-gray-600" />
+                <Button variant="ghost" size="icon" className="relative group">
+                    <ShoppingBag className="h-5 w-5 text-[#2C3E50] group-hover:text-[#C4A672] transition-colors" />
                     {items.length > 0 && (
-                        <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-[#C4A672] text-[10px] font-medium text-white flex items-center justify-center">
+                        <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-[#C4A672] text-[10px] font-medium text-white flex items-center justify-center animate-scale-in">
                             {items.length}
                         </span>
                     )}
@@ -55,15 +55,17 @@ export function CartDrawer() {
                 <div className="flex-1 overflow-hidden mt-4">
                     {items.length === 0 ? (
                         <div className="h-full flex flex-col items-center justify-center text-center p-4">
-                            <ShoppingBag className="h-16 w-16 text-gray-300 mb-4" />
-                            <p className="text-gray-500 font-medium">Your cart is empty</p>
-                            <p className="text-gray-400 text-sm mt-1">Add some books to get started</p>
+                            <div className="w-24 h-24 bg-[#C4A672]/10 rounded-full flex items-center justify-center mb-6">
+                                <BookX className="h-12 w-12 text-gray-300" />
+                                <Sprout className="h-6 w-6 text-[#C4A672] absolute mt-8 ml-8" />
+                            </div>
+                            <h3 className="text-[#2C3E50] font-semibold text-lg mb-2">Your garden is empty</h3>
+                            <p className="text-gray-500 text-sm mb-8">Start planting knowledge today!</p>
                             <Button
-                                variant="outline"
-                                className="mt-6"
+                                className="bg-[#C4A672] hover:bg-[#8B7355] text-white rounded-full px-8"
                                 onClick={() => setIsOpen(false)}
                             >
-                                Continue Shopping
+                                Browse Books
                             </Button>
                         </div>
                     ) : (

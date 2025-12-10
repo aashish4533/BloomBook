@@ -10,7 +10,7 @@ import { CreatePost } from './CreatePost';
 import { PostDetail } from './PostDetail';
 import { toast } from 'sonner';
 import { db, auth } from '../../firebase';
-import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, deleteDoc, onSnapshot, collection, query, orderBy, increment, addDoc, serverTimestamp, deleteField } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, deleteDoc, onSnapshot, collection, query, orderBy, increment, addDoc, serverTimestamp, deleteField, setDoc } from 'firebase/firestore';
 
 interface Post {
   id: string;
@@ -155,22 +155,43 @@ export function CommunityDetails({ userId }: CommunityDetailsProps) {
 
   const handleJoin = async () => {
     if (!communityId || !auth.currentUser?.uid) return;
+    const user = auth.currentUser;
     try {
       const commRef = doc(db, 'communities', communityId);
+      const timestamp = new Date().toISOString();
+
       if (community.privacy === 'private') {
+        // Add to Pending Subcollection
+        await setDoc(doc(db, 'communities', communityId, 'pending', user.uid), {
+          id: user.uid,
+          name: user.displayName || 'Anonymous',
+          avatar: user.photoURL || 'CU',
+          joinedAt: timestamp
+        });
+        // Maintain Array for quick checks
         await updateDoc(commRef, {
-          pending: arrayUnion(auth.currentUser.uid)
+          pending: arrayUnion(user.uid)
         });
         toast.success('Join request sent! Waiting for admin approval.');
       } else {
+        // Add to Members Subcollection
+        await setDoc(doc(db, 'communities', communityId, 'members', user.uid), {
+          id: user.uid,
+          name: user.displayName || 'Anonymous',
+          avatar: user.photoURL || 'CU',
+          role: 'member',
+          joinedAt: timestamp
+        });
+        // Maintain Array & Count
         await updateDoc(commRef, {
-          members: arrayUnion(auth.currentUser?.uid),
+          members: arrayUnion(user.uid),
           memberCount: increment(1)
         });
         setIsMember(true);
         toast.success('Successfully joined the community!');
       }
     } catch (err) {
+      console.error(err);
       toast.error('Failed to join');
     }
   };
@@ -179,6 +200,10 @@ export function CommunityDetails({ userId }: CommunityDetailsProps) {
     if (!communityId || !auth.currentUser?.uid) return;
     try {
       const commRef = doc(db, 'communities', communityId);
+      // Remove from Subcollection
+      await deleteDoc(doc(db, 'communities', communityId, 'members', auth.currentUser.uid));
+
+      // Remove from Array & Count
       await updateDoc(commRef, {
         members: arrayRemove(auth.currentUser.uid),
         memberCount: increment(-1)
@@ -187,6 +212,7 @@ export function CommunityDetails({ userId }: CommunityDetailsProps) {
       toast.info('You left the community');
       navigate('/communities');
     } catch (err) {
+      console.error(err);
       toast.error('Failed to leave');
     }
   };
@@ -262,12 +288,45 @@ export function CommunityDetails({ userId }: CommunityDetailsProps) {
   const handleApproveMember = async (memberId: string) => {
     if (!communityId) return;
     try {
+      // 1. Get Member details explicitly if needed, but we can just use defaults + ID
+      // However, best to copy from pending doc if we want 100% data fidelity.
+      // For now, assuming basic info is sufficient or reading from pending doc.
+      const pendingDocRef = doc(db, 'communities', communityId, 'pending', memberId);
+      const pendingSnap = await getDoc(pendingDocRef);
+      const pendingData = pendingSnap.exists() ? pendingSnap.data() : { name: 'Unknown', avatar: 'U' };
+
+      const timestamp = new Date().toISOString();
+
+      // 2. Move to Members Subcollection
+      await setDoc(doc(db, 'communities', communityId, 'members', memberId), {
+        ...pendingData,
+        role: 'member',
+        joinedAt: timestamp,
+        status: null // Remove status
+      });
+
+      // 3. Remove from Pending Subcollection
+      await deleteDoc(pendingDocRef);
+
+      // 4. Update Parent Arrays
       const commRef = doc(db, 'communities', communityId);
       await updateDoc(commRef, {
         pending: arrayRemove(memberId),
         members: arrayUnion(memberId),
         memberCount: increment(1)
       });
+
+      // 5. Create Notification
+      await addDoc(collection(db, 'notifications'), {
+        userId: memberId,
+        type: 'community_approved',
+        title: 'Community Join Request Approved',
+        message: `Your request to join "${community.name}" has been approved!`,
+        link: `/communities/${communityId}`,
+        read: false,
+        createdAt: serverTimestamp()
+      });
+
       setMembers(prev =>
         prev.map(m =>
           m.id === memberId ? { ...m, status: undefined } : m
@@ -275,6 +334,7 @@ export function CommunityDetails({ userId }: CommunityDetailsProps) {
       );
       toast.success('Member approved');
     } catch (err) {
+      console.error(err);
       toast.error('Failed to approve');
     }
   };
@@ -282,13 +342,29 @@ export function CommunityDetails({ userId }: CommunityDetailsProps) {
   const handleRejectMember = async (memberId: string) => {
     if (!communityId) return;
     try {
+      // 1. Remove from Pending Subcollection
+      await deleteDoc(doc(db, 'communities', communityId, 'pending', memberId));
+
+      // 2. Update Parent Array
       const commRef = doc(db, 'communities', communityId);
       await updateDoc(commRef, {
         pending: arrayRemove(memberId)
       });
+
+      // 3. Create Notification
+      await addDoc(collection(db, 'notifications'), {
+        userId: memberId,
+        type: 'community_rejected',
+        title: 'Community Join Request Rejected',
+        message: `Your request to join "${community.name}" was declined.`,
+        read: false,
+        createdAt: serverTimestamp()
+      });
+
       setMembers(prev => prev.filter(m => m.id !== memberId));
       toast.info('Join request rejected');
     } catch (err) {
+      console.error(err);
       toast.error('Failed to reject');
     }
   };

@@ -1,8 +1,8 @@
 import { Badge } from './ui/badge';
-import { 
-  Search, 
-  Calendar, 
-  MapPin, 
+import {
+  Search,
+  Calendar,
+  MapPin,
   Image as ImageIcon,
   SlidersHorizontal,
   CheckCircle,
@@ -26,78 +26,78 @@ export function RentalBrowseShowcase() {
         {/* Feature Highlights */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
           {/* Book Details Search */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center mb-4">
-              <Search className="w-6 h-6 text-white" />
+          <div className="bg-white rounded-xl shadow-lg p-6 hover:scale-105 transition-transform duration-300">
+            <div className="w-16 h-16 bg-[#C4A672]/20 rounded-full flex items-center justify-center mb-4 mx-auto">
+              <Search className="w-8 h-8 text-[#C4A672]" />
             </div>
-            <h3 className="text-[#2C3E50] text-xl mb-3">Book Details Search</h3>
+            <h3 className="text-[#2C3E50] text-xl mb-3 text-center">Book Details Search</h3>
             <ul className="space-y-2 text-sm text-gray-600">
               <li className="flex items-start gap-2">
-                <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                <CheckCircle className="w-4 h-4 text-[#C4A672] flex-shrink-0 mt-0.5" />
                 <span>Search by title, author, or ISBN</span>
               </li>
               <li className="flex items-start gap-2">
-                <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                <CheckCircle className="w-4 h-4 text-[#C4A672] flex-shrink-0 mt-0.5" />
                 <span>Dedicated ISBN search field</span>
               </li>
               <li className="flex items-start gap-2">
-                <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                <CheckCircle className="w-4 h-4 text-[#C4A672] flex-shrink-0 mt-0.5" />
                 <span>Real-time filtering</span>
               </li>
               <li className="flex items-start gap-2">
-                <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                <CheckCircle className="w-4 h-4 text-[#C4A672] flex-shrink-0 mt-0.5" />
                 <span>Category dropdown</span>
               </li>
             </ul>
           </div>
 
           {/* Rental Price Options */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center mb-4">
-              <Calendar className="w-6 h-6 text-white" />
+          <div className="bg-white rounded-xl shadow-lg p-6 hover:scale-105 transition-transform duration-300">
+            <div className="w-16 h-16 bg-[#C4A672]/20 rounded-full flex items-center justify-center mb-4 mx-auto">
+              <Calendar className="w-8 h-8 text-[#C4A672]" />
             </div>
-            <h3 className="text-[#2C3E50] text-xl mb-3">Rental Price Options</h3>
+            <h3 className="text-[#2C3E50] text-xl mb-3 text-center">Rental Price Options</h3>
             <ul className="space-y-2 text-sm text-gray-600">
               <li className="flex items-start gap-2">
-                <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                <CheckCircle className="w-4 h-4 text-[#C4A672] flex-shrink-0 mt-0.5" />
                 <span>Weekly, Monthly, Yearly rates</span>
               </li>
               <li className="flex items-start gap-2">
-                <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                <CheckCircle className="w-4 h-4 text-[#C4A672] flex-shrink-0 mt-0.5" />
                 <span>Price range slider (Rs. 0-Rs. 20)</span>
               </li>
               <li className="flex items-start gap-2">
-                <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                <CheckCircle className="w-4 h-4 text-[#C4A672] flex-shrink-0 mt-0.5" />
                 <span>Period selector dropdown</span>
               </li>
               <li className="flex items-start gap-2">
-                <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                <CheckCircle className="w-4 h-4 text-[#C4A672] flex-shrink-0 mt-0.5" />
                 <span>Selected rate highlighted</span>
               </li>
             </ul>
           </div>
 
           {/* Location & Condition */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center mb-4">
-              <MapPin className="w-6 h-6 text-white" />
+          <div className="bg-white rounded-xl shadow-lg p-6 hover:scale-105 transition-transform duration-300">
+            <div className="w-16 h-16 bg-[#C4A672]/20 rounded-full flex items-center justify-center mb-4 mx-auto">
+              <MapPin className="w-8 h-8 text-[#C4A672]" />
             </div>
-            <h3 className="text-[#2C3E50] text-xl mb-3">Location & Condition</h3>
+            <h3 className="text-[#2C3E50] text-xl mb-3 text-center">Location & Condition</h3>
             <ul className="space-y-2 text-sm text-gray-600">
               <li className="flex items-start gap-2">
-                <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                <CheckCircle className="w-4 h-4 text-[#C4A672] flex-shrink-0 mt-0.5" />
                 <span>City or ZIP code search</span>
               </li>
               <li className="flex items-start gap-2">
-                <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                <CheckCircle className="w-4 h-4 text-[#C4A672] flex-shrink-0 mt-0.5" />
                 <span>Location proximity filtering</span>
               </li>
               <li className="flex items-start gap-2">
-                <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                <CheckCircle className="w-4 h-4 text-[#C4A672] flex-shrink-0 mt-0.5" />
                 <span>Condition filter (New/Good/Fair)</span>
               </li>
               <li className="flex items-start gap-2">
-                <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                <CheckCircle className="w-4 h-4 text-[#C4A672] flex-shrink-0 mt-0.5" />
                 <span>Color-coded badges</span>
               </li>
             </ul>
@@ -172,7 +172,7 @@ export function RentalBrowseShowcase() {
                   <div className="absolute right-0 -top-1 w-4 h-4 bg-[#C4A672] rounded-full border-2 border-white"></div>
                 </div>
               </div>
-              
+
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                 <h5 className="text-sm text-blue-900 mb-2">Active Filters:</h5>
                 <div className="flex flex-wrap gap-2">

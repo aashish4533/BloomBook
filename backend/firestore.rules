@@ -113,10 +113,24 @@ service cloud.firestore {
       allow read, write: if isAuthenticated() && isOwner(userId);
     }
     
+    // --- Chats ---
+    match /chats/{chatId} {
+      allow read, create: if isAuthenticated();
+      
+      match /messages/{messageId} {
+        allow read, list, create: if isAuthenticated();
+      }
+    }
+
     // --- Rentals ---
     match /rentals/{rentalId} {
       allow read: if isAuthenticated() && (resource.data.renterId == request.auth.uid || resource.data.ownerId == request.auth.uid || isAdmin());
       allow write: if isAuthenticated();
+    }
+    
+    // Default deny for other collections (safety)
+    match /{document=**} {
+      allow read, write: if false; 
     }
   }
 }
