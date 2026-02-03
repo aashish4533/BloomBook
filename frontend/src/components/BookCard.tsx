@@ -84,7 +84,8 @@ export function BookCard({ book, onClick }: BookCardProps) {
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all cursor-pointer overflow-hidden group"
+      className="bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-500 cursor-pointer overflow-hidden group perspective-[1000px] hover:[transform:rotateY(5deg)_scale(1.02)]"
+      style={{ transformStyle: 'preserve-3d' }}
     >
       {/* Book Image */}
       <div className="aspect-[3/4] overflow-hidden bg-gray-100 relative">

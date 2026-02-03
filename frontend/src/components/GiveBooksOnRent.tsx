@@ -187,7 +187,10 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
           updatedAt: serverTimestamp()
         };
 
-        await addDoc(collection(db, 'books'), listingData);
+        // Remove imageFiles from listingData before saving to Firestore
+        const { imageFiles, ...finalListingData } = listingData;
+
+        await addDoc(collection(db, 'books'), finalListingData);
       }
 
       toast.success('Books listed for rent successfully!');

@@ -5,7 +5,7 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
 import { db, auth } from '../../firebase';
-import { collection, getDocs, doc, setDoc, deleteDoc, runTransaction, query, limit, getDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, query, limit, onSnapshot, updateDoc, arrayUnion, arrayRemove, increment } from 'firebase/firestore';
 
 interface Community {
   id: string;
@@ -13,6 +13,7 @@ interface Community {
   description: string;
   memberCount: number;
   admin: string;
+  adminName?: string; // Add optional adminName
   privacy: 'public' | 'private';
   topic: string;
   image: string;
@@ -29,23 +30,36 @@ export function CommunitiesSection({ onNavigateToCommunities, isLoggedIn }: Comm
   const user = auth.currentUser;
 
   useEffect(() => {
-    const fetchCommunities = async () => {
-      const q = query(collection(db, 'communities'), limit(4));  // Top 4
-      const snapshot = await getDocs(q);
-      const data = await Promise.all(snapshot.docs.map(async (d) => {
-        const comm = { id: d.id, ...d.data() } as Community;
+    // Real-time listener for top communities
+    const q = query(collection(db, 'communities'), limit(4));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map((d) => {
+        const dData = d.data();
+        const members = dData.members || [];
+
+        let isMember = false;
         if (user) {
-          const memberRef = doc(db, `communities/${d.id}/members/${user.uid}`);
-          const memberSnap = await getDoc(memberRef);  // Use getDoc for single doc
-          comm.isMember = memberSnap.exists();
-        } else {
-          comm.isMember = false;
+          // Check if user is in members array
+          isMember = members.includes(user.uid);
         }
-        return comm;
-      }));
+
+        return {
+          id: d.id,
+          ...dData,
+          // Map adminName to admin if admin is missing or generic
+          admin: dData.adminName || dData.admin || 'Unknown',
+          image: dData.image || dData.coverImage || 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&q=80',
+          isMember
+        } as Community;
+      });
       setCommunities(data);
-    };
-    fetchCommunities();
+    }, (error) => {
+      console.error("Error fetching communities:", error);
+      // toast.error("Failed to load communities"); // Suppress to avoid spam on mounting if error
+    });
+
+    return () => unsubscribe();
   }, [user]);
 
   const handleJoin = async (communityId: string, privacy: 'public' | 'private') => {
@@ -55,23 +69,46 @@ export function CommunitiesSection({ onNavigateToCommunities, isLoggedIn }: Comm
     }
 
     const commRef = doc(db, 'communities', communityId);
+    // Subcollection ref (Optional for list view but good for integrity)
     const memberRef = doc(commRef, 'members', user.uid);
 
     if (privacy === 'private') {
-      // For private, perhaps add to 'requests' subcollection (TODO: implement)
-      await setDoc(memberRef, { requested: true, date: new Date() });
-      toast.success('Join request sent! Waiting for admin approval.');
+      try {
+        await updateDoc(commRef, {
+          pending: arrayUnion(user.uid)
+        });
+        // Also add to pending subcollection if needed (omitted here for brevity/alignment with Browse)
+        await setDoc(doc(commRef, 'pending', user.uid), {
+          id: user.uid,
+          name: user.displayName || 'Anonymous',
+          avatar: user.photoURL || 'CU',
+          joinedAt: new Date().toISOString()
+        });
+
+        toast.success('Join request sent! Waiting for admin approval.');
+      } catch (err) {
+        toast.error('Failed to send request');
+      }
     } else {
       try {
-        await runTransaction(db, async (transaction) => {
-          const commDoc = await transaction.get(commRef);
-          if (!commDoc.exists()) throw new Error('Community not found');
-          transaction.update(commRef, { memberCount: commDoc.data().memberCount + 1 });
-          transaction.set(memberRef, { joined: new Date() });
+        // Update Array and Count
+        await updateDoc(commRef, {
+          members: arrayUnion(user.uid),
+          memberCount: increment(1)
         });
-        setCommunities(prev => prev.map(c => c.id === communityId ? { ...c, isMember: true, memberCount: c.memberCount + 1 } : c));
+
+        // Update Subcollection
+        await setDoc(memberRef, {
+          id: user.uid,
+          name: user.displayName || 'Anonymous',
+          avatar: user.photoURL || 'CU',
+          role: 'member',
+          joinedAt: new Date().toISOString()
+        });
+
         toast.success('Successfully joined the community!');
       } catch (err) {
+        console.error(err);
         toast.error('Failed to join');
       }
     }
@@ -84,15 +121,18 @@ export function CommunitiesSection({ onNavigateToCommunities, isLoggedIn }: Comm
     const memberRef = doc(commRef, 'members', user.uid);
 
     try {
-      await runTransaction(db, async (transaction) => {
-        const commDoc = await transaction.get(commRef);
-        if (!commDoc.exists()) throw new Error('Community not found');
-        transaction.update(commRef, { memberCount: commDoc.data().memberCount - 1 });
-        transaction.delete(memberRef);
+      // Remove from Array and Count
+      await updateDoc(commRef, {
+        members: arrayRemove(user.uid),
+        memberCount: increment(-1)
       });
-      setCommunities(prev => prev.map(c => c.id === communityId ? { ...c, isMember: false, memberCount: c.memberCount - 1 } : c));
+
+      // Remove from Subcollection
+      await deleteDoc(memberRef);
+
       toast.info('You left the community');
     } catch (err) {
+      console.error(err);
       toast.error('Failed to leave');
     }
   };

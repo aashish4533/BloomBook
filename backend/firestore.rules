@@ -55,6 +55,7 @@ service cloud.firestore {
       allow create: if isAuthenticated();
       // Admin of the community OR System Admin can update/delete
       allow update: if isAuthenticated(); // Needed for the 'members' array update to work
+      allow delete: if isAuthenticated() && resource.data.adminId == request.auth.uid; // Simplified check
 
       // Community Subcollections
       match /members/{memberId} {

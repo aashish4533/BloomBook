@@ -18,39 +18,79 @@ interface AnnouncementCarouselProps {
   onViewAll: () => void;
 }
 
+// Default announcements data
+const DEFAULT_ANNOUNCEMENTS: Announcement[] = [
+  {
+    id: 'default-1',
+    title: 'Welcome to BookBloom!',
+    content: 'Join our thriving community of book lovers. Trade, sell, and discover your next favorite read with ease.',
+    date: new Date().toLocaleDateString(),
+    type: 'info',
+    image: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?auto=format&fit=crop&q=80&w=1000'
+  },
+  {
+    id: 'default-2',
+    title: 'Grand Opening Special',
+    content: 'Zero fees on your first 5 book sales! Start listing your collection today and keep 100% of your earnings.',
+    date: new Date().toLocaleDateString(),
+    type: 'promo',
+    image: 'https://images.unsplash.com/photo-1491841550275-ad7854e35ca6?auto=format&fit=crop&q=80&w=1000'
+  },
+  {
+    id: 'default-3',
+    title: 'New Feature: Community Hubs',
+    content: 'Connect with readers who share your interests. Create or join book clubs, discussion groups, and more.',
+    date: new Date().toLocaleDateString(),
+    type: 'update',
+    image: 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&q=80&w=1000'
+  }
+];
+
 export function AnnouncementCarousel({ onViewAll }: AnnouncementCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);  // Replace mock
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchAnnouncements = async () => {
-      const q = query(collection(db, 'announcements'), orderBy('date', 'desc'), limit(3));
-      const snapshot = await getDocs(q);
-      const data = snapshot.docs.map(doc => {
-        const d = doc.data();
-        let dateStr = '';
-        // Handle Firestore Timestamp (has seconds/nanoseconds & toDate method)
-        if (d.date && typeof d.date.toDate === 'function') {
-          dateStr = d.date.toDate().toLocaleDateString();
-        } else if (d.date instanceof Date) {
-          dateStr = d.date.toLocaleDateString();
-        } else if (d.date) {
-          // Fallback for strings or numbers
-          try {
-            dateStr = new Date(d.date).toLocaleDateString();
-          } catch (e) {
-            dateStr = 'Unknown Date';
-          }
-        }
+      try {
+        const q = query(collection(db, 'announcements'), orderBy('date', 'desc'), limit(3));
+        const snapshot = await getDocs(q);
 
-        return {
-          id: doc.id,
-          ...d,
-          date: dateStr
-        } as Announcement;
-      });
-      setAnnouncements(data);
+        if (snapshot.empty) {
+          setAnnouncements(DEFAULT_ANNOUNCEMENTS);
+        } else {
+          const data = snapshot.docs.map(doc => {
+            const d = doc.data();
+            let dateStr = '';
+            // Handle Firestore Timestamp
+            if (d.date && typeof d.date.toDate === 'function') {
+              dateStr = d.date.toDate().toLocaleDateString();
+            } else if (d.date instanceof Date) {
+              dateStr = d.date.toLocaleDateString();
+            } else if (d.date) {
+              try {
+                dateStr = new Date(d.date).toLocaleDateString();
+              } catch (e) {
+                dateStr = 'Unknown Date';
+              }
+            }
+
+            return {
+              id: doc.id,
+              ...d,
+              date: dateStr
+            } as Announcement;
+          });
+          setAnnouncements(data);
+        }
+      } catch (error) {
+        console.error("Error fetching announcements:", error);
+        setAnnouncements(DEFAULT_ANNOUNCEMENTS);
+      } finally {
+        setIsLoading(false);
+      }
     };
     fetchAnnouncements();
   }, []);
@@ -73,7 +113,15 @@ export function AnnouncementCarousel({ onViewAll }: AnnouncementCarouselProps) {
     setCurrentIndex((prev) => (prev + 1) % announcements.length);
   };
 
-  if (announcements.length === 0) return <div>Loading announcements...</div>;
+  if (isLoading) {
+    return (
+      <div className="w-full h-64 md:h-80 bg-gray-100 animate-pulse flex items-center justify-center">
+        <span className="text-gray-400">Loading announcements...</span>
+      </div>
+    );
+  }
+
+  if (announcements.length === 0) return null;
 
   const currentAnnouncement = announcements[currentIndex];
 
@@ -157,8 +205,8 @@ export function AnnouncementCarousel({ onViewAll }: AnnouncementCarouselProps) {
               setCurrentIndex(index);
             }}
             className={`w-2 h-2 rounded-full transition-all ${index === currentIndex
-                ? 'w-8 bg-white'
-                : 'bg-white/50 hover:bg-white/75'
+              ? 'w-8 bg-white'
+              : 'bg-white/50 hover:bg-white/75'
               }`}
           />
         ))}

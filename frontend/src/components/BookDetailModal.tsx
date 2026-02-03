@@ -266,7 +266,7 @@ function NegotiateDialog({ book, onClose }: { book: Book; onClose: () => void })
           userId: book.userId,
           type: 'offer',
           title: 'New Price Offer',
-          message: `${user.displayName || 'A buyer'} offered $${parseFloat(offerPrice)} for "${book.title}"`,
+          message: `${user.displayName || 'A buyer'} offered ${parseFloat(offerPrice)} for "${book.title}"`,
           read: false,
           createdAt: serverTimestamp(),
           link: '/dashboard/sales' // Or relevant link

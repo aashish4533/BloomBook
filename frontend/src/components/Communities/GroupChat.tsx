@@ -122,6 +122,12 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
         images: imageUrls.length > 0 ? imageUrls : undefined,
         timestamp: serverTimestamp(),
       });
+
+      // Update Community Metadata for Chat Lists
+      await updateDoc(doc(db, 'communities', communityId), {
+        lastMessage: newMessage || 'Image sent',
+        lastMessageTimestamp: serverTimestamp()
+      });
       setNewMessage('');
       setSelectedImages([]);
       toast.success('Message sent');

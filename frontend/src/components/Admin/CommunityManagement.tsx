@@ -36,7 +36,14 @@ export function CommunityManagement() {
       setLoading(true);
       try {
         const snapshot = await getDocs(collection(db, 'communities'));
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Community));
+        const data = snapshot.docs.map(doc => {
+          const d = doc.data();
+          return {
+            id: doc.id,
+            ...d,
+            createdAt: d.createdAt?.toDate ? d.createdAt.toDate() : new Date(d.createdAt || Date.now())
+          } as Community;
+        });
         setCommunities(data);
       } catch (err) {
         toast.error('Failed to fetch communities');
@@ -51,7 +58,7 @@ export function CommunityManagement() {
   const filteredCommunities = communities
     .filter(c => {
       const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          c.admin.toLowerCase().includes(searchQuery.toLowerCase());
+        c.admin.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
       const matchesPrivacy = privacyFilter === 'all' || c.privacy === privacyFilter;
       return matchesSearch && matchesStatus && matchesPrivacy;
@@ -154,9 +161,10 @@ export function CommunityManagement() {
       pending: <Shield className="w-3 h-3 mr-1" />,
       flagged: <Flag className="w-3 h-3 mr-1" />
     };
+    if (!status) return <Badge variant="outline">Unknown</Badge>;
     return (
-      <Badge variant="outline" className={styles[status]}>
-        {icons[status]}
+      <Badge variant="outline" className={styles[status] || ''}>
+        {icons[status] || <Shield className="w-3 h-3 mr-1" />}
         {status.charAt(0).toUpperCase() + status.slice(1)}
       </Badge>
     );

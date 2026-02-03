@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Search, Filter, Grid, List, Plus, Users, Lock, Globe, MessageCircle, TrendingUp, ArrowLeft } from 'lucide-react';
+import { Search, Filter, Grid, List, Plus, Users, Lock, Globe, MessageCircle, TrendingUp, ArrowLeft, Edit2, Trash2 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { toast } from 'sonner';
 import { db, auth } from '../../firebase';
-import { collection, getDocs, query, where, doc, updateDoc, arrayUnion, arrayRemove, onSnapshot, orderBy, limit, increment } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, updateDoc, arrayUnion, arrayRemove, onSnapshot, orderBy, limit, increment, getDoc, deleteDoc } from 'firebase/firestore';
 
 interface Post {
   id: string;
@@ -20,7 +20,8 @@ interface Community {
   name: string;
   description: string;
   memberCount: number;
-  admin: string;
+  admin: string; // Usually displayed name
+  adminId?: string; // ID for permission check
   privacy: 'public' | 'private';
   topic: string;
   image: string;
@@ -51,7 +52,24 @@ export function CommunitiesBrowse({ onNavigateToDetail, onNavigateToCreate, isLo
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'communities'), async (snapshot) => {
       const data = await Promise.all(snapshot.docs.map(async (d) => {
-        const commData = { id: d.id, ...d.data() } as Community;
+        const docData = d.data();
+        const commData = { id: d.id, ...docData } as Community;
+
+        // Calculate membership status
+        if (user) {
+          const members = docData.members || [];
+          const pending = docData.pending || [];
+          // Check if user is in members array (handling both strings and objects)
+          commData.isMember = members.some((m: any) => {
+            if (typeof m === 'string') return m === user.uid;
+            return m.userId === user.uid;
+          });
+          commData.isPending = pending.some((p: any) => {
+            if (typeof p === 'string') return p === user.uid;
+            return p.userId === user.uid;
+          });
+        }
+
         // Fetch recent posts (last 2)
         const postsQ = query(
           collection(db, 'communities', d.id, 'posts'),
@@ -60,7 +78,7 @@ export function CommunitiesBrowse({ onNavigateToDetail, onNavigateToCreate, isLo
         );
         const postsSnap = await getDocs(postsQ);
         commData.recentPosts = postsSnap.docs.map(p => ({ id: p.id, ...p.data() } as Post));
-        commData.postsCount = postsSnap.size;  // Or use a counter
+        commData.postsCount = postsSnap.size;
 
         return commData;
       }));
@@ -68,7 +86,7 @@ export function CommunitiesBrowse({ onNavigateToDetail, onNavigateToCreate, isLo
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [user]);
 
   const handleJoin = async (communityId: string, privacy: 'public' | 'private', e: React.MouseEvent) => {
     e.stopPropagation();
@@ -83,12 +101,12 @@ export function CommunitiesBrowse({ onNavigateToDetail, onNavigateToCreate, isLo
     try {
       if (privacy === 'private') {
         await updateDoc(commRef, {
-          pending: arrayUnion({ userId: user.uid, name: user.displayName || 'User', timestamp: new Date() })
+          pending: arrayUnion(user.uid)
         });
         toast.success('Join request sent! Waiting for admin approval.');
       } else {
         await updateDoc(commRef, {
-          members: arrayUnion({ userId: user.uid, name: user.displayName || 'User', timestamp: new Date() }),
+          members: arrayUnion(user.uid),
           memberCount: increment(1)
         });
         toast.success('Successfully joined the community!');
@@ -107,14 +125,37 @@ export function CommunitiesBrowse({ onNavigateToDetail, onNavigateToCreate, isLo
     const commRef = doc(db, 'communities', communityId);
 
     try {
-      await updateDoc(commRef, {
-        members: arrayRemove({ userId: user.uid }),
-        memberCount: increment(-1)
-      });
-      toast.info('You left the community');
+      const docSnap = await getDoc(commRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const members = data.members || [];
+        const newMembers = members.filter((m: any) => {
+          if (typeof m === 'string') return m !== user.uid;
+          return m.userId !== user.uid;
+        });
+
+        await updateDoc(commRef, {
+          members: newMembers,
+          memberCount: newMembers.length
+        });
+        toast.info('You left the community');
+      }
     } catch (err) {
       toast.error('Failed to leave');
       console.error(err);
+    }
+  };
+
+  const handleDelete = async (communityId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm('Are you sure you want to delete this community? This action cannot be undone.')) return;
+
+    try {
+      await deleteDoc(doc(db, 'communities', communityId));
+      toast.success('Community deleted successfully');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to delete community');
     }
   };
 
@@ -353,7 +394,39 @@ export function CommunitiesBrowse({ onNavigateToDetail, onNavigateToCreate, isLo
                   </div>
 
                   {/* Actions */}
-                  {community.isPending ? (
+                  {user && community.adminId === user.uid ? (
+                    <div className="flex gap-2 mb-2">
+                      <Button
+                        onClick={(e: React.MouseEvent) => {
+                          e.stopPropagation();
+                          onNavigateToDetail(`${community.id}?edit=true`);
+                        }}
+                        className="flex-1 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200"
+                        size="sm"
+                      >
+                        <Edit2 className="w-4 h-4 mr-2" />
+                        Edit
+                      </Button>
+                      <Button
+                        onClick={(e: React.MouseEvent) => handleDelete(community.id, e)}
+                        className="flex-1 bg-white hover:bg-red-50 text-red-600 border border-gray-200"
+                        size="sm"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete
+                      </Button>
+                      <Button
+                        onClick={(e: React.MouseEvent) => {
+                          e.stopPropagation();
+                          onNavigateToDetail(community.id);
+                        }}
+                        className="bg-[#C4A672] hover:bg-[#8B7355] text-white"
+                        size="sm"
+                      >
+                        View
+                      </Button>
+                    </div>
+                  ) : community.isPending ? (
                     <Button
                       disabled
                       className="w-full bg-gray-300 text-gray-600 cursor-not-allowed"
@@ -442,7 +515,31 @@ export function CommunitiesBrowse({ onNavigateToDetail, onNavigateToCreate, isLo
                       </div>
 
                       {/* Action Button */}
-                      <div className="ml-4">
+                      <div className="ml-4 flex flex-col gap-2">
+                        {user && community.adminId === user.uid && (
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={(e: React.MouseEvent) => {
+                                e.stopPropagation();
+                                onNavigateToDetail(`${community.id}?edit=true`);
+                              }}
+                              variant="outline"
+                              size="sm"
+                              className="w-full"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              onClick={(e: React.MouseEvent) => handleDelete(community.id, e)}
+                              variant="outline"
+                              size="sm"
+                              className="w-full text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        )}
+
                         {community.isPending ? (
                           <Button
                             disabled

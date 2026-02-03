@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { AnnouncementForm } from './Admin/AnnouncementForm';
 import { toast } from 'sonner';
 import { db } from '../firebase';
-import { collection, query, orderBy, onSnapshot, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, deleteDoc, doc, updateDoc, addDoc } from 'firebase/firestore';
 
 interface Announcement {
   id: string;
@@ -26,6 +26,33 @@ interface AnnouncementsPageProps {
   isAdmin?: boolean;
   onBack?: () => void;
 }
+
+const DEFAULT_ANNOUNCEMENTS = [
+  {
+    title: 'Welcome to BookBloom!',
+    content: 'Join our thriving community of book lovers. Trade, sell, and discover your next favorite read with ease.',
+    type: 'info' as const,
+    image: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?auto=format&fit=crop&q=80&w=1000',
+    published: true,
+    views: 0
+  },
+  {
+    title: 'Grand Opening Special',
+    content: 'Zero fees on your first 5 book sales! Start listing your collection today and keep 100% of your earnings.',
+    type: 'promo' as const,
+    image: 'https://images.unsplash.com/photo-1491841550275-ad7854e35ca6?auto=format&fit=crop&q=80&w=1000',
+    published: true,
+    views: 0
+  },
+  {
+    title: 'New Feature: Community Hubs',
+    content: 'Connect with readers who share your interests. Create or join book clubs, discussion groups, and more.',
+    type: 'update' as const,
+    image: 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&q=80&w=1000',
+    published: true,
+    views: 0
+  }
+];
 
 export function AnnouncementsPage({ isAdmin = false, onBack }: AnnouncementsPageProps) {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -123,6 +150,23 @@ export function AnnouncementsPage({ isAdmin = false, onBack }: AnnouncementsPage
         return '🎁';
       case 'update':
         return '✨';
+    }
+  };
+
+  const handleSeed = async () => {
+    if (!isAdmin) return;
+    try {
+      const batchPromises = DEFAULT_ANNOUNCEMENTS.map(announcement =>
+        addDoc(collection(db, 'announcements'), {
+          ...announcement,
+          date: new Date()
+        })
+      );
+      await Promise.all(batchPromises);
+      toast.success('Sample announcements added');
+    } catch (error) {
+      console.error("Error seeding announcements:", error);
+      toast.error('Failed to add sample announcements');
     }
   };
 
@@ -309,6 +353,15 @@ export function AnnouncementsPage({ isAdmin = false, onBack }: AnnouncementsPage
                     >
                       <Plus className="w-4 h-4 mr-2" />
                       Create First Announcement
+                    </Button>
+                  )}
+                  {isAdmin && (
+                    <Button
+                      variant="outline"
+                      onClick={handleSeed}
+                      className="ml-2"
+                    >
+                      Load Sample Data
                     </Button>
                   )}
                 </div>

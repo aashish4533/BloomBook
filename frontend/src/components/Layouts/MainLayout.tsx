@@ -3,6 +3,7 @@ import { Navbar } from '../Navbar';
 import { Footer } from '../Footer';
 import { Toaster } from '../ui/sonner';
 import { SidebarProvider } from '../ui/sidebar';
+import { GlobalChatWidget } from '../Chat/GlobalChatWidget';
 
 interface MainLayoutProps {
     isLoggedIn: boolean;
@@ -18,6 +19,7 @@ export function MainLayout({ isLoggedIn, onLogout }: MainLayoutProps) {
                     <Outlet />
                 </main>
                 <Footer />
+                <GlobalChatWidget />
                 <Toaster />
             </div>
         </SidebarProvider>

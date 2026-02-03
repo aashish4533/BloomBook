@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowLeft, Upload, X, Globe, Lock, Check } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -14,11 +14,14 @@ interface CreateCommunityProps {
   onSuccess: (communityId: string) => void;
   userId: string;
   userName: string;
+  initialData?: any;
+  isEditing?: boolean;
+  communityId?: string;
 }
 
 import { useNavigate } from 'react-router-dom';
 
-export function CreateCommunity({ onBack, onSuccess, userId, userName }: CreateCommunityProps) {
+export function CreateCommunity({ onBack, onSuccess, userId, userName, initialData, isEditing, communityId }: CreateCommunityProps) {
   const navigate = useNavigate();
 
   if (!userId) {
@@ -35,18 +38,18 @@ export function CreateCommunity({ onBack, onSuccess, userId, userName }: CreateC
     );
   }
   const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    privacy: 'public' as 'public' | 'private',
+    name: initialData?.name || '',
+    description: initialData?.description || '',
+    privacy: initialData?.privacy || ('public' as 'public' | 'private'),
     topic: '',
-    location: '',
-    image: null as string | null,
+    location: initialData?.location || '',
+    image: initialData?.coverImage || null as string | null,
     imageFile: null as File | null
   });
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
+  const [selectedTopics, setSelectedTopics] = useState<string[]>(initialData?.topics || []);
 
   // ... (topics array same as before)
   const topics = [
@@ -147,54 +150,58 @@ export function CreateCommunity({ onBack, onSuccess, userId, userName }: CreateC
         imageUrl = data.secure_url;
       }
 
-      const newCommunity = await addDoc(collection(db, 'communities'), {
-        name: formData.name,
-        description: formData.description,
-        privacy: formData.privacy,
-        topics: selectedTopics,
-        location: formData.location,
-        coverImage: imageUrl || 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&q=80', // Use coverImage to match CommunityDetails
-        image: imageUrl || 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&q=80', // Keep image for backward compatibility
-        adminId: userId,
-        adminName: userName,
-        memberCount: 1,
-        postsCount: 0,
-        createdAt: serverTimestamp(),
-        members: [] // Initialize empty or with/admin
-      });
+      if (isEditing && communityId) {
+        // UPDATE Existing Community
+        const commRef = doc(db, 'communities', communityId);
+        await updateDoc(commRef, {
+          name: formData.name,
+          description: formData.description,
+          privacy: formData.privacy,
+          topics: selectedTopics,
+          location: formData.location,
+          coverImage: imageUrl || 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&q=80',
+          image: imageUrl || 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&q=80',
+          // Don't update admin info, members, etc.
+        });
+        toast.success('Community updated successfully!');
+        onSuccess(communityId);
+      } else {
+        // CREATE New Community
+        const newCommunity = await addDoc(collection(db, 'communities'), {
+          name: formData.name,
+          description: formData.description,
+          privacy: formData.privacy,
+          topics: selectedTopics,
+          location: formData.location,
+          coverImage: imageUrl || 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&q=80', // Use coverImage to match CommunityDetails
+          image: imageUrl || 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&q=80', // Keep image for backward compatibility
+          adminId: userId,
+          adminName: userName,
+          memberCount: 1,
+          postsCount: 0,
+          createdAt: serverTimestamp(),
+          members: [] // Initialize empty or with/admin
+        });
 
-      // Add creator as member
-      await updateDoc(doc(db, 'communities', newCommunity.id), {
-        members: arrayUnion(userId) // Storing just ID as per other logic, OR object? 
-        // CommunityDetails line 128 uses arrayUnion(auth.currentUser.uid) which implies members is array of strings (Ids).
-        // BUT CommunityDetails line 89 maps doc data to Member object... wait.
-        // Line 89: `snapshot.docs.map...` fetches from SUBCOLLECTION 'members'.
-        // Line 128: `updateDoc(commRef, { members: arrayUnion... })` updates the ARRAY field on the document itself.
-        // It seems there's a dual system: 'members' array on doc AND 'members' subcollection?
-        // Let's stick to updating the doc field for count/list, but `CommunityDetails` fetch uses subcollection?
-        // Checking CommunityDetails again:
-        // Line 87: `collection(db, 'communities', communityId, 'members')` - Subcollection!
-        // Line 128: `await updateDoc... members: arrayUnion(uid)`. This updates the array on the doc.
-        // So we need to do BOTH or at least what is expected.
-        // The previous code in CreateCommunity tried to update `members` with an OBJECT `{userId, name...}`.
-        // If `members` field on doc expects IDs (array of strings), pushing an object might break it or be inconsistent.
-        // If line 128 in CommunityDetails pushes a UID string, then `members` should be strings.
-        // I will fix CreateCommunity to push UID to `members` array, AND create the subcollection doc.
-      });
+        // Add creator as member
+        await updateDoc(doc(db, 'communities', newCommunity.id), {
+          members: arrayUnion(userId)
+        });
 
-      // Create member in subcollection
-      await setDoc(doc(db, 'communities', newCommunity.id, 'members', userId), {
-        id: userId,
-        name: userName,
-        role: 'admin',
-        joinedAt: new Date().toISOString(),
-        avatar: 'CU' // Placeholder
-      });
+        // Create member in subcollection
+        await setDoc(doc(db, 'communities', newCommunity.id, 'members', userId), {
+          id: userId,
+          name: userName,
+          role: 'admin',
+          joinedAt: new Date().toISOString(),
+          avatar: 'CU' // Placeholder
+        });
 
-      toast.success('Community created successfully! You are now the admin.');
-      onSuccess(newCommunity.id);
+        toast.success('Community created successfully! You are now the admin.');
+        onSuccess(newCommunity.id);
+      }
     } catch (err: any) {
-      toast.error(err.message || 'Failed to create community');
+      toast.error(err.message || 'Failed to save community');
       console.error(err);
     } finally {
       setIsSubmitting(false);
@@ -211,10 +218,10 @@ export function CreateCommunity({ onBack, onSuccess, userId, userName }: CreateC
             className="flex items-center gap-2 text-white/80 hover:text-white mb-4 transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
-            Back to Communities
+            {isEditing ? 'Cancel Edit' : 'Back to Communities'}
           </button>
-          <h1 className="text-4xl mb-2">Create a Community</h1>
-          <p className="text-white/90">Build a space for readers to connect and discuss</p>
+          <h1 className="text-4xl mb-2">{isEditing ? 'Edit Community' : 'Create a Community'}</h1>
+          <p className="text-white/90">{isEditing ? 'Update community details' : 'Build a space for readers to connect and discuss'}</p>
         </div>
       </div>
 
@@ -437,7 +444,7 @@ export function CreateCommunity({ onBack, onSuccess, userId, userName }: CreateC
               className="flex-1 bg-[#C4A672] hover:bg-[#8B7355] text-white"
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Creating...' : 'Create Community'}
+              {isSubmitting ? (isEditing ? 'Updating...' : 'Creating...') : (isEditing ? 'Update Community' : 'Create Community')}
             </Button>
           </div>
         </form>
