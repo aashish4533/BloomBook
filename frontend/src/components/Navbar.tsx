@@ -166,99 +166,11 @@ export function Navbar({
         </div>
       </nav>
 
-      {/* Desktop Navbar - Fixed Top */}
-      <nav className="hidden md:block fixed top-0 left-0 right-0 bg-[#C4A672] shadow-lg z-50">
+      {/* Desktop Navbar - Sticky Top */}
+      <nav className="hidden md:block sticky top-0 w-full bg-[#C4A672] shadow-lg z-50">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-4">
-              {/* Sidebar Menu Trigger */}
-              <Sheet>
-                <SheetTrigger asChild>
-                  <button className="flex items-center gap-2 px-3 py-2 bg-[#2C3E50]/10 hover:bg-[#2C3E50]/20 rounded-lg transition-colors">
-                    <Menu className="w-5 h-5 text-[#2C3E50]" />
-                    <span className="text-sm font-bold text-[#2C3E50]"></span>
-                  </button>
-                </SheetTrigger>
-                <SheetContent side="left" className="w-[300px] bg-[#FAF8F3]">
-                  <SheetHeader className="pb-6 border-b border-[#C4A672]/20">
-                    <SheetTitle className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-[#2C3E50] rounded-lg flex items-center justify-center">
-                        <BookOpen className="w-4 h-4 text-white" />
-                      </div>
-                      <span className="text-[#2C3E50] font-bold">BookBloom Menu</span>
-                    </SheetTitle>
-                    <SheetDescription className="sr-only">Mobile navigation menu</SheetDescription>
-                  </SheetHeader>
-                  <div className="py-6 space-y-2">
-                    <div className="px-2 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Academic Resources
-                    </div>
-                    <SheetClose asChild>
-                      <Link to="/tuition" className="flex items-center justify-between p-3 rounded-lg hover:bg-[#C4A672]/10 text-[#2C3E50] group transition-colors">
-                        <div className="flex items-center gap-3">
-                          <GraduationCap className="w-5 h-5 text-[#C4A672]" />
-                          <span className="font-medium">Tuition Hub</span>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#C4A672]" />
-                      </Link>
-                    </SheetClose>
-                    <SheetClose asChild>
-                      <Link to="/notes" className="flex items-center justify-between p-3 rounded-lg hover:bg-[#C4A672]/10 text-[#2C3E50] group transition-colors">
-                        <div className="flex items-center gap-3">
-                          <FileText className="w-5 h-5 text-[#C4A672]" />
-                          <span className="font-medium">Material/Notes</span>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#C4A672]" />
-                      </Link>
-                    </SheetClose>
-
-                    <div className="px-2 mt-6 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Company
-                    </div>
-                    <SheetClose asChild>
-                      <Link to="/about" className="flex items-center justify-between p-3 rounded-lg hover:bg-[#C4A672]/10 text-[#2C3E50] group transition-colors">
-                        <div className="flex items-center gap-3">
-                          <Info className="w-5 h-5 text-[#C4A672]" />
-                          <span className="font-medium">About Us</span>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#C4A672]" />
-                      </Link>
-                    </SheetClose>
-                    <SheetClose asChild>
-                      <Link to="/contact" className="flex items-center justify-between p-3 rounded-lg hover:bg-[#C4A672]/10 text-[#2C3E50] group transition-colors">
-                        <div className="flex items-center gap-3">
-                          <Phone className="w-5 h-5 text-[#C4A672]" />
-                          <span className="font-medium">Contact Us</span>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#C4A672]" />
-                      </Link>
-                    </SheetClose>
-
-                    <div className="px-2 mt-6 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Support
-                    </div>
-                    <SheetClose asChild>
-                      <Link to="/help" className="flex items-center justify-between p-3 rounded-lg hover:bg-[#C4A672]/10 text-[#2C3E50] group transition-colors">
-                        <div className="flex items-center gap-3">
-                          <HelpCircle className="w-5 h-5 text-[#C4A672]" />
-                          <span className="font-medium">Help & FAQ</span>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#C4A672]" />
-                      </Link>
-                    </SheetClose>
-                    <SheetClose asChild>
-                      <Link to="/terms" className="flex items-center justify-between p-3 rounded-lg hover:bg-[#C4A672]/10 text-[#2C3E50] group transition-colors">
-                        <div className="flex items-center gap-3">
-                          <Shield className="w-5 h-5 text-[#C4A672]" />
-                          <span className="font-medium">Terms of Service</span>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#C4A672]" />
-                      </Link>
-                    </SheetClose>
-                  </div>
-                </SheetContent>
-              </Sheet>
-
               {/* Logo */}
               <Link to="/" className="flex items-center gap-2 group">
                 <div className="relative w-10 h-10 flex items-center justify-center bg-[#2C3E50] rounded-lg group-hover:bg-[#1a252f] transition-colors">
@@ -314,7 +226,7 @@ export function Navbar({
 
                     {/* Dropdown Menu */}
                     {showProfileDropdown && (
-                      <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 py-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
                         {/* User Info */}
                         <div className="px-4 py-3 border-b border-gray-200">
                           <p className="text-sm text-gray-500">Signed in as</p>
@@ -444,7 +356,6 @@ export function Navbar({
         </div>
       </nav>
 
-      <div className="hidden md:block h-16" />
       {/* Spacer for mobile top navbar */}
       <div className="md:hidden h-16" />
       {/* Spacer for mobile bottom tab bar */}

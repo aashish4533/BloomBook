@@ -109,9 +109,10 @@ export function NotesHub() {
             toast.success('Notes uploaded successfully!');
             setIsUploading(false);
             setUploadForm({ title: '', subject: '', description: '', file: null });
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
-            toast.error('Failed to upload notes');
+            const errorMessage = err?.message || 'Failed to upload notes';
+            toast.error(`Upload failed: ${errorMessage}`);
             setIsUploading(false);
         }
     };
@@ -249,7 +250,19 @@ export function NotesHub() {
                                     <Button
                                         variant="outline"
                                         className="flex-1"
-                                        onClick={() => window.open(note.fileUrl, '_blank')}
+                                        onClick={() => {
+                                            let downloadUrl = note.fileUrl;
+                                            if (note.fileUrl.includes('cloudinary.com') && note.fileUrl.includes('/upload/') && !note.fileUrl.includes('/fl_attachment/')) {
+                                                downloadUrl = note.fileUrl.replace('/upload/', '/upload/fl_attachment/');
+                                            }
+                                            const link = document.createElement('a');
+                                            link.href = downloadUrl;
+                                            link.download = `${note.title}.pdf`;
+                                            link.target = '_blank'; // Important for cross-origin downloads sometimes
+                                            document.body.appendChild(link);
+                                            link.click();
+                                            document.body.removeChild(link);
+                                        }}
                                     >
                                         <Download className="w-4 h-4 mr-2" />
                                         Download

@@ -34,7 +34,19 @@ export function NotesViewer({
 
   const handleDownload = () => {
     if (fileUrl) {
-      window.open(fileUrl, '_blank');
+      // Check if it's a Cloudinary URL and add fl_attachment flag to force download
+      let downloadUrl = fileUrl;
+      if (fileUrl.includes('cloudinary.com') && fileUrl.includes('/upload/') && !fileUrl.includes('/fl_attachment/')) {
+        downloadUrl = fileUrl.replace('/upload/', '/upload/fl_attachment/');
+      }
+
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `${title}.pdf`;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     } else {
       alert('No file URL provided');
     }
@@ -46,7 +58,7 @@ export function NotesViewer({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/90 flex flex-col z-50">
+    <div className="fixed inset-0 bg-black/90 flex flex-col z-[100]">
       {/* Header */}
       <div className="bg-[#1E1E1E] border-b border-gray-700 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -72,28 +84,7 @@ export function NotesViewer({
       {/* Toolbar */}
       <div className="bg-[#2A2A2A] border-b border-gray-700 px-6 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          {/* Zoom Controls */}
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleZoomOut}
-              disabled={zoom <= 50}
-              className="text-white hover:bg-gray-700"
-            >
-              <ZoomOut className="w-4 h-4" />
-            </Button>
-            <span className="text-white text-sm w-16 text-center">{zoom}%</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleZoomIn}
-              disabled={zoom >= 200}
-              className="text-white hover:bg-gray-700"
-            >
-              <ZoomIn className="w-4 h-4" />
-            </Button>
-          </div>
+          <div className="flex-1"></div> {/* Spacer */}
 
           {/* Actions */}
           <div className="flex items-center gap-2">
@@ -123,11 +114,24 @@ export function NotesViewer({
       {/* Document Viewer */}
       <div className="flex-1 overflow-hidden bg-gray-800 relative">
         {fileUrl ? (
-          <iframe
-            src={fileUrl}
-            className="w-full h-full border-0"
-            title="PDF Viewer"
-          />
+          <div className="w-full h-full relative">
+            <iframe
+              src={`https://docs.google.com/gview?url=${encodeURIComponent(fileUrl)}&embedded=true`}
+              className="w-full h-full border-0"
+              title="PDF Viewer"
+            />
+            <div className="absolute bottom-4 right-4 z-10">
+              <a
+                href={fileUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="bg-black/80 hover:bg-black text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors"
+              >
+                <Share2 className="w-4 h-4" />
+                Open Original File
+              </a>
+            </div>
+          </div>
         ) : (
           <div className="flex items-center justify-center h-full text-white">
             No PDF URL provided

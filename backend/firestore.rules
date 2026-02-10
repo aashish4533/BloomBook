@@ -128,6 +128,13 @@ service cloud.firestore {
       allow read: if isAuthenticated() && (resource.data.renterId == request.auth.uid || resource.data.ownerId == request.auth.uid || isAdmin());
       allow write: if isAuthenticated();
     }
+
+    // --- Notes ---
+    match /notes/{noteId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && (resource.data.authorId == request.auth.uid || isAdmin());
+    }
     
     // Default deny for other collections (safety)
     match /{document=**} {
