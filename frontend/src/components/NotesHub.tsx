@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileText, Upload, Search, Filter, ArrowLeft, Download, Eye } from 'lucide-react';
+import { FileText, Upload, Search, ArrowLeft, Download, Eye, Trash2, Pencil } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
@@ -7,11 +7,12 @@ import { Badge } from './ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from './ui/dialog';
 import { Label } from './ui/label';
 import { db, auth } from '../firebase';
-import { collection, addDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, deleteDoc, updateDoc, doc, serverTimestamp, query, orderBy } from 'firebase/firestore';
 import { useCollection } from 'react-firebase-hooks/firestore';
 import { toast } from 'sonner';
 import { NotesViewer } from './NotesViewer';
 import { useNavigate } from 'react-router-dom';
+import { downloadFile } from '../utils/fileHandler';
 
 interface Note {
     id: string;
@@ -21,7 +22,7 @@ interface Note {
     authorId: string;
     description: string;
     fileUrl: string;
-    fileType: string; // 'pdf'
+    fileType: string;
     createdAt: any;
     downloads: number;
     views: number;
@@ -39,11 +40,21 @@ export function NotesHub() {
         file: null as File | null
     });
 
+    // Edit state
+    const [editingNote, setEditingNote] = useState<Note | null>(null);
+    const [editForm, setEditForm] = useState({ title: '', subject: '', description: '' });
+    const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+    // Delete confirmation state
+    const [deletingNote, setDeletingNote] = useState<Note | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
     const [value, loading, error] = useCollection(
         query(collection(db, 'notes'), orderBy('createdAt', 'desc'))
     );
 
     const notes = value?.docs.map(doc => ({ id: doc.id, ...doc.data() } as Note)) || [];
+    const currentUserId = auth.currentUser?.uid;
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -81,7 +92,6 @@ export function NotesHub() {
             const formData = new FormData();
             formData.append('file', uploadForm.file);
             formData.append('upload_preset', uploadPreset);
-            // Resource type auto allows PDF
 
             const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
                 method: 'POST',
@@ -116,6 +126,57 @@ export function NotesHub() {
             setIsUploading(false);
         }
     };
+
+    // ── Edit handler ────────────────────────────────────────────────────
+
+    const openEditDialog = (note: Note) => {
+        setEditForm({ title: note.title, subject: note.subject, description: note.description });
+        setEditingNote(note);
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editingNote) return;
+        if (!editForm.title.trim() || !editForm.subject.trim()) {
+            toast.error('Title and subject are required');
+            return;
+        }
+
+        setIsSavingEdit(true);
+        try {
+            await updateDoc(doc(db, 'notes', editingNote.id), {
+                title: editForm.title.trim(),
+                subject: editForm.subject.trim(),
+                description: editForm.description.trim(),
+            });
+            toast.success('Note updated successfully!');
+            setEditingNote(null);
+        } catch (err: any) {
+            console.error(err);
+            toast.error(err?.message || 'Failed to update note');
+        } finally {
+            setIsSavingEdit(false);
+        }
+    };
+
+    // ── Delete handler ──────────────────────────────────────────────────
+
+    const handleDelete = async () => {
+        if (!deletingNote) return;
+
+        setIsDeleting(true);
+        try {
+            await deleteDoc(doc(db, 'notes', deletingNote.id));
+            toast.success('Note deleted successfully!');
+            setDeletingNote(null);
+        } catch (err: any) {
+            console.error(err);
+            toast.error(err?.message || 'Failed to delete note');
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    // ── Filtering ───────────────────────────────────────────────────────
 
     const filteredNotes = notes.filter(note =>
         note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -222,58 +283,74 @@ export function NotesHub() {
                     <div>Loading notes...</div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {filteredNotes.map((note) => (
-                            <Card key={note.id} className="hover:shadow-lg transition-shadow p-6">
-                                <div className="flex items-start justify-between mb-4">
-                                    <div className="p-3 bg-red-100 rounded-lg">
-                                        <FileText className="w-6 h-6 text-red-500" />
+                        {filteredNotes.map((note) => {
+                            const isOwner = currentUserId === note.authorId;
+
+                            return (
+                                <Card key={note.id} className="hover:shadow-lg transition-shadow p-6">
+                                    <div className="flex items-start justify-between mb-4">
+                                        <div className="p-3 bg-red-100 rounded-lg">
+                                            <FileText className="w-6 h-6 text-red-500" />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant="outline">{note.subject}</Badge>
+                                            {/* Owner actions */}
+                                            {isOwner && (
+                                                <>
+                                                    <button
+                                                        onClick={() => openEditDialog(note)}
+                                                        className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400 hover:text-blue-600 transition-colors"
+                                                        title="Edit note"
+                                                    >
+                                                        <Pencil className="w-4 h-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setDeletingNote(note)}
+                                                        className="p-1.5 rounded-md hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
+                                                        title="Delete note"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
-                                    <Badge variant="outline">{note.subject}</Badge>
-                                </div>
 
-                                <h3 className="text-lg font-semibold text-[#2C3E50] mb-2">{note.title}</h3>
-                                <p className="text-sm text-gray-600 mb-4 line-clamp-2">{note.description}</p>
+                                    <h3 className="text-lg font-semibold text-[#2C3E50] mb-2">{note.title}</h3>
+                                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">{note.description}</p>
 
-                                <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
-                                    <span>By {note.authorName}</span>
-                                    <span>{new Date(note.createdAt?.toDate()).toLocaleDateString()}</span>
-                                </div>
+                                    <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+                                        <span>By {note.authorName}</span>
+                                        <span>{note.createdAt?.toDate ? new Date(note.createdAt.toDate()).toLocaleDateString() : ''}</span>
+                                    </div>
 
-                                <div className="flex gap-2">
-                                    <Button
-                                        className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800"
-                                        onClick={() => setSelectedNote(note)}
-                                    >
-                                        <Eye className="w-4 h-4 mr-2" />
-                                        View
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        className="flex-1"
-                                        onClick={() => {
-                                            let downloadUrl = note.fileUrl;
-                                            if (note.fileUrl.includes('cloudinary.com') && note.fileUrl.includes('/upload/') && !note.fileUrl.includes('/fl_attachment/')) {
-                                                downloadUrl = note.fileUrl.replace('/upload/', '/upload/fl_attachment/');
-                                            }
-                                            const link = document.createElement('a');
-                                            link.href = downloadUrl;
-                                            link.download = `${note.title}.pdf`;
-                                            link.target = '_blank'; // Important for cross-origin downloads sometimes
-                                            document.body.appendChild(link);
-                                            link.click();
-                                            document.body.removeChild(link);
-                                        }}
-                                    >
-                                        <Download className="w-4 h-4 mr-2" />
-                                        Download
-                                    </Button>
-                                </div>
-                            </Card>
-                        ))}
+                                    <div className="flex gap-2">
+                                        <Button
+                                            className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800"
+                                            onClick={() => setSelectedNote(note)}
+                                        >
+                                            <Eye className="w-4 h-4 mr-2" />
+                                            View
+                                        </Button>
+
+                                        <Button
+                                            variant="outline"
+                                            className="flex-1"
+                                            disabled={!note.fileUrl}
+                                            onClick={() => downloadFile(note.fileUrl, `${note.title}.pdf`)}
+                                        >
+                                            <Download className="w-4 h-4 mr-2" />
+                                            Download
+                                        </Button>
+                                    </div>
+                                </Card>
+                            );
+                        })}
                     </div>
                 )}
             </div>
 
+            {/* ── NotesViewer overlay ──────────────────────────────────────── */}
             {selectedNote && (
                 <NotesViewer
                     title={selectedNote.title}
@@ -282,6 +359,80 @@ export function NotesHub() {
                     onClose={() => setSelectedNote(null)}
                 />
             )}
+
+            {/* ── Edit Dialog ─────────────────────────────────────────────── */}
+            <Dialog open={!!editingNote} onOpenChange={(open) => !open && setEditingNote(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Edit Note</DialogTitle>
+                        <DialogDescription>
+                            Update the details of your uploaded note.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="edit-title">Title</Label>
+                            <Input
+                                id="edit-title"
+                                value={editForm.title}
+                                onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="edit-subject">Subject</Label>
+                            <Input
+                                id="edit-subject"
+                                value={editForm.subject}
+                                onChange={(e) => setEditForm({ ...editForm, subject: e.target.value })}
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="edit-description">Description</Label>
+                            <Input
+                                id="edit-description"
+                                value={editForm.description}
+                                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                            />
+                        </div>
+                        <div className="flex gap-2 justify-end">
+                            <Button variant="outline" onClick={() => setEditingNote(null)}>
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={handleSaveEdit}
+                                disabled={isSavingEdit}
+                                className="bg-[#C4A672] hover:bg-[#8B7355] text-white"
+                            >
+                                {isSavingEdit ? 'Saving…' : 'Save Changes'}
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* ── Delete Confirmation Dialog ──────────────────────────────── */}
+            <Dialog open={!!deletingNote} onOpenChange={(open) => !open && setDeletingNote(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete Note</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to delete <strong>"{deletingNote?.title}"</strong>? This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex gap-2 justify-end pt-4">
+                        <Button variant="outline" onClick={() => setDeletingNote(null)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleDelete}
+                            disabled={isDeleting}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                        >
+                            {isDeleting ? 'Deleting…' : 'Delete'}
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
