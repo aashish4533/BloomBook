@@ -36,6 +36,7 @@ export function NotesHub() {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedNote, setSelectedNote] = useState<Note | null>(null);
     const [isUploading, setIsUploading] = useState(false);
+    const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false); // New state for dialog visibility
     const [uploadProgress, setUploadProgress] = useState(0); // Progress state
     const [uploadForm, setUploadForm] = useState({
         title: '',
@@ -134,7 +135,7 @@ export function NotesHub() {
                         toast.success('Material uploaded successfully!');
                         // Reset form
                         setUploadForm({ title: '', subject: '', description: '', file: null });
-                        // Close dialog (handled by isUploading state in UI logic if we want, or manually)
+                        setIsUploadDialogOpen(false); // Close dialog
 
                     } catch (dbError: any) {
                         console.error("Database error:", dbError);
@@ -230,7 +231,7 @@ export function NotesHub() {
                             <p className="text-white/80">Share and discover study materials</p>
                         </div>
 
-                        <Dialog open={isUploading} onOpenChange={(open: boolean) => !isUploading && setIsUploading(open)}>
+                        <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
                             <DialogTrigger asChild>
                                 <Button className="bg-[#C4A672] hover:bg-[#8B7355] text-white">
                                     <Upload className="w-4 h-4 mr-2" />

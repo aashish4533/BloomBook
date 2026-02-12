@@ -29,6 +29,28 @@ export const TutorVerificationForm: React.FC = () => {
         return await getDownloadURL(storageRef);
     };
 
+    const validateFile = (file: File) => {
+        const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+        if (!validTypes.includes(file.type)) {
+            setError('Invalid file type. Only PDF, JPG, and PNG are allowed.');
+            return false;
+        }
+        return true;
+    };
+
+    const onFileChange = (e: React.ChangeEvent<HTMLInputElement>, setFile: React.Dispatch<React.SetStateAction<File | null>>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            if (validateFile(file)) {
+                setError(null);
+                setFile(file);
+            } else {
+                e.target.value = ''; // Reset input
+                setFile(null);
+            }
+        }
+    };
+
     const handleIdentitySubmit = async () => {
         if (!idFile || !selfieFile) {
             setError('Please upload both ID and Selfie.');
@@ -134,12 +156,22 @@ export const TutorVerificationForm: React.FC = () => {
                         <h2 className="text-2xl font-semibold">Identity Verification</h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Government ID</label>
-                                <input type="file" onChange={(e) => setIdFile(e.target.files?.[0] || null)} className="w-full border p-2 rounded" />
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Government ID (PDF, JPG, PNG)</label>
+                                <input
+                                    type="file"
+                                    accept=".pdf,.jpg,.jpeg,.png"
+                                    onChange={(e) => onFileChange(e, setIdFile)}
+                                    className="w-full border p-2 rounded"
+                                />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Selfie</label>
-                                <input type="file" onChange={(e) => setSelfieFile(e.target.files?.[0] || null)} className="w-full border p-2 rounded" />
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Selfie (JPG, PNG)</label>
+                                <input
+                                    type="file"
+                                    accept=".jpg,.jpeg,.png"
+                                    onChange={(e) => onFileChange(e, setSelfieFile)}
+                                    className="w-full border p-2 rounded"
+                                />
                             </div>
                         </div>
                         <button
@@ -156,8 +188,13 @@ export const TutorVerificationForm: React.FC = () => {
                     <div className="space-y-6">
                         <h2 className="text-2xl font-semibold">Certificate Verification</h2>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Upload Degree/Certificate</label>
-                            <input type="file" onChange={(e) => setCertFile(e.target.files?.[0] || null)} className="w-full border p-2 rounded" />
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Upload Degree/Certificate (PDF, JPG, PNG)</label>
+                            <input
+                                type="file"
+                                accept=".pdf,.jpg,.jpeg,.png"
+                                onChange={(e) => onFileChange(e, setCertFile)}
+                                className="w-full border p-2 rounded"
+                            />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <input
