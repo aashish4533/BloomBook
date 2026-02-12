@@ -1,16 +1,16 @@
-// Updated src/components/AdminDashboard.tsx
 import { UserManagement } from './Admin/UserManagement';
 import { BookInventory } from './Admin/BookInventory';
 import { RentalManagement } from './Admin/RentalManagement';
 import { TransactionHistory } from './Admin/TransactionHistory';
 import { SystemSettings } from './Admin/SystemSettings';
 import { CommunityManagement } from './Admin/CommunityManagement';
+import { NotesManagement } from './Admin/NotesManagement'; // New Import
 import { Button } from './ui/button';
-import { Users, BookOpen, Calendar, DollarSign, Settings, LogOut, BarChart3, Shield, MessageCircle, Bell } from 'lucide-react';
+import { Users, BookOpen, Calendar, DollarSign, Settings, LogOut, BarChart3, Shield, MessageCircle, Bell, FileText } from 'lucide-react'; // Added FileText
 import { Outlet, NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
-import { auth, db } from '../firebase'; // Ensure db is imported
+import { auth, db } from '../firebase';
 import { collection, getAggregateFromServer, sum, count, doc, getDoc, setDoc } from 'firebase/firestore';
-import { useEffect, useState } from 'react'; // Consolidated imports
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 interface AdminDashboardProps {
@@ -95,6 +95,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     { id: 'books', label: 'Book Inventory', icon: BookOpen, path: '/admin/dashboard/books' },
     { id: 'rentals', label: 'Rental Management', icon: Calendar, path: '/admin/dashboard/rentals' },
     { id: 'transactions', label: 'Transaction History', icon: DollarSign, path: '/admin/dashboard/transactions' },
+    { id: 'notes', label: 'Notes Management', icon: FileText, path: '/admin/dashboard/notes' }, // Integrated new tab
     { id: 'communities', label: 'Communities', icon: MessageCircle, path: '/admin/dashboard/communities' },
     { id: 'announcements', label: 'Announcements', icon: Bell, path: '/admin/dashboard/announcements' },
     { id: 'settings', label: 'System Settings', icon: Settings, path: '/admin/dashboard/settings' },

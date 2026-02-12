@@ -1,4 +1,3 @@
-// Updated src/components/BookCard.tsx
 import { Book } from './BookMarketplace';
 import { Star, User, Tag, Calendar, ShoppingCart } from 'lucide-react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
@@ -9,6 +8,8 @@ import { auth } from '../firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { handleAuthCheck } from '../utils/auth';
+import { useWishlist } from '../hooks/useWishlist';
+import { useUserRole } from '../context/UserRoleContext';
 
 interface BookCardProps {
   book: Book;
@@ -20,6 +21,8 @@ export function BookCard({ book, onClick }: BookCardProps) {
   const [user] = useAuthState(auth);
   const navigate = useNavigate();
   const location = useLocation();
+  const { isInWishlist, toggleWishlist } = useWishlist();
+  const { isAdmin } = useUserRole();
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -33,9 +36,15 @@ export function BookCard({ book, onClick }: BookCardProps) {
       image: book.images?.[0] || '',
       type: book.type === 'rent' ? 'rent' : 'buy',
       sellerName: book.seller?.name || 'Unknown',
-      sellerId: book.userId || 'unknown' // Book type in marketplace might not have sellerId at top level, keeping safe
+      sellerId: book.userId || 'unknown'
     });
   };
+
+  const handleToggleWishlist = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    toggleWishlist(book);
+  };
+
   const getConditionColor = (condition: string) => {
     switch (condition) {
       case 'New':
@@ -52,35 +61,6 @@ export function BookCard({ book, onClick }: BookCardProps) {
     }
   };
 
-  const getTypeBadge = (book: Book) => {
-    const badges = [];
-    if (book.availableFor?.includes('sale')) {
-      badges.push(<Badge key="sale" className="bg-blue-100 text-blue-800 absolute top-2 right-2">For Sale</Badge>);
-    }
-    if (book.availableFor?.includes('rent')) {
-      badges.push(<Badge key="rent" className="bg-purple-100 text-purple-800 absolute top-2 right-20">Rent</Badge>); // Adjust positioning if needed or stack them
-    }
-    if (book.availableFor?.includes('exchange')) {
-      badges.push(<Badge key="exchange" className="bg-orange-100 text-orange-800 absolute top-2 right-2">Exchange</Badge>);
-    }
-
-    // Fallback if availableFor is not set but type is
-    if (!book.availableFor || book.availableFor.length === 0) {
-      if (book.type === 'sell') return <Badge className="bg-blue-100 text-blue-800 absolute top-2 right-2">For Sale</Badge>;
-      if (book.type === 'rent') return <Badge className="bg-purple-100 text-purple-800 absolute top-2 right-2">For Rent</Badge>;
-      if (book.type === 'exchange') return <Badge className="bg-orange-100 text-orange-800 absolute top-2 right-2">Exchange</Badge>;
-    }
-
-    // For now, let's just show the primary one or stack them properly? 
-    // Simplified: Just show primary badge based on priority or a simplified "Multiple" badge?
-    // Let's stack them horizontally or just show the most relevant one for now to avoid UI clutter
-    if (book.availableFor?.includes('sale')) return <Badge className="bg-blue-100 text-blue-800 absolute top-2 right-2">For Sale</Badge>;
-    if (book.availableFor?.includes('rent')) return <Badge className="bg-purple-100 text-purple-800 absolute top-2 right-2">For Rent</Badge>;
-    if (book.availableFor?.includes('exchange')) return <Badge className="bg-orange-100 text-orange-800 absolute top-2 right-2">Exchange</Badge>;
-
-    return null;
-  };
-
   return (
     <div
       onClick={onClick}
@@ -94,6 +74,17 @@ export function BookCard({ book, onClick }: BookCardProps) {
           alt={book.title}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
         />
+
+        {/* Wishlist Button - Only for Admins */}
+        {isAdmin && (
+          <button
+            onClick={handleToggleWishlist}
+            className="absolute top-2 left-2 p-1.5 rounded-full bg-white/80 hover:bg-white text-gray-500 hover:text-red-500 transition-colors z-10"
+          >
+            <Star className={`w-4 h-4 ${isInWishlist(book.id) ? 'fill-red-500 text-red-500' : ''}`} />
+          </button>
+        )}
+
         <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
           {book.availableFor?.includes('sale') && <Badge className="bg-blue-100 text-blue-800 shadow-sm">Sale</Badge>}
           {book.availableFor?.includes('rent') && <Badge className="bg-purple-100 text-purple-800 shadow-sm">Rent</Badge>}

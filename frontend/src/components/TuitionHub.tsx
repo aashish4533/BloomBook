@@ -317,85 +317,18 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-[#2C3E50] text-2xl">Available Tutors ({tutors.length})</h2>
             <div className="flex gap-2">
-              <Dialog open={isRegistering} onOpenChange={setIsRegistering}>
-                <DialogTrigger asChild>
-                  <Button className="bg-[#C4A672] hover:bg-[#8B7355] text-white">
-                    Become a Tutor
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                  <DialogHeader>
-                    <DialogTitle>Register as a Tutor</DialogTitle>
-                    <DialogDescription>
-                      Fill out the form below to become a tutor.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="subject">Subject</Label>
-                      <Input
-                        id="subject"
-                        value={tutorForm.subject}
-                        onChange={(e) => setTutorForm({ ...tutorForm, subject: e.target.value })}
-                        placeholder="e.g. Mathematics"
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="specialization">Specialization</Label>
-                      <Input
-                        id="specialization"
-                        value={tutorForm.specialization}
-                        onChange={(e) => setTutorForm({ ...tutorForm, specialization: e.target.value })}
-                        placeholder="e.g. Calculus"
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="rate">Hourly Rate (PKR)</Label>
-                      <Input
-                        id="rate"
-                        type="number"
-                        value={tutorForm.hourlyRate}
-                        onChange={(e) => setTutorForm({ ...tutorForm, hourlyRate: e.target.value })}
-                        placeholder="1500"
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="experience">Experience</Label>
-                      <Input
-                        id="experience"
-                        value={tutorForm.experience}
-                        onChange={(e) => setTutorForm({ ...tutorForm, experience: e.target.value })}
-                        placeholder="e.g. 5 years"
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="bio">Bio</Label>
-                      <Textarea
-                        id="bio"
-                        value={tutorForm.bio}
-                        onChange={(e) => setTutorForm({ ...tutorForm, bio: e.target.value })}
-                        placeholder="Tell students about yourself..."
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="availableHours">Available Hours</Label>
-                      <Input
-                        id="availableHours"
-                        value={tutorForm.availableHours}
-                        onChange={(e) => setTutorForm({ ...tutorForm, availableHours: e.target.value })}
-                        placeholder="e.g. Mon-Fri, 5 PM - 8 PM"
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label>Degree/Certificate (Verification)</Label>
-                      <Input type="file" onChange={handleCertUpload} />
-                    </div>
-                    <Button onClick={handleBecomeTutor} className="bg-[#C4A672] text-white">
-                      Submit Application
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
+              <Button
+                onClick={() => {
+                  if (!isLoggedIn) {
+                    toast.error("Please login to register as a tutor");
+                    return;
+                  }
+                  navigate('/tutor-verification');
+                }}
+                className="bg-[#C4A672] hover:bg-[#8B7355] text-white"
+              >
+                Become a Tutor
+              </Button>
               <Dialog open={isPostingRequest} onOpenChange={setIsPostingRequest}>
                 <DialogTrigger asChild>
                   <Button className="bg-[#2C3E50] text-white hover:bg-[#1a252f]">

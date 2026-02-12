@@ -17,28 +17,21 @@ service cloud.firestore {
 
     // --- Users Collection ---
     match /users/{userId} {
-      // Allow anyone to read user profiles (needed for posts, comments, etc.)
       allow read: if true;
-      // Only the user themselves or an admin can edit the profile
       allow write: if isAuthenticated() && (isOwner(userId) || isAdmin());
     }
 
     // --- Notifications ---
     match /notifications/{notificationId} {
-      // Users can only read/write their own notifications
       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      // Allow creation if authenticated (system triggers usually handle this, but for client-side logic):
       allow create: if isAuthenticated();
-      // Allow users to mark their own notifications as read (update)
       allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
 
     // --- Announcements ---
     match /announcements/{announcementId} {
-      // Public read access
       allow read: if true;
-      // Only admins can create/update/delete announcements
       allow write: if isAdmin();
     }
 
@@ -53,11 +46,9 @@ service cloud.firestore {
     match /communities/{communityId} {
       allow read: if true;
       allow create: if isAuthenticated();
-      // Admin of the community OR System Admin can update/delete
-      allow update: if isAuthenticated(); // Needed for the 'members' array update to work
-      allow delete: if isAuthenticated() && resource.data.adminId == request.auth.uid; // Simplified check
+      allow update: if isAuthenticated(); 
+      allow delete: if isAuthenticated() && resource.data.adminId == request.auth.uid;
 
-      // Community Subcollections
       match /members/{memberId} {
         allow read: if true;
         allow write: if isAuthenticated();
@@ -66,12 +57,10 @@ service cloud.firestore {
         allow read: if true;
         allow write: if isAuthenticated();
 
-        // Comments on posts
         match /comments/{commentId} {
           allow read: if true;
           allow write: if isAuthenticated();
 
-          // Replies to comments
           match /replies/{replyId} {
             allow read: if true;
             allow write: if isAuthenticated();
@@ -83,7 +72,7 @@ service cloud.firestore {
       }
     }
 
-    // --- Global Posts (if used outside communities) ---
+    // --- Global Posts ---
     match /posts/{postId} {
       allow read: if true;
       allow write: if isAuthenticated();
@@ -129,14 +118,53 @@ service cloud.firestore {
       allow write: if isAuthenticated();
     }
 
-    // --- Notes ---
+    // --- Notes (Helping Material) ---
     match /notes/{noteId} {
       allow read: if true;
       allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && (resource.data.authorId == request.auth.uid || isAdmin());
+      // Allow update/delete if user email matches uploadedBy OR if user is admin
+      allow update, delete: if isAuthenticated() && (
+        request.auth.token.email == resource.data.uploadedBy || 
+        isAdmin()
+      );
+
+      // Comments subcollection for notes
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isAuthenticated();
+        // Allow author to delete/edit their own comment or admin
+        allow update, delete: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+      }
     }
     
-    // Default deny for other collections (safety)
+    // --- Wishlists ---
+    match /wishlists/{wishlistId} {
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    // --- Verification System ---
+    match /verifications/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if false; // Only via Cloud Functions
+    }
+
+    match /skillTests/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if false; // Only via Cloud Functions
+    }
+
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if false; // Only via Cloud Functions
+    }
+
+    match /tutors/{tutorId} {
+      allow read: if true;
+      allow update: if isAuthenticated() && request.auth.uid == tutorId;
+    }
+
+    // Default deny
     match /{document=**} {
       allow read, write: if false; 
     }

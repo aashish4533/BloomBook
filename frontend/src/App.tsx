@@ -5,6 +5,7 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, db } from './firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { CartProvider } from './context/CartContext';
+import { UserRoleProvider, useUserRole } from './context/UserRoleContext';
 
 // Layouts
 import { MainLayout } from './components/Layouts/MainLayout';
@@ -40,6 +41,7 @@ import { AdvancedSearch } from './components/AdvancedSearch';
 import { WishlistPage } from './components/WishlistPage';
 import { TuitionHub } from './components/TuitionHub';
 import { NotesHub } from './components/NotesHub';
+import { TutorVerificationForm } from './components/TutorVerificationForm';
 import { DeliveryTracking } from './components/DeliveryTracking';
 
 // User Dashboard Sub-components
@@ -59,8 +61,9 @@ import { BookInventory } from './components/Admin/BookInventory';
 import { RentalManagement } from './components/Admin/RentalManagement';
 import { TransactionHistory } from './components/Admin/TransactionHistory';
 import { CommunityManagement } from './components/Admin/CommunityManagement';
+import { NotesManagement } from './components/Admin/NotesManagement';
 import { SystemSettings } from './components/Admin/SystemSettings';
-import { Button } from './components/ui/button'; // For Admin Announcements placeholder
+import { Button } from './components/ui/button';
 
 // Wrappers for components that need navigation or location state
 function SellBookFlowWrapper() {
@@ -181,121 +184,103 @@ function AdminAnnouncementsWrapper() {
   );
 }
 
-export default function App() {
-  const [userRole, setUserRole] = useState<'user' | 'admin' | null>(null);
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setCurrentUser(user);
-        try {
-          // Fetch role from Firestore
-          const docRef = doc(db, 'users', user.uid);
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists()) {
-            setUserRole(docSnap.data().role as 'user' | 'admin');
-          } else {
-            setUserRole('user');
-          }
-        } catch (e) {
-          console.error("Error fetching role", e);
-          setUserRole('user');
-        }
-      } else {
-        setUserRole(null);
-        setCurrentUser(null);
-      }
-      setIsLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
+function AppContent() {
+  const { user, loading } = useUserRole();
 
   const handleLogout = () => {
     auth.signOut();
-    setUserRole(null);
-    setCurrentUser(null);
+    // UserRoleContext handles state updates automatically via onAuthStateChanged
   };
 
-  if (isLoading) {
+  if (loading) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
 
   return (
-    <CartProvider>
-      <Router>
-        <Routes>
-          {/* Auth Routes */}
-          <Route element={<AuthLayout />}>
-            <Route path="/login" element={<LoginForm onLogin={() => setUserRole('user')} />} />
-            <Route path="/register" element={<SignUpForm onSignUp={() => setUserRole('user')} />} />
-            <Route path="/admin/login" element={<AdminLogin onLogin={() => setUserRole('admin')} />} />
-          </Route>
+    <Router>
+      <Routes>
+        {/* Auth Routes */}
+        <Route element={<AuthLayout />}>
+          <Route path="/login" element={<LoginForm onLogin={() => { }} />} />
+          <Route path="/register" element={<SignUpForm onSignUp={() => { }} />} />
+          <Route path="/admin/login" element={<AdminLogin onLogin={() => { }} />} />
+        </Route>
 
-          {/* Main App Routes */}
-          <Route element={<MainLayout isLoggedIn={!!currentUser} onLogout={handleLogout} />}>
-            {/* Public Routes */}
-            <Route path="/" element={<HomeScreen isLoggedIn={!!currentUser} />} />
-            <Route path="/about" element={<AboutPageWrapper />} />
-            <Route path="/contact" element={<ContactPage />} />
-            <Route path="/help" element={<HelpPage />} />
-            <Route path="/terms" element={<TermsPage />} />
+        {/* Main App Routes */}
+        <Route element={<MainLayout isLoggedIn={!!user} onLogout={handleLogout} />}>
+          {/* Public Routes */}
+          <Route path="/" element={<HomeScreen isLoggedIn={!!user} />} />
+          <Route path="/about" element={<AboutPageWrapper />} />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/help" element={<HelpPage />} />
+          <Route path="/terms" element={<TermsPage />} />
 
-            {/* Protected User Routes */}
-            <Route element={<ProtectedRoute isLoggedIn={!!currentUser} />}>
-              <Route path="/marketplace" element={<BookMarketplace />} />
-              <Route path="/book/:id" element={<BookDetailsPage />} />
-              <Route path="/sell" element={<SellBookFlowWrapper />} />
-              <Route path="/rent" element={<RentBookFlowWrapper />} />
-              <Route path="/exchange" element={<ExchangeBookFlowWrapper />} />
+          {/* Protected User Routes */}
+          <Route element={<ProtectedRoute isLoggedIn={!!user} />}>
+            <Route path="/marketplace" element={<BookMarketplace />} />
+            <Route path="/book/:id" element={<BookDetailsPage />} />
+            <Route path="/sell" element={<SellBookFlowWrapper />} />
+            <Route path="/rent" element={<RentBookFlowWrapper />} />
+            <Route path="/exchange" element={<ExchangeBookFlowWrapper />} />
 
-              <Route path="/communities" element={<CommunitiesBrowseWrapper />} />
-              <Route path="/communities/create" element={<CreateCommunityWrapper />} />
-              <Route path="/communities/:id" element={<CommunityDetails userId={currentUser?.uid} />} />
-              <Route path="/communities/:id/chat" element={<GroupChatWrapper />} />
+            <Route path="/communities" element={<CommunitiesBrowseWrapper />} />
+            <Route path="/communities/create" element={<CreateCommunityWrapper />} />
+            <Route path="/communities/:id" element={<CommunityDetails userId={user?.uid} />} />
+            <Route path="/communities/:id/chat" element={<GroupChatWrapper />} />
 
-              <Route path="/chat" element={<PrivateChatWrapper />} />
+            <Route path="/chat" element={<PrivateChatWrapper />} />
 
-              <Route path="/announcements" element={<AnnouncementsPage isAdmin={userRole === 'admin'} />} />
-              <Route path="/search" element={<AdvancedSearchWrapper />} />
-              <Route path="/wishlist" element={<WishlistPageWrapper />} />
+            <Route path="/announcements" element={<AnnouncementsPage />} />
+            <Route path="/search" element={<AdvancedSearchWrapper />} />
+            <Route path="/wishlist" element={<WishlistPageWrapper />} />
 
-              <Route path="/tuition" element={<TuitionHubWrapper />} />
-              <Route path="/notes" element={<NotesHub />} />
-              <Route path="/tracking/:orderId" element={<DeliveryTracking />} />
+            <Route path="/tuition" element={<TuitionHubWrapper />} />
+            <Route path="/notes" element={<NotesHub />} />
+            <Route path="/tracking/:orderId" element={<DeliveryTracking />} />
 
-              <Route path="/dashboard" element={<UserDashboard onLogout={handleLogout} />}>
-                <Route index element={<UserProfile />} />
-                <Route path="purchases" element={<PurchaseHistory />} />
-                <Route path="sales" element={<SalesHistory />} />
-                <Route path="rentals" element={<RentalHistory />} />
-                <Route path="wishlist" element={<DashboardWishlistWrapper />} />
-                <Route path="communities" element={<UserCommunities />} />
-                <Route path="chats" element={<UserChats />} />
-                <Route path="exchanges" element={<UserExchanges />} />
-                <Route path="negotiations" element={<NegotiationInbox />} />
-              </Route>
+            <Route path="/dashboard" element={<UserDashboard onLogout={handleLogout} />}>
+              <Route index element={<UserProfile />} />
+              <Route path="purchases" element={<PurchaseHistory />} />
+              <Route path="sales" element={<SalesHistory />} />
+              <Route path="rentals" element={<RentalHistory />} />
+              <Route path="wishlist" element={<DashboardWishlistWrapper />} />
+              <Route path="communities" element={<UserCommunities />} />
+              <Route path="chats" element={<UserChats />} />
+              <Route path="exchanges" element={<UserExchanges />} />
+              <Route path="negotiations" element={<NegotiationInbox />} />
             </Route>
 
-            {/* Admin Routes */}
-            <Route element={<AdminRoute userRole={userRole} />}>
-              <Route path="/admin/dashboard" element={<AdminDashboard onLogout={handleLogout} />}>
-                <Route index element={<UserManagement />} />
-                <Route path="books" element={<BookInventory />} />
-                <Route path="rentals" element={<RentalManagement />} />
-                <Route path="transactions" element={<TransactionHistory />} />
-                <Route path="communities" element={<CommunityManagement />} />
-                <Route path="announcements" element={<AdminAnnouncementsWrapper />} />
-                <Route path="settings" element={<SystemSettings />} />
-              </Route>
-            </Route>
+            <Route path="/tutor-verification" element={<TutorVerificationForm />} />
           </Route>
 
-          {/* Catch all */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Router>
-    </CartProvider >
+          {/* Admin Routes */}
+          <Route element={<AdminRoute />}>
+            <Route path="/admin/dashboard" element={<AdminDashboard onLogout={handleLogout} />}>
+              <Route index element={<UserManagement />} />
+              <Route path="books" element={<BookInventory />} />
+              <Route path="rentals" element={<RentalManagement />} />
+              <Route path="transactions" element={<TransactionHistory />} />
+              <Route path="notes" element={<NotesManagement />} />
+              <Route path="communities" element={<CommunityManagement />} />
+              <Route path="announcements" element={<AdminAnnouncementsWrapper />} />
+              <Route path="settings" element={<SystemSettings />} />
+            </Route>
+          </Route>
+        </Route>
+
+        {/* Catch all */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Router>
+  );
+}
+
+export default function App() {
+  return (
+    <UserRoleProvider>
+      <CartProvider>
+        <AppContent />
+      </CartProvider>
+    </UserRoleProvider>
   );
 }

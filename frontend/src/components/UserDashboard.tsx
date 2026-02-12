@@ -5,6 +5,7 @@ import { Button } from './ui/button';
 import { User, ShoppingBag, DollarSign, Calendar, Heart, BookOpen, LogOut, Users, MessageCircle, ArrowLeftRight, Gavel } from 'lucide-react';
 import { auth } from '../firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
+import { useUserRole } from '../context/UserRoleContext';
 
 interface UserDashboardProps {
   onLogout: () => void;
@@ -13,14 +14,17 @@ interface UserDashboardProps {
 export function UserDashboard({ onLogout }: UserDashboardProps) {
   const [showPasswordSuccess, setShowPasswordSuccess] = useState(false);
   const navigate = useNavigate();
+  // We can get user from useAuthState or useUserRole. 
+  // keeping useAuthState to avoid breaking existing logic if any, but useUserRole is cleaner.
   const [user, loading, error] = useAuthState(auth);
+  const { isAdmin } = useUserRole();
 
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User, path: '/dashboard' },
     { id: 'purchases', label: 'Purchases', icon: ShoppingBag, path: '/dashboard/purchases' },
     { id: 'sales', label: 'Sales', icon: DollarSign, path: '/dashboard/sales' },
     { id: 'rentals', label: 'Rentals', icon: Calendar, path: '/dashboard/rentals' },
-    { id: 'wishlist', label: 'Wishlist', icon: Heart, path: '/dashboard/wishlist' },
+    ...(isAdmin ? [{ id: 'wishlist', label: 'Wishlist', icon: Heart, path: '/dashboard/wishlist' }] : []),
     { id: 'communities', label: 'Communities', icon: Users, path: '/dashboard/communities' },
     { id: 'chats', label: 'Chats', icon: MessageCircle, path: '/dashboard/chats' },
     { id: 'exchanges', label: 'Exchanges', icon: ArrowLeftRight, path: '/dashboard/exchanges' },

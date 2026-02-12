@@ -8,6 +8,7 @@ import { AnnouncementForm } from './Admin/AnnouncementForm';
 import { toast } from 'sonner';
 import { db } from '../firebase';
 import { collection, query, orderBy, onSnapshot, deleteDoc, doc, updateDoc, addDoc } from 'firebase/firestore';
+import { useUserRole } from '../context/UserRoleContext';
 
 interface Announcement {
   id: string;
@@ -20,10 +21,8 @@ interface Announcement {
   views: number;
 }
 
-
-
 interface AnnouncementsPageProps {
-  isAdmin?: boolean;
+  isAdmin?: boolean; // Deprecated, use context
   onBack?: () => void;
 }
 
@@ -54,7 +53,8 @@ const DEFAULT_ANNOUNCEMENTS = [
   }
 ];
 
-export function AnnouncementsPage({ isAdmin = false, onBack }: AnnouncementsPageProps) {
+export function AnnouncementsPage({ onBack }: AnnouncementsPageProps) {
+  const { isAdmin } = useUserRole();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');

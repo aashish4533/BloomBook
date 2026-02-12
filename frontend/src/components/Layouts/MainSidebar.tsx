@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   Store,
@@ -22,6 +22,7 @@ import { cn } from "../ui/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Button } from "../ui/button";
 import { auth } from "../../firebase";
+import { useUserRole } from "../../context/UserRoleContext";
 
 // Type definitions for navigation items
 interface NavItem {
@@ -34,33 +35,6 @@ interface NavSection {
   label: string;
   items: NavItem[];
 }
-
-// Navigation configuration
-const navigationSections: NavSection[] = [
-  {
-    label: "Discover",
-    items: [
-      { title: "Marketplace", path: "/marketplace", icon: Store },
-      { title: "Rentals", path: "/rent", icon: Calendar },
-      { title: "Exchanges", path: "/exchange", icon: ArrowLeftRight },
-    ],
-  },
-  {
-    label: "Social",
-    items: [
-      { title: "Communities", path: "/communities", icon: Users },
-      { title: "Tuition Hub", path: "/tuition", icon: GraduationCap },
-    ],
-  },
-  {
-    label: "Personal",
-    items: [
-      { title: "My Wallet", path: "/dashboard/wallet", icon: Wallet },
-      { title: "Wishlist", path: "/wishlist", icon: Heart },
-      { title: "My Notes", path: "/notes", icon: FileText },
-    ],
-  },
-];
 
 export interface MainSidebarProps {
   onLogout?: () => void;
@@ -81,6 +55,7 @@ export function MainSidebar({
 }: MainSidebarProps) {
   const location = useLocation();
   const [isMobile, setIsMobile] = useState(false);
+  const { isAdmin } = useUserRole();
 
   // Check for mobile viewport
   useEffect(() => {
@@ -94,6 +69,34 @@ export function MainSidebar({
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
+
+  // Navigation configuration - Memoized to react to isAdmin
+  const navigationSections: NavSection[] = useMemo(() => [
+    {
+      label: "Discover",
+      items: [
+        { title: "Marketplace", path: "/marketplace", icon: Store },
+        { title: "Rentals", path: "/rent", icon: Calendar },
+        { title: "Exchanges", path: "/exchange", icon: ArrowLeftRight },
+      ],
+    },
+    {
+      label: "Social",
+      items: [
+        { title: "Communities", path: "/communities", icon: Users },
+        { title: "Tuition Hub", path: "/tuition", icon: GraduationCap },
+      ],
+    },
+    {
+      label: "Personal",
+      items: [
+        { title: "My Wallet", path: "/dashboard/wallet", icon: Wallet },
+        // Conditionally add Wishlist
+        ...(isAdmin ? [{ title: "Wishlist", path: "/wishlist", icon: Heart }] : []),
+        { title: "My Notes", path: "/notes", icon: FileText },
+      ],
+    },
+  ], [isAdmin]);
 
   // Get current user info
   const user = auth.currentUser;

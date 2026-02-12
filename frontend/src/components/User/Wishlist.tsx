@@ -1,52 +1,40 @@
 // Updated src/components/User/Wishlist.tsx
-import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Heart, ShoppingCart, X } from 'lucide-react';
-import { db, auth } from '../../firebase';
-import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
-import { toast } from 'sonner';
+import { useWishlist } from '../../hooks/useWishlist';
+import { useCart } from '../../context/CartContext';
 
 interface WishlistProps {
   onNavigateToMarketplace: () => void;
 }
 
 export function Wishlist({ onNavigateToMarketplace }: WishlistProps) {
-  const [wishlistItems, setWishlistItems] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const user = auth.currentUser;
+  const { wishlist, loading, toggleWishlist } = useWishlist();
+  const { addToCart } = useCart();
 
-  useEffect(() => {
-    if (!user) return;
-
-    const fetchWishlist = async () => {
-      setLoading(true);
-      try {
-        const q = query(collection(db, 'wishlists'), where('userId', '==', user.uid));
-        const snapshot = await getDocs(q);
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setWishlistItems(data);
-      } catch (err) {
-        toast.error('Failed to fetch wishlist');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchWishlist();
-  }, [user]);
-
-  const handleRemove = async (id: string) => {
-    try {
-      await deleteDoc(doc(db, 'wishlists', id));
-      setWishlistItems(prev => prev.filter(item => item.id !== id));
-      toast.success('Removed from wishlist');
-    } catch (err) {
-      toast.error('Failed to remove');
-      console.error(err);
-    }
+  const handleAddToCart = (item: any) => {
+    addToCart({
+      id: item.bookId,
+      title: item.title,
+      price: item.price,
+      image: item.image,
+      type: item.type,
+      sellerName: 'Unknown',
+      sellerId: 'unknown'
+    });
   };
 
-  if (loading) return <div>Loading...</div>;
+  const handleRemove = (item: any) => {
+    toggleWishlist({ id: item.bookId });
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C4A672]"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -64,24 +52,29 @@ export function Wishlist({ onNavigateToMarketplace }: WishlistProps) {
           </Button>
         </div>
 
-        {wishlistItems.length > 0 ? (
+        {wishlist.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {wishlistItems.map((item) => (
+            {wishlist.map((item) => (
               <div key={item.id} className="border border-gray-200 rounded-lg p-4">
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <h4 className="text-[#2C3E50]">{item.title}</h4>
                     <p className="text-sm text-gray-600">by {item.author}</p>
-                    <p className="text-[#C4A672] text-lg mt-2">${item.price.toFixed(2)}</p>
+                    <p className="text-[#C4A672] text-lg mt-2">
+                      {item.type === 'rent' ? `$${item.price.toFixed(2)}/term` : `$${item.price.toFixed(2)}`}
+                    </p>
                   </div>
-                  <button onClick={() => handleRemove(item.id)} className="text-gray-400 hover:text-red-500">
+                  <button onClick={() => handleRemove(item)} className="text-gray-400 hover:text-red-500">
                     <X className="w-5 h-5" />
                   </button>
                 </div>
                 {item.available && (
-                  <Button className="w-full bg-[#C4A672] hover:bg-[#8B7355] text-white">
+                  <Button
+                    onClick={() => handleAddToCart(item)}
+                    className="w-full bg-[#C4A672] hover:bg-[#8B7355] text-white"
+                  >
                     <ShoppingCart className="w-4 h-4 mr-2" />
-                    Add to Cart
+                    {item.type === 'rent' ? 'Rent Now' : 'Add to Cart'}
                   </Button>
                 )}
               </div>

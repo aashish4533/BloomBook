@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { FileText, Upload, Search, ArrowLeft, Download, Eye, Trash2, Pencil } from 'lucide-react';
+import { FileText, Upload, Search, ArrowLeft, Download, Eye, Trash2, Pencil, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from './ui/dialog';
 import { Label } from './ui/label';
-import { db, auth } from '../firebase';
+import { db, auth, storage } from '../firebase';
 import { collection, addDoc, deleteDoc, updateDoc, doc, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { useCollection } from 'react-firebase-hooks/firestore';
 import { toast } from 'sonner';
 import { NotesViewer } from './NotesViewer';
@@ -18,14 +19,16 @@ interface Note {
     id: string;
     title: string;
     subject: string;
-    authorName: string;
-    authorId: string;
+    authorName: string; // Keep for display
+    uploadedBy: string; // New field for permission (email)
     description: string;
-    fileUrl: string;
+    url: string; // New field (was fileUrl)
     fileType: string;
-    createdAt: any;
+    timestamp: any; // New field (was createdAt)
     downloads: number;
     views: number;
+    averageRating: number; // New field
+    comments: any[]; // New field
 }
 
 export function NotesHub() {
@@ -33,6 +36,7 @@ export function NotesHub() {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedNote, setSelectedNote] = useState<Note | null>(null);
     const [isUploading, setIsUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0); // Progress state
     const [uploadForm, setUploadForm] = useState({
         title: '',
         subject: '',
@@ -50,25 +54,32 @@ export function NotesHub() {
     const [isDeleting, setIsDeleting] = useState(false);
 
     const [value, loading, error] = useCollection(
-        query(collection(db, 'notes'), orderBy('createdAt', 'desc'))
+        query(collection(db, 'notes'), orderBy('timestamp', 'desc')) // Order by new field
     );
 
-    const notes = value?.docs.map(doc => ({ id: doc.id, ...doc.data() } as Note)) || [];
-    const currentUserId = auth.currentUser?.uid;
+    const notes = value?.docs.map(doc => {
+        const data = doc.data();
+        // Map old fields to new schema for backward compatibility if needed
+        return {
+            id: doc.id,
+            ...data,
+            url: data.url || data.fileUrl,
+            timestamp: data.timestamp || data.createdAt,
+            uploadedBy: data.uploadedBy || data.authorEmail
+        } as Note;
+    }) || [];
+
+    const currentUserEmail = auth.currentUser?.email;
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
-            if (file.type !== 'application/pdf') {
-                toast.error('Only PDF files are allowed');
-                return;
-            }
             setUploadForm({ ...uploadForm, file });
         }
     };
 
     const handleUpload = async () => {
-        if (!auth.currentUser) {
+        if (!auth.currentUser || !auth.currentUser.email) {
             toast.error('Please login to upload notes');
             return;
         }
@@ -78,51 +89,65 @@ export function NotesHub() {
         }
 
         setIsUploading(true);
+        setUploadProgress(0);
 
         try {
-            const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-            const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+            const file = uploadForm.file;
+            const fileType = file.name.split('.').pop()?.toLowerCase() || 'unknown';
 
-            if (!cloudName || !uploadPreset) {
-                toast.error("Cloudinary credentials missing");
-                setIsUploading(false);
-                return;
-            }
+            // Storage Path: helping-material/{userEmail}/{fileName}
+            const storagePath = `helping-material/${auth.currentUser.email}/${Date.now()}_${file.name}`;
+            const storageRef = ref(storage, storagePath);
 
-            const formData = new FormData();
-            formData.append('file', uploadForm.file);
-            formData.append('upload_preset', uploadPreset);
+            const uploadTask = uploadBytesResumable(storageRef, file);
 
-            const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
-                method: 'POST',
-                body: formData
-            });
+            uploadTask.on('state_changed',
+                (snapshot) => {
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    setUploadProgress(Math.round(progress));
+                },
+                (error) => {
+                    console.error("Upload error:", error);
+                    toast.error(`Upload failed: ${error.message}`);
+                    setIsUploading(false);
+                },
+                async () => {
+                    // Upload completed successfully
+                    try {
+                        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
 
-            if (!response.ok) throw new Error('Upload failed');
+                        await addDoc(collection(db, 'notes'), {
+                            title: uploadForm.title,
+                            subject: uploadForm.subject,
+                            description: uploadForm.description,
+                            authorName: auth.currentUser?.displayName || 'Anonymous',
+                            uploadedBy: auth.currentUser?.email, // Permission field
+                            url: downloadURL,
+                            fileType: fileType,
+                            timestamp: serverTimestamp(),
+                            downloads: 0,
+                            views: 0,
+                            averageRating: 0,
+                            comments: []
+                        });
 
-            const data = await response.json();
-            const downloadURL = data.secure_url;
+                        toast.success('Material uploaded successfully!');
+                        // Reset form
+                        setUploadForm({ title: '', subject: '', description: '', file: null });
+                        // Close dialog (handled by isUploading state in UI logic if we want, or manually)
 
-            await addDoc(collection(db, 'notes'), {
-                title: uploadForm.title,
-                subject: uploadForm.subject,
-                description: uploadForm.description,
-                authorName: auth.currentUser.displayName || 'Anonymous',
-                authorId: auth.currentUser.uid,
-                fileUrl: downloadURL,
-                fileType: 'pdf',
-                createdAt: serverTimestamp(),
-                downloads: 0,
-                views: 0
-            });
+                    } catch (dbError: any) {
+                        console.error("Database error:", dbError);
+                        toast.error(`Failed to save metadata: ${dbError.message}`);
+                    } finally {
+                        setIsUploading(false);
+                    }
+                }
+            );
 
-            toast.success('Notes uploaded successfully!');
-            setIsUploading(false);
-            setUploadForm({ title: '', subject: '', description: '', file: null });
         } catch (err: any) {
             console.error(err);
-            const errorMessage = err?.message || 'Failed to upload notes';
-            toast.error(`Upload failed: ${errorMessage}`);
+            toast.error(err?.message || 'Failed to initiate upload');
             setIsUploading(false);
         }
     };
@@ -205,18 +230,18 @@ export function NotesHub() {
                             <p className="text-white/80">Share and discover study materials</p>
                         </div>
 
-                        <Dialog open={isUploading} onOpenChange={setIsUploading}>
+                        <Dialog open={isUploading} onOpenChange={(open: boolean) => !isUploading && setIsUploading(open)}>
                             <DialogTrigger asChild>
                                 <Button className="bg-[#C4A672] hover:bg-[#8B7355] text-white">
                                     <Upload className="w-4 h-4 mr-2" />
-                                    Upload Notes
+                                    Upload Material
                                 </Button>
                             </DialogTrigger>
                             <DialogContent>
                                 <DialogHeader>
-                                    <DialogTitle>Upload Study Notes (PDF)</DialogTitle>
+                                    <DialogTitle>Upload Study Material</DialogTitle>
                                     <DialogDescription>
-                                        Share your study materials with others.
+                                        Share your study materials (Docs, Images, Videos, PDFs) with others.
                                     </DialogDescription>
                                 </DialogHeader>
                                 <div className="grid gap-4 py-4">
@@ -227,6 +252,7 @@ export function NotesHub() {
                                             value={uploadForm.title}
                                             onChange={(e) => setUploadForm({ ...uploadForm, title: e.target.value })}
                                             placeholder="e.g. Calculus Chapter 1"
+                                            disabled={isUploading}
                                         />
                                     </div>
                                     <div className="grid gap-2">
@@ -236,6 +262,7 @@ export function NotesHub() {
                                             value={uploadForm.subject}
                                             onChange={(e) => setUploadForm({ ...uploadForm, subject: e.target.value })}
                                             placeholder="e.g. Mathematics"
+                                            disabled={isUploading}
                                         />
                                     </div>
                                     <div className="grid gap-2">
@@ -245,19 +272,41 @@ export function NotesHub() {
                                             value={uploadForm.description}
                                             onChange={(e) => setUploadForm({ ...uploadForm, description: e.target.value })}
                                             placeholder="Brief description of contents"
+                                            disabled={isUploading}
                                         />
                                     </div>
                                     <div className="grid gap-2">
-                                        <Label htmlFor="file">PDF File</Label>
+                                        <Label htmlFor="file">Material File</Label>
                                         <Input
                                             id="file"
                                             type="file"
-                                            accept=".pdf"
+                                            accept="image/*,video/*,.doc,.docx,.txt,.pdf"
                                             onChange={handleFileChange}
+                                            disabled={isUploading}
                                         />
                                     </div>
-                                    <Button onClick={handleUpload} className="bg-[#C4A672] text-white">
-                                        Upload
+
+                                    {isUploading && (
+                                        <div className="space-y-1">
+                                            <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                                                <div
+                                                    className="h-full bg-[#C4A672] transition-all duration-300"
+                                                    style={{ width: `${uploadProgress}%` }}
+                                                />
+                                            </div>
+                                            <p className="text-xs text-center text-gray-500">Uploading... {uploadProgress}%</p>
+                                        </div>
+                                    )}
+
+                                    <Button onClick={handleUpload} className="bg-[#C4A672] text-white" disabled={isUploading}>
+                                        {isUploading ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                                Uploading...
+                                            </>
+                                        ) : (
+                                            'Upload'
+                                        )}
                                     </Button>
                                 </div>
                             </DialogContent>
@@ -284,7 +333,8 @@ export function NotesHub() {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {filteredNotes.map((note) => {
-                            const isOwner = currentUserId === note.authorId;
+                            // Check ownership by email match
+                            const isOwner = currentUserEmail === note.uploadedBy;
 
                             return (
                                 <Card key={note.id} className="hover:shadow-lg transition-shadow p-6">
@@ -321,7 +371,7 @@ export function NotesHub() {
 
                                     <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
                                         <span>By {note.authorName}</span>
-                                        <span>{note.createdAt?.toDate ? new Date(note.createdAt.toDate()).toLocaleDateString() : ''}</span>
+                                        <span>{note.timestamp?.toDate ? new Date(note.timestamp.toDate()).toLocaleDateString() : ''}</span>
                                     </div>
 
                                     <div className="flex gap-2">
@@ -336,8 +386,8 @@ export function NotesHub() {
                                         <Button
                                             variant="outline"
                                             className="flex-1"
-                                            disabled={!note.fileUrl}
-                                            onClick={() => downloadFile(note.fileUrl, `${note.title}.pdf`)}
+                                            disabled={!note.url}
+                                            onClick={() => downloadFile(note.url, `${note.title}.${note.fileType || 'pdf'}`)}
                                         >
                                             <Download className="w-4 h-4 mr-2" />
                                             Download
@@ -355,13 +405,14 @@ export function NotesHub() {
                 <NotesViewer
                     title={selectedNote.title}
                     author={selectedNote.authorName}
-                    fileUrl={selectedNote.fileUrl}
+                    id={selectedNote.id} // Passing ID for comments
+                    url={selectedNote.url}
                     onClose={() => setSelectedNote(null)}
                 />
             )}
 
             {/* ── Edit Dialog ─────────────────────────────────────────────── */}
-            <Dialog open={!!editingNote} onOpenChange={(open) => !open && setEditingNote(null)}>
+            <Dialog open={!!editingNote} onOpenChange={(open: boolean) => !open && setEditingNote(null)}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Edit Note</DialogTitle>
@@ -411,7 +462,7 @@ export function NotesHub() {
             </Dialog>
 
             {/* ── Delete Confirmation Dialog ──────────────────────────────── */}
-            <Dialog open={!!deletingNote} onOpenChange={(open) => !open && setDeletingNote(null)}>
+            <Dialog open={!!deletingNote} onOpenChange={(open: boolean) => !open && setDeletingNote(null)}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Delete Note</DialogTitle>

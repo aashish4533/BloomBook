@@ -5,6 +5,8 @@ import { Card } from './ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Badge } from './ui/badge';
 import { ImageWithFallback } from './figma/ImageWithFallback';
+import { useWishlist } from '../hooks/useWishlist';
+import { useCart } from '../context/CartContext';
 
 interface WishlistPageProps {
   onBack: () => void;
@@ -14,63 +16,11 @@ interface WishlistPageProps {
 
 export function WishlistPage({ onBack, onNavigateToMarketplace, onNavigateToBook }: WishlistPageProps) {
   const [activeTab, setActiveTab] = useState<'buy' | 'rent'>('buy');
-  
-  // Mock wishlist data
-  const buyWishlist = [
-    {
-      id: '1',
-      title: 'The Hobbit',
-      author: 'J.R.R. Tolkien',
-      price: 14.99,
-      condition: 'Like New',
-      available: true,
-      image: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400&q=80',
-      addedDate: '2 days ago'
-    },
-    {
-      id: '2',
-      title: 'Dune',
-      author: 'Frank Herbert',
-      price: 16.50,
-      condition: 'Very Good',
-      available: true,
-      image: 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d?w=400&q=80',
-      addedDate: '5 days ago'
-    },
-    {
-      id: '3',
-      title: '1984',
-      author: 'George Orwell',
-      price: 11.99,
-      condition: 'Good',
-      available: false,
-      image: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=400&q=80',
-      addedDate: '1 week ago'
-    },
-  ];
+  const { wishlist, loading, toggleWishlist } = useWishlist();
+  const { addToCart } = useCart();
 
-  const rentWishlist = [
-    {
-      id: '4',
-      title: 'To Kill a Mockingbird',
-      author: 'Harper Lee',
-      price: 5.99,
-      duration: '2 weeks',
-      available: true,
-      image: 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=400&q=80',
-      addedDate: '3 days ago'
-    },
-    {
-      id: '5',
-      title: 'The Great Gatsby',
-      author: 'F. Scott Fitzgerald',
-      price: 4.99,
-      duration: '2 weeks',
-      available: true,
-      image: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400&q=80',
-      addedDate: '1 week ago'
-    },
-  ];
+  const buyWishlist = wishlist.filter(item => item.type === 'buy');
+  const rentWishlist = wishlist.filter(item => item.type === 'rent');
 
   const recommendations = [
     {
@@ -91,17 +41,31 @@ export function WishlistPage({ onBack, onNavigateToMarketplace, onNavigateToBook
     },
   ];
 
-  const handleRemoveFromWishlist = (id: string) => {
-    // Handle remove logic
-    console.log('Remove item:', id);
+  const handleRemoveFromWishlist = (item: any) => {
+    toggleWishlist({ id: item.bookId });
   };
 
-  const handleAddToCart = (id: string) => {
-    // Handle add to cart logic
-    console.log('Add to cart:', id);
+  const handleAddToCart = (item: any) => {
+    addToCart({
+      id: item.bookId,
+      title: item.title,
+      price: item.price,
+      image: item.image,
+      type: item.type,
+      sellerName: 'Unknown',
+      sellerId: 'unknown'
+    });
   };
 
   const currentWishlist = activeTab === 'buy' ? buyWishlist : rentWishlist;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#FAF8F3] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#C4A672]"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#FAF8F3] to-white pb-20 md:pb-8">
@@ -133,7 +97,7 @@ export function WishlistPage({ onBack, onNavigateToMarketplace, onNavigateToBook
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'buy' | 'rent')} className="mb-8">
+        <Tabs value={activeTab} onValueChange={(v: string) => setActiveTab(v as 'buy' | 'rent')} className="mb-8">
           <TabsList className="grid w-full max-w-md mx-auto grid-cols-2">
             <TabsTrigger value="buy" className="data-[state=active]:bg-[#C4A672] data-[state=active]:text-white">
               Buy ({buyWishlist.length})
@@ -162,7 +126,7 @@ export function WishlistPage({ onBack, onNavigateToMarketplace, onNavigateToBook
                         </div>
                       )}
                       <button
-                        onClick={() => handleRemoveFromWishlist(item.id)}
+                        onClick={() => handleRemoveFromWishlist(item)}
                         className="absolute top-2 right-2 bg-white/90 hover:bg-white rounded-full p-2 shadow-md"
                       >
                         <X className="w-4 h-4 text-red-500" />
@@ -172,23 +136,26 @@ export function WishlistPage({ onBack, onNavigateToMarketplace, onNavigateToBook
                       <h3 className="text-[#2C3E50] mb-1">{item.title}</h3>
                       <p className="text-sm text-gray-600 mb-2">by {item.author}</p>
                       <div className="flex items-center justify-between mb-3">
-                        <span className="text-[#C4A672] text-xl">${item.price.toFixed(2)}</span>
+                        <span className="text-[#C4A672] text-xl">
+                          {item.type === 'buy' ? `$${item.price.toFixed(2)}` : `$${item.price.toFixed(2)}/${item.rentDuration || 'term'}`}
+                        </span>
                         <Badge variant="outline">{item.condition}</Badge>
                       </div>
-                      <p className="text-xs text-gray-500 mb-3">Added {item.addedDate}</p>
+                      <p className="text-xs text-gray-500 mb-3">
+                        Added {item.createdAt?.toDate ? item.createdAt.toDate().toLocaleDateString() : 'Recently'}
+                      </p>
                       <div className="flex gap-2">
                         <Button
-                          onClick={() => onNavigateToBook?.(item.id)}
+                          onClick={() => onNavigateToBook?.(item.bookId)}
                           variant="outline"
                           className="flex-1"
-                          disabled={!item.available}
                         >
                           <Eye className="w-4 h-4 mr-2" />
                           View
                         </Button>
                         {item.available && (
                           <Button
-                            onClick={() => handleAddToCart(item.id)}
+                            onClick={() => handleAddToCart(item)}
                             className="flex-1 bg-[#C4A672] hover:bg-[#8B7355] text-white"
                           >
                             <ShoppingCart className="w-4 h-4 mr-2" />
@@ -234,7 +201,7 @@ export function WishlistPage({ onBack, onNavigateToMarketplace, onNavigateToBook
                         </div>
                       )}
                       <button
-                        onClick={() => handleRemoveFromWishlist(item.id)}
+                        onClick={() => handleRemoveFromWishlist(item)}
                         className="absolute top-2 right-2 bg-white/90 hover:bg-white rounded-full p-2 shadow-md"
                       >
                         <X className="w-4 h-4 text-red-500" />
@@ -244,22 +211,23 @@ export function WishlistPage({ onBack, onNavigateToMarketplace, onNavigateToBook
                       <h3 className="text-[#2C3E50] mb-1">{item.title}</h3>
                       <p className="text-sm text-gray-600 mb-2">by {item.author}</p>
                       <div className="flex items-center justify-between mb-3">
-                        <span className="text-[#C4A672] text-xl">${item.price.toFixed(2)}/{item.duration}</span>
+                        <span className="text-[#C4A672] text-xl">${item.price.toFixed(2)}/{item.rentDuration || 'term'}</span>
                       </div>
-                      <p className="text-xs text-gray-500 mb-3">Added {item.addedDate}</p>
+                      <p className="text-xs text-gray-500 mb-3">
+                        Added {item.createdAt?.toDate ? item.createdAt.toDate().toLocaleDateString() : 'Recently'}
+                      </p>
                       <div className="flex gap-2">
                         <Button
-                          onClick={() => onNavigateToBook?.(item.id)}
+                          onClick={() => onNavigateToBook?.(item.bookId)}
                           variant="outline"
                           className="flex-1"
-                          disabled={!item.available}
                         >
                           <Eye className="w-4 h-4 mr-2" />
                           View
                         </Button>
                         {item.available && (
                           <Button
-                            onClick={() => handleAddToCart(item.id)}
+                            onClick={() => handleAddToCart(item)}
                             className="flex-1 bg-[#C4A672] hover:bg-[#8B7355] text-white"
                           >
                             Rent Now

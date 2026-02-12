@@ -15,10 +15,15 @@ import { collection, addDoc, serverTimestamp, doc } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { Book } from './BookMarketplace';
 import { useDocument } from 'react-firebase-hooks/firestore';
+import { useWishlist } from '../hooks/useWishlist';
+import { useUserRole } from '../context/UserRoleContext';
+import { Heart } from 'lucide-react'; // Ensure Heart is imported if not already, though it is usually.
 
 export function BookDetailsPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const { isInWishlist, toggleWishlist } = useWishlist();
+    const { isAdmin } = useUserRole();
 
     const [value, loading, error] = useDocument(
         id ? doc(db, 'books', id) : null,
@@ -153,9 +158,21 @@ export function BookDetailsPage() {
 
                     {/* Right Column - Details */}
                     <div className="space-y-6">
-                        <div>
-                            <h1 className="text-3xl font-bold text-[#2C3E50] mb-2">{book.title}</h1>
-                            <p className="text-gray-600 text-lg">by {book.author}</p>
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <h1 className="text-3xl font-bold text-[#2C3E50] mb-2">{book.title}</h1>
+                                <p className="text-gray-600 text-lg">by {book.author}</p>
+                            </div>
+                            {isAdmin && (
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => toggleWishlist(book)}
+                                    className="text-gray-400 hover:text-red-500 hover:bg-red-50"
+                                >
+                                    <Heart className={`w-8 h-8 ${isInWishlist(book.id) ? 'fill-red-500 text-red-500' : ''}`} />
+                                </Button>
+                            )}
                         </div>
 
                         {/* Price and Condition */}

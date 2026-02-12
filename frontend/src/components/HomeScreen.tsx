@@ -147,7 +147,7 @@ export function HomeScreen({ isLoggedIn }: HomeScreenProps) {
             <div className="hidden md:block relative h-[450px]">
               <div className="absolute inset-0 bg-[#C4A672] rounded-2xl transform rotate-6 opacity-20 blur-sm"></div>
               <img
-                src="https://images.unsplash.com/photo-1507842217153-e21f40668bc9?auto=format&fit=crop&q=80&w=1000"
+                src="https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&q=80&w=1000"
                 alt="Library Atmosphere"
                 className="absolute inset-0 w-full h-full object-cover rounded-2xl shadow-2xl transform -rotate-3 hover:rotate-0 transition-transform duration-700 ease-out border border-[#C4A672]/20"
               />
