@@ -1,5 +1,5 @@
 import { setGlobalOptions } from "firebase-functions";
-import { onCall, HttpsError } from "firebase-functions/https";
+import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 
 setGlobalOptions({ maxInstances: 10 });
@@ -10,7 +10,7 @@ setGlobalOptions({ maxInstances: 10 });
  * speculative fiction and advanced physics.
  */
 export const getAntigravityRecommendations = onCall(
-    { cors: true },
+    { cors: true }, // Allow all origins for production compatibility
     async () => {
         try {
             logger.info("getAntigravityRecommendations called");
@@ -22,9 +22,14 @@ export const getAntigravityRecommendations = onCall(
                     author: "Nick Cook",
                     genre: "Speculative Non-Fiction",
                     summary:
-                        "Aviation journalist Nick Cook investigates decades of classified research into antigravity propulsion. He traces the thread from WWII Nazi experiments to modern black-budget aerospace programmes, asking whether gravity control has already been achieved in secret.",
+                        "Aviation journalist Nick Cook investigates decades of classified " +
+                        "research into antigravity propulsion. He traces the thread from " +
+                        "WWII Nazi experiments to modern black-budget aerospace " +
+                        "programmes, asking whether gravity control has already been " +
+                        "achieved in secret.",
                     relevance:
-                        "The definitive investigative deep-dive into real-world antigravity research and its hidden history.",
+                        "The definitive investigative deep-dive into real-world " +
+                        "antigravity research and its hidden history.",
                     difficulty: "Intermediate",
                     bloom_score: 88,
                 },
@@ -34,9 +39,14 @@ export const getAntigravityRecommendations = onCall(
                     author: "Ursula K. Le Guin",
                     genre: "Classic Sci-Fi",
                     summary:
-                        "Physicist Shevek develops a General Temporal Theory that could unlock instantaneous communication—and, by extension, manipulation of space-time and gravity. The novel explores how such a breakthrough reshapes two opposing societies.",
+                        "Physicist Shevek develops a General Temporal Theory that could " +
+                        "unlock instantaneous communication—and, by extension, " +
+                        "manipulation of space-time and gravity. The novel explores how " +
+                        "such a breakthrough reshapes two opposing societies.",
                     relevance:
-                        "Explores the social and political consequences of a physics breakthrough that could rewrite the rules of gravity and communication.",
+                        "Explores the social and political consequences of a physics " +
+                        "breakthrough that could rewrite the rules of gravity and " +
+                        "communication.",
                     difficulty: "Intermediate",
                     bloom_score: 95,
                 },
@@ -46,9 +56,14 @@ export const getAntigravityRecommendations = onCall(
                     author: "Michael Flynn",
                     genre: "Hard Science Fiction",
                     summary:
-                        "When an alien starship crash-lands in medieval Germany, the villagers and the extraterrestrials must coexist. Flynn meticulously details the aliens' gravity-manipulation drive and how 14th-century scholars attempt to understand it using Aristotelian physics.",
+                        "When an alien starship crash-lands in medieval Germany, the " +
+                        "villagers and the extraterrestrials must coexist. Flynn " +
+                        "meticulously details the aliens' gravity-manipulation drive and " +
+                        "how 14th-century scholars attempt to understand it using " +
+                        "Aristotelian physics.",
                     relevance:
-                        "A masterclass in hard-SF gravity-drive mechanics set against an unexpected historical backdrop.",
+                        "A masterclass in hard-SF gravity-drive mechanics set against " +
+                        "an unexpected historical backdrop.",
                     difficulty: "Advanced Science",
                     bloom_score: 82,
                 },
@@ -58,21 +73,32 @@ export const getAntigravityRecommendations = onCall(
                     author: "Hal Clement",
                     genre: "Hard Science Fiction",
                     summary:
-                        "On the disc-shaped planet Mesklin, surface gravity varies from 3 g at the equator to nearly 700 g at the poles. A tiny caterpillar-like alien leads an expedition across this crushing landscape to retrieve a stranded human probe.",
+                        "On the disc-shaped planet Mesklin, surface gravity varies from " +
+                        "3 g at the equator to nearly 700 g at the poles. A tiny " +
+                        "caterpillar-like alien leads an expedition across this crushing " +
+                        "landscape to retrieve a stranded human probe.",
                     relevance:
-                        "The gold-standard novel for exploring how variable gravity shapes biology, culture, and adventure.",
+                        "The gold-standard novel for exploring how variable gravity " +
+                        "shapes biology, culture, and adventure.",
                     difficulty: "Beginner",
                     bloom_score: 91,
                 },
                 {
                     id: "e5f6a7b8-c9d0-1234-efab-345678901234",
-                    title: "Pushing Gravity: New Perspectives on Le Sage's Theory of Gravitation",
+                    title: "Pushing Gravity: New Perspectives on Le Sage's Theory of " +
+                        "Gravitation",
                     author: "Matthew R. Edwards (Editor)",
                     genre: "Speculative Non-Fiction",
                     summary:
-                        "A collection of academic essays revisiting Le Sage's mechanical theory of gravity—the idea that gravity is caused by the shielding of an omnidirectional flux of ultra-mundane particles. Contributors explore whether such models could ever lead to gravity shielding or propulsion.",
+                        "A collection of academic essays revisiting Le Sage's mechanical " +
+                        "theory of gravity—the idea that gravity is caused by the " +
+                        "shielding of an omnidirectional flux of ultra-mundane particles. " +
+                        "Contributors explore whether such models could ever lead to " +
+                        "gravity shielding or propulsion.",
                     relevance:
-                        "For readers who want the real physics: peer-reviewed perspectives on alternative gravity theories and their antigravity implications.",
+                        "For readers who want the real physics: peer-reviewed " +
+                        "perspectives on alternative gravity theories and their " +
+                        "antigravity implications.",
                     difficulty: "Advanced Science",
                     bloom_score: 74,
                 },
@@ -82,13 +108,16 @@ export const getAntigravityRecommendations = onCall(
         } catch (error: unknown) {
             const message = error instanceof Error ? error.message : "Unknown error";
             logger.error("getAntigravityRecommendations failed:", message, error);
-            throw new HttpsError("internal", `Failed to get recommendations: ${message}`);
+            throw new HttpsError(
+                "internal",
+                `Failed to get recommendations: ${message}`
+            );
         }
     }
 );
 
-export * from './verification/identity';
-export * from './verification/certificates';
-export * from './verification/profiles';
-export * from './verification/skillTest';
-export * from './verification/reviews';
+export * from "./verification/identity";
+export * from "./verification/certificates";
+export * from "./verification/profiles";
+export * from "./verification/skillTest";
+export * from "./verification/reviews";

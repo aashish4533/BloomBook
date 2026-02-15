@@ -1,0 +1,31 @@
+﻿
+> Website Design Request@1.0.0 start
+> concurrently --kill-others-on-fail --names "EMULATORS,FRONTEND" "cd backend && firebase emulators:start" "cd frontend && npm run dev"
+
+[FRONTEND] 
+[FRONTEND] > Website Design Request@0.1.0 dev
+[FRONTEND] > vite
+[FRONTEND] 
+[FRONTEND] 
+[FRONTEND]   [32m[1mVITE[22m v6.3.5[39m  [2mready in [0m[1m405[22m[2m[0m ms[22m
+[FRONTEND] 
+[FRONTEND]   [32mΓ₧£[39m  [1mLocal[22m:   [36mhttp://localhost:[1m3000[22m/[39m
+[FRONTEND] [2m  [32mΓ₧£[39m  [1mNetwork[22m[2m: use [22m[1m--host[22m[2m to expose[22m
+[EMULATORS] [36m[1mi  emulators:[22m[39m Starting emulators: auth, functions, firestore, storage, extensions
+[EMULATORS] [33m[1m!  firestore:[22m[39m Port 8080 is not open on 127.0.0.1, could not start Firestore Emulator.
+[EMULATORS] [33m[1m!  firestore:[22m[39m To select a different host/port, specify that host/port in a firebase.json config file:
+[EMULATORS]       {
+[EMULATORS]         // ...
+[EMULATORS]         "emulators": {
+[EMULATORS]           "firestore": {
+[EMULATORS]             "host": "[33mHOST[39m",
+[EMULATORS]             "port": "[33mPORT[39m"
+[EMULATORS]           }
+[EMULATORS]         }
+[EMULATORS]       }
+[EMULATORS] [36m[1mi  emulators:[22m[39m Shutting down emulators.
+[EMULATORS] 
+[EMULATORS] [1m[31mError:[39m[22m Could not start Firestore Emulator, port taken.
+[EMULATORS] cd backend && firebase emulators:start exited with code 1
+--> Sending SIGTERM to other processes..
+[FRONTEND] cd frontend && npm run dev exited with code 1

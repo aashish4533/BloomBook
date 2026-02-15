@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { NotesViewer } from './NotesViewer';
 import { useNavigate } from 'react-router-dom';
 import { downloadFile } from '../utils/fileHandler';
+import { FilePreview } from './FilePreview';
 
 interface Note {
     id: string;
@@ -35,6 +36,7 @@ export function NotesHub() {
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedNote, setSelectedNote] = useState<Note | null>(null);
+    const [previewNote, setPreviewNote] = useState<Note | null>(null); // New state for preview dialog
     const [isUploading, setIsUploading] = useState(false);
     const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false); // New state for dialog visibility
     const [uploadProgress, setUploadProgress] = useState(0); // Progress state
@@ -378,10 +380,10 @@ export function NotesHub() {
                                     <div className="flex gap-2">
                                         <Button
                                             className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800"
-                                            onClick={() => setSelectedNote(note)}
+                                            onClick={() => setPreviewNote(note)}
                                         >
                                             <Eye className="w-4 h-4 mr-2" />
-                                            View
+                                            Preview
                                         </Button>
 
                                         <Button
@@ -482,6 +484,26 @@ export function NotesHub() {
                         >
                             {isDeleting ? 'Deleting…' : 'Delete'}
                         </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* ── File Preview Dialog ────────────────────────────────────── */}
+            <Dialog open={!!previewNote} onOpenChange={(open: boolean) => !open && setPreviewNote(null)}>
+                <DialogContent className="max-w-4xl w-full h-[80vh] flex flex-col p-0 overflow-hidden bg-white">
+                    <DialogHeader className="px-6 py-4 border-b">
+                        <DialogTitle>{previewNote?.title}</DialogTitle>
+                        <DialogDescription>
+                            {previewNote?.subject} - {previewNote?.authorName}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex-1 overflow-auto bg-gray-100 p-4">
+                        {previewNote?.url && (
+                            <FilePreview
+                                fileUrl={previewNote.url}
+                                fileType={previewNote.fileType}
+                            />
+                        )}
                     </div>
                 </DialogContent>
             </Dialog>

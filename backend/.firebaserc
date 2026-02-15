@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "book-bloom-emulator"
-  }
+    "default": "bookbloom-2026"
+  },
+  "targets": {},
+  "etags": {}
 }
