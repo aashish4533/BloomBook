@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GraduationCap, Video, Calendar, Clock, Star, Users, BookOpen, Search, Filter, ArrowLeft } from 'lucide-react';
+import { GraduationCap, Video, Calendar, Clock, Star, Users, BookOpen, Search, Filter, ArrowLeft, Trash2, Edit2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 
 import { db, auth } from '../firebase';
-import { collection, addDoc, serverTimestamp, query, where } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { useCollection } from 'react-firebase-hooks/firestore';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from './ui/dialog';
@@ -74,6 +74,7 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
     budget: ''
   });
   const [isPostingRequest, setIsPostingRequest] = useState(false);
+  const [editingRequestId, setEditingRequestId] = useState<string | null>(null);
   const [certFile, setCertFile] = useState<File | null>(null);
 
   const [value, loading, error] = useCollection(collection(db, 'tutors'));
@@ -90,25 +91,57 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
 
   const handlePostRequest = async () => {
     if (!auth.currentUser) {
-      toast.error('Please login to post a request');
+      toast.error('Please login to send a request');
       return;
     }
     try {
-      await addDoc(collection(db, 'tuition_requests'), {
-        studentId: auth.currentUser.uid,
-        studentName: auth.currentUser.displayName || 'Anonymous',
-        subject: requestForm.subject,
-        topic: requestForm.topic, // "Need Math Tutor for Grade 10"
-        gradeLevel: requestForm.gradeLevel,
-        budget: requestForm.budget,
-        createdAt: serverTimestamp()
-      });
-      toast.success('Request posted successfully!');
+      if (editingRequestId) {
+        await updateDoc(doc(db, 'tuition_requests', editingRequestId), {
+          subject: requestForm.subject,
+          topic: requestForm.topic,
+          gradeLevel: requestForm.gradeLevel,
+          budget: requestForm.budget,
+        });
+        toast.success('Request updated successfully!');
+      } else {
+        await addDoc(collection(db, 'tuition_requests'), {
+          studentId: auth.currentUser.uid,
+          studentName: auth.currentUser.displayName || 'Anonymous',
+          subject: requestForm.subject,
+          topic: requestForm.topic,
+          gradeLevel: requestForm.gradeLevel,
+          budget: requestForm.budget,
+          createdAt: serverTimestamp()
+        });
+        toast.success('Request sent successfully!');
+      }
       setIsPostingRequest(false);
+      setEditingRequestId(null);
       setRequestForm({ subject: '', topic: '', gradeLevel: '', budget: '' });
     } catch (err) {
-      toast.error('Failed to post request');
+      toast.error(editingRequestId ? 'Failed to update request' : 'Failed to send request');
     }
+  };
+
+  const handleDeleteRequest = async (requestId: string) => {
+    if (!window.confirm('Are you sure you want to delete this request?')) return;
+    try {
+      await deleteDoc(doc(db, 'tuition_requests', requestId));
+      toast.success('Request deleted');
+    } catch (error) {
+      toast.error('Failed to delete request');
+    }
+  };
+
+  const handleEditRequest = (req: TuitionRequest) => {
+    setRequestForm({
+      subject: req.subject,
+      topic: req.topic,
+      gradeLevel: req.gradeLevel,
+      budget: req.budget || ''
+    });
+    setEditingRequestId(req.id);
+    setIsPostingRequest(true);
   };
 
   const handleBecomeTutor = async () => {
@@ -329,17 +362,23 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
               >
                 Become a Tutor
               </Button>
-              <Dialog open={isPostingRequest} onOpenChange={setIsPostingRequest}>
+              <Dialog open={isPostingRequest} onOpenChange={(open: boolean) => {
+                setIsPostingRequest(open);
+                if (!open) {
+                  setEditingRequestId(null);
+                  setRequestForm({ subject: '', topic: '', gradeLevel: '', budget: '' });
+                }
+              }}>
                 <DialogTrigger asChild>
                   <Button className="bg-[#2C3E50] text-white hover:bg-[#1a252f]">
-                    Post Tuition Request
+                    Request Tuition
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Post Tuition Request</DialogTitle>
+                    <DialogTitle>{editingRequestId ? 'Edit Tuition Request' : 'Request Tuition'}</DialogTitle>
                     <DialogDescription>
-                      Post a request for a tutor to help you.
+                      {editingRequestId ? 'Update your tuition request details.' : 'Post a request for a tutor to help you.'}
                     </DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
@@ -347,7 +386,9 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                     <Input placeholder="Details (e.g. Need help with Grade 10 Geometry)" value={requestForm.topic} onChange={e => setRequestForm({ ...requestForm, topic: e.target.value })} />
                     <Input placeholder="Grade Level" value={requestForm.gradeLevel} onChange={e => setRequestForm({ ...requestForm, gradeLevel: e.target.value })} />
                     <Input placeholder="Budget (Optional)" value={requestForm.budget} onChange={e => setRequestForm({ ...requestForm, budget: e.target.value })} />
-                    <Button onClick={handlePostRequest} className="bg-[#C4A672] text-white">Post Request</Button>
+                    <Button onClick={handlePostRequest} className="bg-[#C4A672] text-white">
+                      {editingRequestId ? 'Update Request' : 'Send Request'}
+                    </Button>
                   </div>
                 </DialogContent>
               </Dialog>
@@ -367,7 +408,19 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                   <Card key={req.id} className="p-4 border border-blue-100 bg-blue-50/50">
                     <div className="flex justify-between items-start mb-2">
                       <Badge variant="outline" className="bg-white">{req.subject}</Badge>
-                      <span className="text-xs text-gray-500">From {req.studentName}</span>
+                      <div className="flex items-center gap-2">
+                        {auth.currentUser?.uid === req.studentId && (
+                          <div className="flex gap-1">
+                            <button onClick={() => handleEditRequest(req)} className="text-gray-400 hover:text-[#C4A672] transition-colors p-1">
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => handleDeleteRequest(req.id)} className="text-gray-400 hover:text-red-500 transition-colors p-1">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+                        <span className="text-xs text-gray-500">From {req.studentName}</span>
+                      </div>
                     </div>
                     <h4 className="font-medium text-[#2C3E50] mb-1">{req.topic}</h4>
                     <p className="text-sm text-gray-600 mb-2">{req.gradeLevel}</p>

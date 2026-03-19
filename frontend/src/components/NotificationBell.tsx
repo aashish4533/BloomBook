@@ -203,15 +203,6 @@ export function NotificationBell() {
                         }`}
                     >
                       <div className="flex gap-3">
-                        {/* Icon */}
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${getNotificationColor(notification.type)}`}>
-                          {notification.type === 'order' && '📦'}
-                          {notification.type === 'message' && '💬'}
-                          {notification.type === 'community' && '👥'}
-                          {notification.type === 'system' && '🔔'}
-                          {notification.type === 'community_approved' && '✅'}
-                          {notification.type === 'community_rejected' && '❌'}
-                        </div>
 
                         {/* Content */}
                         <div className="flex-1 min-w-0">

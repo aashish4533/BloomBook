@@ -133,6 +133,9 @@ export const submitSkillTest = onCall({ cors: "*" }, async (request) => {
 
     const percentage = (score / total) * 100;
     const passed = percentage >= 70;
+    
+    // Knowledge Mass assessment determines stabilization
+    const finalStatus = passed ? "stabilized" : "test_failed";
 
     await admin.firestore()
       .collection("verifications")
@@ -146,14 +149,27 @@ export const submitSkillTest = onCall({ cors: "*" }, async (request) => {
           passed,
           completedAt: admin.firestore.FieldValue.serverTimestamp(),
         },
+        status: finalStatus
       }, { merge: true });
 
     await testDoc.ref.update({
       status: "completed",
       result: { score, total, passed },
     });
+    
+    // If the Knowledge Mass assessment is passed, finalize orbital entry
+    if (passed) {
+      const tutorSnapshot = await admin.firestore().collection("tutors").where("userId", "==", request.auth.uid).limit(1).get();
+      if (!tutorSnapshot.empty) {
+        await tutorSnapshot.docs[0].ref.update({
+          verified: true,
+          status: "stabilized"
+        });
+        logger.info(`Tutor ${request.auth.uid} has been stabilized (verified) after sufficient Knowledge Mass evaluation.`);
+      }
+    }
 
-    return { success: true, score, total, passed };
+    return { success: true, score, total, passed, finalStatus };
   } catch (error: unknown) {
     logger.error("Test Submission Error:", error);
     throw new HttpsError("internal", (error as Error).message);

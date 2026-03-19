@@ -18,7 +18,7 @@ faceapi.env.monkeyPatch({ Canvas, Image, ImageData } as any);
 /**
  * Verifies user identity using OCR and mocked face matching.
  */
-export const verifyIdentity = onCall({ cors: "*" }, async (request) => {
+export const verifyIdentity = onCall({ cors: "*", memory: "1GiB", timeoutSeconds: 120 }, async (request) => {
   // 1. Authentication check
   if (!request.auth) {
     throw new HttpsError(
@@ -58,10 +58,30 @@ export const verifyIdentity = onCall({ cors: "*" }, async (request) => {
       isMatch = true;
     }
 
-    // 5. Store Verification Result
+    // 5. Fetch previous verification attempts (Integrity Checksums)
     const verificationRef = admin.firestore()
       .collection("verifications")
       .doc(request.auth.uid);
+      
+    const verificationDoc = await verificationRef.get();
+    let failedAttempts = 0;
+    
+    if (verificationDoc.exists) {
+       const existingData = verificationDoc.data();
+       if (existingData?.failedAttempts) {
+         failedAttempts = existingData.failedAttempts;
+       }
+       if (existingData?.status === "grounded") {
+         throw new HttpsError("permission-denied", "Integrity Checksum critical failure. Orbit permanently grounded.");
+       }
+    }
+
+    if (!isMatch) {
+       failedAttempts += 1;
+    }
+    
+    const isGrounded = failedAttempts >= 2 && !isMatch;
+    const finalStatus = isGrounded ? "grounded" : (isMatch ? "pending_certificates" : "failed");
 
     await verificationRef.set({
       uid: request.auth.uid,
@@ -70,9 +90,19 @@ export const verifyIdentity = onCall({ cors: "*" }, async (request) => {
       ocrText: extractedText,
       faceMatchScore: matchScore,
       isIdentityVerified: isMatch,
+      failedAttempts: failedAttempts,
+      status: finalStatus,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      status: isMatch ? "verified" : "failed",
     }, { merge: true });
+
+    if (isGrounded) {
+       return {
+          success: false,
+          isMatch: false,
+          status: "grounded",
+          message: "Atmospheric Re-entry denied. Integrity Checksum failed twice."
+       };
+    }
 
     return {
       success: true,

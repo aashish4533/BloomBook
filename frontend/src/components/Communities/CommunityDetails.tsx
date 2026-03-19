@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Users, MessageCircle, Settings, MoreVertical, Heart, MessageSquare, Share2, Plus, UserPlus, UserMinus, Edit2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Users, MessageCircle, Settings, MoreVertical, Heart, MessageSquare, Share2, Plus, UserPlus, UserMinus, Edit2, Trash2, ThumbsUp, Lightbulb, Smile } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
@@ -10,7 +10,7 @@ import { CreatePost } from './CreatePost';
 import { PostDetail } from './PostDetail';
 import { toast } from 'sonner';
 import { db, auth } from '../../firebase';
-import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, deleteDoc, onSnapshot, collection, query, orderBy, increment, addDoc, serverTimestamp, deleteField, setDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, deleteDoc, onSnapshot, collection, query, orderBy, increment, addDoc, serverTimestamp, deleteField, setDoc, getDocs } from 'firebase/firestore';
 import { CreateCommunity } from './CreateCommunity';
 import {
   AlertDialog,
@@ -77,6 +77,14 @@ export function CommunityDetails({ userId }: CommunityDetailsProps) {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletePostId, setDeletePostId] = useState<string | null>(null);
+  const [userReactions, setUserReactions] = useState<Record<string, 'like' | 'love' | 'insightful'>>({});
+  const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
+
+  const REACTIONS: { key: 'like' | 'love' | 'insightful'; emoji: string; label: string }[] = [
+    { key: 'like', emoji: '👍', label: 'Like' },
+    { key: 'love', emoji: '❤️', label: 'Love' },
+    { key: 'insightful', emoji: '💡', label: 'Insightful' },
+  ];
 
   const onBack = () => navigate('/communities');
   const onNavigateToChat = (id: string) => navigate(`/communities/${id}/chat`);
@@ -188,6 +196,22 @@ export function CommunityDetails({ userId }: CommunityDetailsProps) {
       pendingUnsub();
     };
   }, [communityId]);
+ 
+  // Healing trigger for admin sync defaults
+  useEffect(() => {
+    if (isAdmin && community && communityId) {
+      const approvedCount = members.filter(m => !m.status).length;
+      const actualPostsCount = posts.length;
+      
+      if (community.memberCount !== approvedCount || community.postsCount !== actualPostsCount) {
+         const commRef = doc(db, 'communities', communityId);
+         updateDoc(commRef, {
+            memberCount: approvedCount,
+            postsCount: actualPostsCount
+         });
+      }
+    }
+  }, [members, posts, community, isAdmin, communityId]);
 
   const handleJoin = async () => {
     if (!communityId || !auth.currentUser?.uid) return;
@@ -222,6 +246,40 @@ export function CommunityDetails({ userId }: CommunityDetailsProps) {
       }
     } catch (err) {
       toast.error('Failed to join');
+    }
+  };
+ 
+  const handleApprove = async (userId: string, memberData: any) => {
+    if (!communityId) return;
+    try {
+      const commRef = doc(db, 'communities', communityId);
+      await updateDoc(commRef, {
+        members: arrayUnion(userId),
+        memberCount: increment(1)
+      });
+
+      await setDoc(doc(db, 'communities', communityId, 'members', userId), {
+        id: userId,
+        name: memberData.name,
+        role: 'member',
+        joinedAt: serverTimestamp(),
+        avatar: memberData.avatar || 'U'
+      });
+
+      await deleteDoc(doc(db, 'communities', communityId, 'pending', userId));
+      toast.success('Member approved');
+    } catch (err) {
+      toast.error('Failed to approve member');
+    }
+  };
+
+  const handleDecline = async (userId: string) => {
+    if (!communityId) return;
+    try {
+      await deleteDoc(doc(db, 'communities', communityId, 'pending', userId));
+      toast.success('Join request declined');
+    } catch (err) {
+      toast.error('Failed to decline request');
     }
   };
 
@@ -282,6 +340,52 @@ export function CommunityDetails({ userId }: CommunityDetailsProps) {
       toast.error('Failed to create post');
     }
   };
+
+  const handleReaction = async (postId: string, reactionType: 'like' | 'love' | 'insightful') => {
+    const user = auth.currentUser;
+    if (!user || !communityId) { toast.error('You must be a member to react.'); return; }
+
+    const postRef = doc(db, 'communities', communityId, 'posts', postId);
+    const userReactionRef = doc(db, 'communities', communityId, 'posts', postId, 'reactions', user.uid);
+
+    const existing = userReactions[postId];
+    try {
+      if (existing === reactionType) {
+        // Remove reaction
+        await updateDoc(postRef, { [`reactions.${reactionType}`]: increment(-1) });
+        await deleteDoc(userReactionRef);
+        setUserReactions(prev => { const n = { ...prev }; delete n[postId]; return n; });
+      } else {
+        if (existing) {
+          // Switch reaction: decrement old, increment new
+          await updateDoc(postRef, {
+            [`reactions.${existing}`]: increment(-1),
+            [`reactions.${reactionType}`]: increment(1),
+          });
+        } else {
+          await updateDoc(postRef, { [`reactions.${reactionType}`]: increment(1) });
+        }
+        await setDoc(userReactionRef, { type: reactionType, userId: user.uid });
+        setUserReactions(prev => ({ ...prev, [postId]: reactionType }));
+      }
+    } catch (err) {
+      toast.error('Failed to react. Please try again.');
+    }
+    setShowReactionPicker(null);
+  };
+
+  // Load user's existing reactions on posts
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!communityId || !user || posts.length === 0) return;
+    posts.forEach(async (post) => {
+      const ref = doc(db, 'communities', communityId, 'posts', post.id, 'reactions', user.uid);
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        setUserReactions(prev => ({ ...prev, [post.id]: snap.data().type }));
+      }
+    });
+  }, [posts, communityId]);
 
   // Logic for displaying content
   if (showCreatePost) {
@@ -419,7 +523,7 @@ export function CommunityDetails({ userId }: CommunityDetailsProps) {
               Posts
             </TabsTrigger>
             <TabsTrigger value="members" className="data-[state=active]:bg-[#C4A672] data-[state=active]:text-white">
-              Members ({members.length})
+              Members ({members.filter(m => !m.status).length})
             </TabsTrigger>
           </TabsList>
 
@@ -474,16 +578,60 @@ export function CommunityDetails({ userId }: CommunityDetailsProps) {
                     </div>
                   )}
 
-                  <div className="flex items-center gap-6 text-gray-500">
-                    <button className="flex items-center gap-2 hover:text-[#C4A672] transition-colors">
-                      <Heart className="w-5 h-5" />
-                      <span>{post.reactions?.like || 0}</span>
-                    </button>
-                    <button className="flex items-center gap-2 hover:text-[#C4A672] transition-colors">
+                  <div className="flex items-center gap-4 text-gray-500" onClick={e => e.stopPropagation()}>
+                    {/* Reaction Button with Emoji Picker */}
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowReactionPicker(showReactionPicker === post.id ? null : post.id)}
+                        className={`flex items-center gap-1.5 px-2 py-1 rounded-full transition-colors hover:bg-gray-100 ${
+                          userReactions[post.id] ? 'text-[#C4A672] font-semibold' : ''
+                        }`}
+                      >
+                        <span className="text-base">
+                          {userReactions[post.id] === 'like' ? '👍' : userReactions[post.id] === 'love' ? '❤️' : userReactions[post.id] === 'insightful' ? '💡' : '😊'}
+                        </span>
+                        <span className="text-sm">
+                          {(post.reactions?.like || 0) + (post.reactions?.love || 0) + (post.reactions?.insightful || 0)}
+                        </span>
+                      </button>
+
+                      {/* Reaction Picker Popover — only 1 react allowed at a time */}
+                      {showReactionPicker === post.id && (
+                        <div className="absolute bottom-10 left-0 z-20 bg-white rounded-2xl shadow-xl border border-gray-200 flex gap-1 p-2 animate-in fade-in slide-in-from-bottom-2">
+                          {REACTIONS.map(r => {
+                            const isActive = userReactions[post.id] === r.key;
+                            const isDisabled = !!userReactions[post.id] && !isActive;
+                            return (
+                              <button
+                                key={r.key}
+                                onClick={() => !isDisabled && handleReaction(post.id, r.key)}
+                                className={[
+                                  'flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-all',
+                                  isActive ? 'bg-[#FDF8F0] ring-2 ring-[#C4A672] scale-110' : '',
+                                  isDisabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-[#FDF8F0] hover:scale-110',
+                                ].join(' ')}
+                                title={isDisabled ? 'Remove your current reaction first' : r.label}
+                              >
+                                <span className="text-xl transition-transform">{r.emoji}</span>
+                                <span className={`text-[10px] ${isActive ? 'text-[#C4A672] font-bold' : 'text-gray-500'}`}>{r.label}</span>
+                                <span className="text-[10px] font-semibold text-[#C4A672]">{post.reactions?.[r.key] || 0}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => setSelectedPost(post)}
+                      className="flex items-center gap-2 hover:text-[#C4A672] transition-colors"
+                    >
                       <MessageSquare className="w-5 h-5" />
                       <span>{post.commentCount || 0} comments</span>
                     </button>
-                    <button className="flex items-center gap-2 hover:text-[#C4A672] transition-colors ml-auto">
+                    <button className="flex items-center gap-2 hover:text-[#C4A672] transition-colors ml-auto"
+                      onClick={() => { navigator.clipboard.writeText(window.location.href); toast.success('Link copied!'); }}
+                    >
                       <Share2 className="w-5 h-5" />
                       <span>Share</span>
                     </button>
@@ -503,10 +651,22 @@ export function CommunityDetails({ userId }: CommunityDetailsProps) {
                     </div>
                   </Avatar>
                   <div>
-                    <div className="font-medium text-[#2C3E50] border-none">{member.name}</div>
+                    <div className="font-medium text-[#2C3E50] border-none flex items-center gap-2">
+                      {member.name}
+                      {member.status === 'pending' && <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100 border-none">Pending</Badge>}
+                    </div>
                     <div className="text-xs text-gray-500 border-none capitalize">{member.role}</div>
                   </div>
-                  {isAdmin && member.id !== auth.currentUser?.uid && (
+                  {isAdmin && member.status === 'pending' ? (
+                    <div className="ml-auto flex gap-1">
+                      <Button size="sm" onClick={() => handleApprove(member.id, member)} className="bg-green-600 hover:bg-green-700 text-white h-8 px-3">
+                        Approve
+                      </Button>
+                      <Button size="sm" onClick={() => handleDecline(member.id)} variant="outline" className="text-red-500 border-red-200 hover:bg-red-50 h-8 px-3">
+                        Decline
+                      </Button>
+                    </div>
+                  ) : isAdmin && member.id !== auth.currentUser?.uid && (
                     <Button variant="ghost" size="sm" className="ml-auto text-red-500 hover:text-red-700 hover:bg-red-50">
                       Remove
                     </Button>

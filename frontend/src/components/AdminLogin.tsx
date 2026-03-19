@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore'; // Add getDoc
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '../firebase';
+import { useUserRole } from '../context/UserRoleContext';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -24,6 +25,14 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const navigate = useNavigate();
+  const { isAdmin, loading } = useUserRole();
+
+  // Redirect if already logged in as admin
+  useEffect(() => {
+    if (!loading && isAdmin) {
+      navigate('/admin/dashboard', { replace: true });
+    }
+  }, [isAdmin, loading, navigate]);
 
   const handleInitialLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,59 +63,36 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
         }
 
         try {
-          // 1. Try to Login
-          // 1. Try to Login
-          const userCredential = await signInWithEmailAndPassword(auth, email, password); // Capture result
+          // Sign in to Firebase Auth
+          const userCredential = await signInWithEmailAndPassword(auth, email, password);
+          const user = userCredential.user;
 
-          // Self-repair: Check if DB document exists
-          const user = auth.currentUser;
-          if (user) {
-            const userDocRef = doc(db, 'users', user.uid);
-            const userDocSnap = await getDoc(userDocRef);
-
-            // If DB is empty (wiped), recreate the Admin ID
-            if (!userDocSnap.exists()) {
-              await setDoc(userDocRef, {
-                email: email,
-                name: 'Admin',
-                role: 'admin',
-                createdAt: serverTimestamp(),
-                verified: true
-              });
-              toast.success("Admin database profile restored.");
-            }
+          // Self-heal: ensure the Firestore admin document exists
+          const userDocRef = doc(db, 'users', user.uid);
+          const userDocSnap = await getDoc(userDocRef);
+          if (!userDocSnap.exists()) {
+            await setDoc(userDocRef, {
+              email: email,
+              name: 'Admin',
+              role: 'admin',
+              createdAt: serverTimestamp(),
+              verified: true
+            });
+            toast.info('Admin profile restored in database.');
+          } else if (userDocSnap.data().role !== 'admin') {
+            await auth.signOut();
+            throw new Error('This account does not have admin privileges.');
           }
-        } catch (error: any) {
-          // 2. If user doesn't exist (or password changed in env), try to Register
-          if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-            try {
-              const { createUserWithEmailAndPassword } = await import('firebase/auth');
-              // Create the Authentication User
-              const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-
-              // 3. CRITICAL FIX: Create the Database Document immediately
-              await setDoc(doc(db, 'users', userCredential.user.uid), {
-                email: email,
-                name: 'Admin',
-                role: 'admin', // This grants access to the dashboard
-                createdAt: serverTimestamp(),
-                verified: true
-              });
-
-              toast.success("Admin account created and linked to database.");
-
-            } catch (createError: any) {
-              console.error("Creation failed:", createError);
-              // If creation failed (e.g., email taken), throw the original login error
-              throw error;
-            }
-          } else {
-            throw error;
+        } catch (firebaseError: any) {
+          // Map Firebase error codes to readable messages
+          const code = firebaseError.code || '';
+          if (code === 'auth/user-not-found' || code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
+            throw new Error('Invalid admin credentials. Please check your email and password.');
           }
+          throw firebaseError;
         }
 
-        // Success - 2FA DISABLED FOR DEPLOYMENT/TESTING
-        // const code = Math.floor(100000 + Math.random() * 900000).toString();
+        // Direct login success
 
         /*
         try {
@@ -264,7 +250,7 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
                 disabled={isLoading}
                 className="w-full h-12 bg-[#C4A672] hover:bg-[#8B7355] text-white"
               >
-                {isLoading ? 'Verifying...' : 'Continue to 2FA'}
+                {isLoading ? 'Signing in...' : 'Sign In to Admin Portal'}
               </Button>
 
               {/* Security Notice */}

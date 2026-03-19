@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { CreditCard, Lock, ShieldCheck, Check, AlertCircle, X } from 'lucide-react';
+import { CreditCard, Lock, ShieldCheck, Check, AlertCircle, X, Smartphone } from 'lucide-react';
 import { toast } from 'sonner';
-import { db, auth } from '../../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { auth } from '../../firebase';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Card } from '../ui/card';
@@ -21,10 +21,15 @@ interface PaymentGatewayProps {
 }
 
 export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel, cartItems }: PaymentGatewayProps) {
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'paypal'>('card');
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'easypaisa' | 'jazzcash'>('card');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [transactionId, setTransactionId] = useState('');
+  const [mobileNumber, setMobileNumber] = useState('');
+
+  // Gravitational 2% Platform Stabilization Fee
+  const stabilizationFee = amount * 0.02;
+  const totalAmount = amount + stabilizationFee;
 
   // Card details
   const [cardNumber, setCardNumber] = useState('');
@@ -110,65 +115,53 @@ export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel, c
         toast.error('Please enter a valid CVV');
         return;
       }
+    } else if (paymentMethod === 'easypaisa' || paymentMethod === 'jazzcash') {
+      if (!mobileNumber || mobileNumber.length < 10) {
+        toast.error('Please enter a valid mobile number for the wallet prompt.');
+        return;
+      }
     }
 
     setIsProcessing(true);
 
-    // Simulate payment processing
-    setTimeout(async () => {
-      const txId = 'TXN' + Math.random().toString(36).substr(2, 9).toUpperCase();
-      setTransactionId(txId);
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("A user origin is required to establish payment orbit.");
 
-      try {
-        const user = auth.currentUser;
-        if (user) {
-          const itemsToProcess = cartItems && cartItems.length > 0 ? cartItems : [{
-            id: 'single-item',
-            title: itemTitle,
-            price: amount,
-            image: '',
-            type: type,
-            sellerName: 'Unknown',
-            sellerId: 'unknown'
-          }];
+      const functions = getFunctions();
+      const createPaymentIntent = httpsCallable(functions, 'createPaymentIntent');
+      
+      const payload = {
+        amount: amount, // Cloud function handles fee independently but uses base amount
+        type: type,
+        itemTitle: itemTitle,
+        method: paymentMethod,
+        mobileNumber: mobileNumber
+      };
 
-          for (const item of itemsToProcess) {
-            // Save purchase/rental logic
-            const collectionName = item.type === 'rent' ? 'rentals' : 'purchases';
+      const response: any = await createPaymentIntent(payload);
+      const { status, iframeUrl, transactionId: backendTxId, message } = response.data;
+      
+      setTransactionId(backendTxId);
 
-            const docRef = await addDoc(collection(db, collectionName), {
-              userId: user.uid,
-              bookId: item.id || '', // id might be missing from single item flow if not careful, but cart items have it
-              bookTitle: item.title,
-              price: item.price,
-              date: new Date().toISOString(),
-              status: 'completed', // or 'active' for rentals
-              transactionId: txId,
-              type: item.type,
-              createdAt: serverTimestamp(),
-              // Specific fields could differ, keeping it simple for uniformity first
-            });
-
-            // Also save to transactions collection for Admin Dashboard
-            await addDoc(collection(db, 'transactions'), {
-              type: type === 'rent' ? 'rent' : 'buy', // Use strict type or map item.type
-              bookTitle: item.title,
-              user: user.displayName || user.email || 'Unknown User',
-              amount: item.price,
-              date: new Date().toISOString(),
-              status: 'completed',
-              relatedId: docRef.id,
-              createdAt: serverTimestamp()
-            });
-          }
-        }
-      } catch (error) {
-        console.error("Error saving purchase:", error);
+      if (status === 'push_prompt_sent') {
+        toast.success(message || 'Push prompt initiated. Please check your phone.');
+        // For wallets, we assume pending success via webhook. We'll show the success screen.
+        setShowSuccess(true);
+      } else if (status === 'iframe_ready') {
+        // Option A: Open iframe directly here
+        // Option B: Redirect top window
+        window.location.href = iframeUrl;
+      } else {
+        throw new Error("Invalid orbital state returned from gateway sequence.");
       }
 
+    } catch (error: any) {
+      console.error("Payment initiation anomaly:", error);
+      toast.error(error.message || "Failed to initiate payment sequence.");
+    } finally {
       setIsProcessing(false);
-      setShowSuccess(true);
-    }, 2000);
+    }
   };
 
   const handleSuccessClose = () => {
@@ -199,14 +192,14 @@ export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel, c
               <span className="text-[#2C3E50] capitalize">{type}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">Amount:</span>
-              <span className="text-[#C4A672] text-lg">Rs. {amount.toLocaleString()}</span>
+              <span className="text-gray-600">Total Charged:</span>
+              <span className="text-[#C4A672] text-lg">Rs. {totalAmount.toLocaleString()}</span>
             </div>
           </div>
 
           <div className="flex items-center justify-center gap-2 text-sm text-gray-500 mb-6">
             <ShieldCheck className="w-4 h-4 text-green-600" />
-            <span>Secure transaction via SSL encryption</span>
+            <span>Secure transaction via localized integration API</span>
           </div>
 
           <Button
@@ -242,27 +235,30 @@ export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel, c
 
         <form onSubmit={handleSubmit} className="p-6">
           {/* Order Summary */}
-          <div className="bg-gray-50 rounded-lg p-4 mb-6">
-            <h3 className="text-[#2C3E50] mb-3">Order Summary</h3>
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-gray-600">{itemTitle}</span>
+          <div className="bg-gray-50 rounded-lg p-4 mb-6 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-[#C4A672]/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+            <h3 className="text-[#2C3E50] mb-3 relative z-10">Orbital Summary</h3>
+            <div className="flex justify-between items-center mb-2 relative z-10">
+              <span className="text-gray-600">{itemTitle} (Base Mass)</span>
               <span className="text-[#2C3E50]">Rs. {amount.toLocaleString()}</span>
             </div>
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-gray-600">Processing Fee</span>
-              <span className="text-[#2C3E50]">Rs. 0</span>
+            <div className="flex justify-between items-center mb-2 relative z-10 group">
+              <span className="text-gray-600 border-b border-dashed border-gray-400 cursor-help" title="Mandatory platform fee to maintain network equilibrium">
+                Stabilization Fee (2%)
+              </span>
+              <span className="text-[#2C3E50]">+ Rs. {stabilizationFee.toLocaleString()}</span>
             </div>
-            <div className="border-t pt-2 mt-2 flex justify-between items-center">
-              <span className="text-[#2C3E50]">Total Amount</span>
-              <span className="text-[#C4A672] text-xl">Rs. {amount.toLocaleString()}</span>
+            <div className="border-t pt-2 mt-2 flex justify-between items-center relative z-10">
+              <span className="text-[#2C3E50] font-semibold">Total Gravity Payload</span>
+              <span className="text-[#C4A672] text-xl font-semibold">Rs. {totalAmount.toLocaleString()}</span>
             </div>
           </div>
 
           {/* Payment Method Selection */}
           <div className="mb-6">
-            <Label className="mb-3 block">Select Payment Method</Label>
-            <RadioGroup value={paymentMethod} onValueChange={(v: string) => setPaymentMethod(v as 'card' | 'paypal')}>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Label className="mb-3 block text-[#2C3E50]">Select Payment Trajectory</Label>
+            <RadioGroup value={paymentMethod} onValueChange={(v: string) => setPaymentMethod(v as 'card' | 'easypaisa' | 'jazzcash')}>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${paymentMethod === 'card' ? 'border-[#C4A672] bg-[#C4A672]/5' : 'border-gray-200'
                   }`}>
                   <RadioGroupItem value="card" id="card" className="sr-only" />
@@ -279,16 +275,25 @@ export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel, c
                     />
                   </label>
                 </div>
-                <div className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${paymentMethod === 'paypal' ? 'border-[#C4A672] bg-[#C4A672]/5' : 'border-gray-200'
+                <div className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${paymentMethod === 'easypaisa' ? 'border-[#C4A672] bg-[#C4A672]/5' : 'border-gray-200'
                   }`}>
-                  <RadioGroupItem value="paypal" id="paypal" className="sr-only" />
-                  <label htmlFor="paypal" className="flex items-center gap-3 cursor-pointer">
-                    <div className="w-6 h-6 bg-[#0070BA] rounded flex items-center justify-center text-white text-xs">
-                      P
-                    </div>
+                  <RadioGroupItem value="easypaisa" id="easypaisa" className="sr-only" />
+                  <label htmlFor="easypaisa" className="flex items-center gap-3 cursor-pointer">
+                    <Smartphone className={`w-6 h-6 ${paymentMethod === 'easypaisa' ? 'text-[#C4A672]' : 'text-gray-400'}`} />
                     <div className="flex-1">
-                      <p className="text-[#2C3E50]">PayPal</p>
-                      <p className="text-xs text-gray-500">Fast & Secure</p>
+                      <p className="text-[#2C3E50]">EasyPaisa</p>
+                      <p className="text-[10px] text-gray-500 leading-tight">Mobile Push</p>
+                    </div>
+                  </label>
+                </div>
+                <div className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${paymentMethod === 'jazzcash' ? 'border-[#C4A672] bg-[#C4A672]/5' : 'border-gray-200'
+                  }`}>
+                  <RadioGroupItem value="jazzcash" id="jazzcash" className="sr-only" />
+                  <label htmlFor="jazzcash" className="flex items-center gap-3 cursor-pointer">
+                    <Smartphone className={`w-6 h-6 ${paymentMethod === 'jazzcash' ? 'text-[#C4A672]' : 'text-gray-400'}`} />
+                    <div className="flex-1">
+                      <p className="text-[#2C3E50]">JazzCash</p>
+                      <p className="text-[10px] text-gray-500 leading-tight">Mobile Push</p>
                     </div>
                   </label>
                 </div>
@@ -358,11 +363,24 @@ export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel, c
             </div>
           )}
 
-          {/* PayPal Notice */}
-          {paymentMethod === 'paypal' && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-              <p className="text-sm text-blue-800">
-                You will be redirected to PayPal to complete your payment securely.
+          {/* Mobile Wallet Details */}
+          {(paymentMethod === 'easypaisa' || paymentMethod === 'jazzcash') && (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+              <Label htmlFor="mobileNumber">Mobile Wallet Number</Label>
+              <div className="relative mt-2">
+                <Input
+                  id="mobileNumber"
+                  type="text"
+                  placeholder="03XXXXXXXXX"
+                  value={mobileNumber}
+                  onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ''))}
+                  className="pl-10"
+                  required
+                />
+                <Smartphone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                A payment prompt will be pushed to this number. Please authorize the transaction on your mobile device.
               </p>
             </div>
           )}
@@ -407,7 +425,7 @@ export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel, c
               ) : (
                 <>
                   <Lock className="w-4 h-4 mr-2" />
-                  Pay Rs. {amount.toLocaleString()}
+                  Authorize Rs. {totalAmount.toLocaleString()}
                 </>
               )}
             </Button>

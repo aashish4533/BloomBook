@@ -1,5 +1,7 @@
-// Updated src/components/Chat/ChatMessage.tsx
-import { Download } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Download, Reply, Smile, Edit2, Trash } from 'lucide-react';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db } from '../../firebase';
 
 interface ChatMessageProps {
   message: {
@@ -12,11 +14,42 @@ interface ChatMessageProps {
     timestamp: Date;
     status?: 'sending' | 'sent' | 'delivered' | 'read';
     isOwn: boolean;
+    edited?: boolean;
+    replyTo?: { id: string; senderName: string };
   };
   showAvatar?: boolean;
+  onReply?: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  onReact?: (emoji: string) => void;
+  communityId?: string;
+  currentUserId?: string;
 }
 
-export function ChatMessage({ message, showAvatar = true }: ChatMessageProps) {
+export function ChatMessage({
+  message,
+  showAvatar = true,
+  onReply,
+  onEdit,
+  onDelete,
+  onReact,
+  communityId,
+}: ChatMessageProps) {
+  const [reactions, setReactions] = useState<{ userId: string; emoji: string }[]>([]);
+
+  useEffect(() => {
+    if (!communityId || !message.id) return;
+    const unsub = onSnapshot(collection(db, 'communities', communityId, 'messages', message.id, 'reactions'), (snap) => {
+      setReactions(snap.docs.map(d => ({ userId: d.id, emoji: d.data().emoji })));
+    });
+    return () => unsub();
+  }, [communityId, message.id]);
+
+  const aggregatedReactions = reactions.reduce((acc, curr) => {
+    acc[curr.emoji] = (acc[curr.emoji] || 0) + 1;
+    return acc;
+  }, {} as { [key: string]: number });
+
   const formatTime = (date: Date) => {
     const now = new Date();
     const diff = now.getTime() - date.getTime();
@@ -75,43 +108,63 @@ export function ChatMessage({ message, showAvatar = true }: ChatMessageProps) {
             </span>
           )}
 
-          {/* Message Bubble */}
-          <div
-            className={`rounded-2xl p-3 ${
-              message.isOwn
-                ? 'bg-[#2C3E50] text-white rounded-br-none'
-                : 'bg-white border border-gray-200 text-gray-900 rounded-bl-none'
-            }`}
-          >
-            {/* Text Content */}
-            {message.content && (
-              <p className="whitespace-pre-wrap break-words text-sm">
-                {message.content}
-              </p>
-            )}
+          {/* Message Bubble with hover actions */}
+          <div className="relative group">
+            {/* Action Bar */}
+            <div className={`absolute -top-3 flex gap-1 bg-white border border-gray-100 rounded-full shadow-md p-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity ${message.isOwn ? 'left-0' : 'right-0'}`}>
+              {onReply && <button onClick={onReply} className="p-1 hover:bg-gray-100 rounded text-gray-500" title="Reply"><Reply className="w-3.5 h-3.5" /></button>}
+              {onReact && <button onClick={() => onReact('👍')} className="p-1 hover:bg-gray-50 rounded">👍</button>}
+              {onReact && <button onClick={() => onReact('❤️')} className="p-1 hover:bg-gray-50 rounded">❤️</button>}
+              {onReact && <button onClick={() => onReact('🔥')} className="p-1 hover:bg-gray-50 rounded">🔥</button>}
+              {message.isOwn && onEdit && <button onClick={onEdit} className="p-1 hover:bg-gray-100 rounded text-gray-500" title="Edit"><Edit2 className="w-3.5 h-3.5" /></button>}
+              {onDelete && <button onClick={onDelete} className="p-1 hover:bg-gray-100 rounded text-red-500" title="Delete"><Trash className="w-3.5 h-3.5" /></button>}
+            </div>
 
-            {/* Images */}
-            {message.images && message.images.length > 0 && (
-              <div
-                className={`grid gap-2 ${
-                  message.images.length === 1
-                    ? 'grid-cols-1'
-                    : message.images.length === 2
-                    ? 'grid-cols-2'
-                    : 'grid-cols-2'
-                } ${message.content ? 'mt-2' : ''}`}
-              >
-                {message.images.map((img, idx) => (
-                  <img
-                    key={idx}
-                    src={img}
-                    alt={`Attachment ${idx + 1}`}
-                    className="rounded-lg max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
-                    onClick={() => window.open(img, '_blank')}
-                  />
-                ))}
-              </div>
-            )}
+            <div
+              className={`rounded-2xl p-3 relative ${
+                message.isOwn
+                  ? 'bg-[#2C3E50] text-white rounded-br-none'
+                  : 'bg-white border border-gray-200 text-gray-900 rounded-bl-none'
+              }`}
+            >
+              {/* Reply Preview */}
+              {message.replyTo && (
+                <div className={`text-xs p-1.5 mb-2 rounded border-l-2 bg-black/5 flex flex-col ${message.isOwn ? 'border-sky-400' : 'border-gray-400'}`}>
+                  <span className="font-semibold text-gray-500">{message.replyTo.senderName}</span>
+                  <span className="opacity-80 truncate">Replying to message</span>
+                </div>
+              )}
+
+              {/* Text Content */}
+              {message.content && (
+                <p className="whitespace-pre-wrap break-words text-sm">
+                  {message.content}
+                  {message.edited && <span className="text-[10px] opacity-60 ml-1">(edited)</span>}
+                </p>
+              )}
+
+              {/* Images */}
+              {message.images && message.images.length > 0 && (
+                <div
+                  className={`grid gap-2 ${
+                    message.images.length === 1
+                      ? 'grid-cols-1'
+                      : 'grid-cols-2'
+                  } ${message.content ? 'mt-2' : ''}`}
+                >
+                  {message.images.map((img, idx) => (
+                    <img
+                      key={idx}
+                      src={img}
+                      crossOrigin="anonymous"
+                      referrerPolicy="no-referrer"
+                      alt={`Attachment ${idx + 1}`}
+                      className="rounded-lg max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
+                      onClick={() => window.open(img, '_blank')}
+                    />
+                  ))}
+                </div>
+              )}
 
             {/* Files */}
             {message.files && message.files.length > 0 && (
@@ -125,23 +178,30 @@ export function ChatMessage({ message, showAvatar = true }: ChatMessageProps) {
                       message.isOwn ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-100 hover:bg-gray-200'
                     }`}
                   >
-                    <div
-                      className={`w-10 h-10 rounded flex items-center justify-center ${
-                        message.isOwn ? 'bg-white/20' : 'bg-gray-300'
-                      }`}
-                    >
-                      <span className="text-xs">
-                        {file.type.split('/')[1]?.toUpperCase().slice(0, 3) || 'FILE'}
-                      </span>
+                    <div className={`w-10 h-10 rounded flex items-center justify-center ${message.isOwn ? 'bg-white/20' : 'bg-gray-300'}`}>
+                      <span className="text-xs">{file.type.split('/')[1]?.toUpperCase().slice(0, 3) || 'FILE'}</span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-center">
-                        <div className="text-center">{file.name}</div>
+                      <div>
+                        <div>{file.name}</div>
                         <div className="text-xs opacity-70">{file.type}</div>
                       </div>
                     </div>
                     <Download className="w-4 h-4 flex-shrink-0" />
                   </a>
+                ))}
+              </div>
+            )}
+            </div> {/* bubble end */}
+
+            {/* Reactions Overlay */}
+            {reactions.length > 0 && (
+              <div className={`absolute -bottom-2 flex gap-1 bg-white border border-gray-100 rounded-full shadow-sm px-1.5 py-0.5 text-xs ${message.isOwn ? 'right-2' : 'left-2'}`}>
+                {Object.entries(aggregatedReactions).map(([emoji, count]) => (
+                  <span key={emoji} className="flex items-center gap-0.5" title={`${count} users`}>
+                    <span>{emoji}</span>
+                    {count > 1 && <span className="text-gray-500 font-medium">{count}</span>}
+                  </span>
                 ))}
               </div>
             )}

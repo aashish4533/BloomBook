@@ -204,7 +204,7 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
 
     } catch (err: any) {
       console.error('Failed to submit listing:', err);
-      toast.error('Failed to create listing. Please try again.');
+      toast.error(`Failed to create listing: ${err.message}`);
     } finally {
       setIsSubmitting(false);
     }

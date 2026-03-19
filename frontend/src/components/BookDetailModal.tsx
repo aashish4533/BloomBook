@@ -260,18 +260,6 @@ function NegotiateDialog({ book, onClose }: { book: Book; onClose: () => void })
         createdAt: serverTimestamp()
       });
 
-      // Send Notification to Seller
-      if (book.userId) {
-        await addDoc(collection(db, 'notifications'), {
-          userId: book.userId,
-          type: 'offer',
-          title: 'New Price Offer',
-          message: `${user.displayName || 'A buyer'} offered ${parseFloat(offerPrice)} for "${book.title}"`,
-          read: false,
-          createdAt: serverTimestamp(),
-          link: '/dashboard/sales' // Or relevant link
-        });
-      }
 
       toast.success('Offer sent to seller!');
       onClose();

@@ -1,0 +1,61 @@
+
+> lint
+> eslint --ext .js,.ts .
+
+
+C:\Users\Lenovo\Desktop\FYP\BookBloom\backend\functions\src\corsConfig.ts
+  13:36  error  Missing trailing comma  comma-dangle
+  14:14  error  Missing trailing comma  comma-dangle
+
+C:\Users\Lenovo\Desktop\FYP\BookBloom\backend\functions\src\notifications.ts
+   34:39   error  Missing trailing comma                   comma-dangle
+   84:54   error  Missing trailing comma                   comma-dangle
+  103:104  error  Trailing spaces not allowed              no-trailing-spaces
+  104:52   error  Trailing spaces not allowed              no-trailing-spaces
+  110:37   error  Trailing spaces not allowed              no-trailing-spaces
+  138:58   error  Trailing spaces not allowed              no-trailing-spaces
+  141:62   error  Trailing spaces not allowed              no-trailing-spaces
+  155:37   error  Missing trailing comma                   comma-dangle
+  157:110  error  Block must not be padded by blank lines  padded-blocks
+
+C:\Users\Lenovo\Desktop\FYP\BookBloom\backend\functions\src\payments.ts
+    2:36  warning  'firebase-functions/v2/https' imported multiple times  import/no-duplicates
+    3:27  warning  'firebase-functions/v2/https' imported multiple times  import/no-duplicates
+    8:59  error    Trailing spaces not allowed                            no-trailing-spaces
+   16:1   error    Missing JSDoc @return for function                     valid-jsdoc
+   16:1   error    Missing JSDoc for parameter 'baseAmount'               valid-jsdoc
+   17:79  error    Trailing spaces not allowed                            no-trailing-spaces
+   18:43  error    Trailing spaces not allowed                            no-trailing-spaces
+   27:17  error    Missing trailing comma                                 comma-dangle
+   32:24  error    Trailing spaces not allowed                            no-trailing-spaces
+   33:58  error    Trailing spaces not allowed                            no-trailing-spaces
+   53:1   error    Trailing spaces not allowed                            no-trailing-spaces
+   70:1   error    Trailing spaces not allowed                            no-trailing-spaces
+   78:1   error    Trailing spaces not allowed                            no-trailing-spaces
+   99:1   error    Trailing spaces not allowed                            no-trailing-spaces
+  106:27  error    Missing trailing comma                                 comma-dangle
+  110:55  error    Trailing spaces not allowed                            no-trailing-spaces
+  116:25  error    Missing trailing comma                                 comma-dangle
+  117:9   error    Block must not be padded by blank lines                padded-blocks
+  149:1   error    Trailing spaces not allowed                            no-trailing-spaces
+  152:1   error    Trailing spaces not allowed                            no-trailing-spaces
+  166:48  error    Missing trailing comma                                 comma-dangle
+  180:48  error    Missing trailing comma                                 comma-dangle
+  189:48  error    Missing trailing comma                                 comma-dangle
+
+C:\Users\Lenovo\Desktop\FYP\BookBloom\backend\functions\src\verification\identity.ts
+   65:1   error  Trailing spaces not allowed  no-trailing-spaces
+   68:1   error  Trailing spaces not allowed  no-trailing-spaces
+   82:1   error  Trailing spaces not allowed  no-trailing-spaces
+  103:83  error  Missing trailing comma       comma-dangle
+
+C:\Users\Lenovo\Desktop\FYP\BookBloom\backend\functions\src\verification\skillTest.ts
+   54:48  warning  'answer' is defined but never used  @typescript-eslint/no-unused-vars
+  136:1   error    Trailing spaces not allowed         no-trailing-spaces
+  152:28  error    Missing trailing comma              comma-dangle
+  159:1   error    Trailing spaces not allowed         no-trailing-spaces
+  166:31  error    Missing trailing comma              comma-dangle
+
+✖ 43 problems (40 errors, 3 warnings)
+  38 errors and 0 warnings potentially fixable with the `--fix` option.
+

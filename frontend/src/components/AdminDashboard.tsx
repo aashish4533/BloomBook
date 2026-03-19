@@ -4,9 +4,10 @@ import { RentalManagement } from './Admin/RentalManagement';
 import { TransactionHistory } from './Admin/TransactionHistory';
 import { SystemSettings } from './Admin/SystemSettings';
 import { CommunityManagement } from './Admin/CommunityManagement';
-import { NotesManagement } from './Admin/NotesManagement'; // New Import
+import { NotesManagement } from './Admin/NotesManagement';
+import { TuitionManagement } from './Admin/TuitionManagement';
 import { Button } from './ui/button';
-import { Users, BookOpen, Calendar, DollarSign, Settings, LogOut, BarChart3, Shield, MessageCircle, Bell, FileText } from 'lucide-react'; // Added FileText
+import { Users, BookOpen, Calendar, DollarSign, Settings, LogOut, BarChart3, Shield, MessageCircle, Bell, FileText, GraduationCap } from 'lucide-react';
 import { Outlet, NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase';
 import { collection, getAggregateFromServer, sum, count, doc, getDoc, setDoc } from 'firebase/firestore';
@@ -95,7 +96,8 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     { id: 'books', label: 'Book Inventory', icon: BookOpen, path: '/admin/dashboard/books' },
     { id: 'rentals', label: 'Rental Management', icon: Calendar, path: '/admin/dashboard/rentals' },
     { id: 'transactions', label: 'Transaction History', icon: DollarSign, path: '/admin/dashboard/transactions' },
-    { id: 'notes', label: 'Notes Management', icon: FileText, path: '/admin/dashboard/notes' }, // Integrated new tab
+    { id: 'notes', label: 'Notes Management', icon: FileText, path: '/admin/dashboard/notes' },
+    { id: 'tuition', label: 'Tuition Hub', icon: GraduationCap, path: '/admin/dashboard/tuition' },
     { id: 'communities', label: 'Communities', icon: MessageCircle, path: '/admin/dashboard/communities' },
     { id: 'announcements', label: 'Announcements', icon: Bell, path: '/admin/dashboard/announcements' },
     { id: 'settings', label: 'System Settings', icon: Settings, path: '/admin/dashboard/settings' },
@@ -108,9 +110,9 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
-      <aside className="w-64 bg-[#2C3E50] text-white flex flex-col">
+      <aside className="w-64 bg-[#2C3E50] text-white flex flex-col sticky top-0 h-screen">
         {/* Logo */}
-        <div className="p-6 border-b border-white/10">
+        <div className="p-6 border-b border-white/10 flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-[#C4A672] rounded-lg flex items-center justify-center">
               <Shield className="w-6 h-6 text-white" />
@@ -123,7 +125,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-2">
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (

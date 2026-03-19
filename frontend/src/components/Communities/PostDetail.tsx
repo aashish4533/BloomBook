@@ -98,6 +98,7 @@ export function PostDetail({ post, onClose, isAdmin, userId }: PostDetailProps &
   // SAFE BET: Pass `communityId`. Use `communities` collection.
 
   const [comments, setComments] = useState<Comment[]>([]);
+  const [isCommentsLoaded, setIsCommentsLoaded] = useState(false);
   const [activePost, setActivePost] = useState<Post>(post);
   const [showDeletePostAlert, setShowDeletePostAlert] = useState(false);
 
@@ -158,6 +159,16 @@ export function PostDetail({ post, onClose, isAdmin, userId }: PostDetailProps &
     });
     return () => unsubPost();
   }, [communityId, post.id]);
+ 
+  // Healing trigger for comment count sync
+  useEffect(() => {
+    if (isCommentsLoaded && activePost && activePost.commentCount !== comments.length && communityId) {
+      const postRef = doc(db, 'communities', communityId, 'posts', post.id);
+      updateDoc(postRef, {
+        commentCount: comments.length
+      });
+    }
+  }, [comments.length, activePost, communityId, post.id, isCommentsLoaded]);
 
 
   // 2. Listen to Comments
@@ -169,15 +180,15 @@ export function PostDetail({ post, onClose, isAdmin, userId }: PostDetailProps &
       orderBy('createdAt', 'asc')
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const allDocs = snapshot.docs.map(doc => {
-        const d = doc.data();
-        return {
-          id: doc.id,
-          ...d,
-          createdAt: formatTimestamp(d.createdAt),
-          replies: []
-        } as Comment;
-      });
+        const allDocs = snapshot.docs.map(doc => {
+          const d = doc.data();
+          return {
+            id: doc.id,
+            ...d,
+            createdAt: formatTimestamp(d.createdAt),
+            replies: []
+          } as unknown as Comment;
+        });
 
       const rootComments: Comment[] = [];
       const replyMap = new Map<string, Comment[]>();
@@ -195,8 +206,9 @@ export function PostDetail({ post, onClose, isAdmin, userId }: PostDetailProps &
       rootComments.forEach(c => {
         c.replies = replyMap.get(c.id) || [];
       });
-
+ 
       setComments(rootComments);
+      setIsCommentsLoaded(true);
     });
     return () => unsubscribe();
   }, [communityId, post.id]);
@@ -284,9 +296,7 @@ export function PostDetail({ post, onClose, isAdmin, userId }: PostDetailProps &
 
     // For Like Logic:
     try {
-      const ref = isReply && parentId
-        ? doc(db, 'communities', communityId, 'posts', post.id, 'comments', parentId, 'replies', commentId)
-        : doc(db, 'communities', communityId, 'posts', post.id, 'comments', commentId);
+      const ref = doc(db, 'communities', communityId, 'posts', post.id, 'comments', commentId);
 
       // Perform a transaction or check state? 
       // Simplified Toggle:

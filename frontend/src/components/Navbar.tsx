@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import { Home, ShoppingBag, Calendar, DollarSign, User, LogIn, UserPlus, LogOut, ChevronDown, UserCircle2, History, Heart, Settings, Users, Search, ArrowLeftRight, BookOpen, Sprout, Menu, Info, Phone, FileText, HelpCircle, Shield, ChevronRight, GraduationCap } from 'lucide-react';
 import { Button } from './ui/button';
 import { NotificationBell } from './NotificationBell';
-import { CartDrawer } from './Cart/CartDrawer';
 import { Link, useLocation } from 'react-router-dom';
 import { auth } from '../firebase';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose, SheetDescription } from './ui/sheet';
@@ -204,8 +203,6 @@ export function Navbar({
 
             {/* Auth Section */}
             <div className="flex items-center gap-3">
-              {/* Cart Drawer */}
-              <CartDrawer />
               {isLoggedIn ? (
                 <>
                   {/* Notification Bell */}

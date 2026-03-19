@@ -63,7 +63,9 @@ import { TransactionHistory } from './components/Admin/TransactionHistory';
 import { CommunityManagement } from './components/Admin/CommunityManagement';
 import { NotesManagement } from './components/Admin/NotesManagement';
 import { SystemSettings } from './components/Admin/SystemSettings';
+import { TuitionManagement } from './components/Admin/TuitionManagement';
 import { Button } from './components/ui/button';
+import { AIChatbox } from './components/Chat/AIChatbox';
 
 // Wrappers for components that need navigation or location state
 function SellBookFlowWrapper() {
@@ -261,6 +263,7 @@ function AppContent() {
               <Route path="rentals" element={<RentalManagement />} />
               <Route path="transactions" element={<TransactionHistory />} />
               <Route path="notes" element={<NotesManagement />} />
+              <Route path="tuition" element={<TuitionManagement />} />
               <Route path="communities" element={<CommunityManagement />} />
               <Route path="announcements" element={<AdminAnnouncementsWrapper />} />
               <Route path="settings" element={<SystemSettings />} />
@@ -271,6 +274,7 @@ function AppContent() {
         {/* Catch all */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <AIChatbox />
     </Router>
   );
 }

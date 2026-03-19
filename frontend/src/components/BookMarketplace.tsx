@@ -106,6 +106,11 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
       if (categoryFilter !== 'all') {
         constraints.push(where('category', '==', categoryFilter));
       }
+ 
+      if (listingType !== 'all') {
+        const typeSearch = listingType === 'sell' ? 'sale' : listingType;
+        constraints.push(where('availableFor', 'array-contains', typeSearch));
+      }
 
       // Sorting
       // Note: 'price' sort requires an index if combined with 'category' filter
@@ -152,7 +157,7 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
   // Initial fetch and when core backend filters change
   useEffect(() => {
     fetchBooks(false);
-  }, [categoryFilter, sortBy]);
+  }, [categoryFilter, sortBy, listingType]);
 
   // Client-side filtering for fields that are too complex for simple Firestore queries without many indexes
   // or text search (which Firestore doesn't natively support well for partial matches)
