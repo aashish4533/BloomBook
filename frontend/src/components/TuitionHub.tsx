@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GraduationCap, Video, Calendar, Clock, Star, Users, BookOpen, Search, Filter, ArrowLeft, Trash2, Edit2 } from 'lucide-react';
+import { GraduationCap, Video, Calendar, Clock, Star, Users, BookOpen, Search, Filter, ArrowLeft, Trash2, Edit2, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -10,12 +10,43 @@ import { ImageWithFallback } from './figma/ImageWithFallback';
 
 import { db, auth } from '../firebase';
 import { collection, addDoc, serverTimestamp, query, where, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { useCollection } from 'react-firebase-hooks/firestore';
+import { useCollection, useDocument } from 'react-firebase-hooks/firestore';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from './ui/dialog';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+
+// ─── Bids Sub-Collection List Component ──────────────────────────────────────
+const BidsList: React.FC<{ requestId: string; onAssign: (tutorId: string) => void; isOwner: boolean; status: string }> = ({ requestId, onAssign, isOwner, status }) => {
+  const { collection } = require('firebase/firestore');
+  const [bidsSnap] = useCollection(collection(db, 'tuition_requests', requestId, 'bids'));
+  const bids = bidsSnap?.docs.map(d => ({ id: d.id, ...d.data() })) || [];
+
+  return (
+    <div className="space-y-3 mt-4 bg-gray-50 p-4 rounded-xl border">
+      <h5 className="font-semibold text-sm text-[#2C3E50] flex items-center gap-1">
+        <Users className="w-4 h-4 text-[#C4A672]" /> 
+        Active Bids ({bids.length})
+      </h5>
+      {bids.map((b: any) => (
+        <div key={b.id} className="p-3 bg-white rounded-lg border shadow-sm flex justify-between items-center">
+          <div>
+            <p className="font-medium text-sm text-[#2C3E50]">{b.tutorName}</p>
+            <p className="text-xs text-[#C4A672] font-semibold">Rs. {b.amount}</p>
+            {b.message && <p className="text-xs text-gray-500 mt-1">"{b.message}"</p>}
+          </div>
+          {isOwner && status !== 'Assigned' && (
+            <Button size="sm" onClick={() => onAssign(b.tutorId)} className="bg-green-600 hover:bg-green-700 text-white h-8 text-xs">
+              Assign
+            </Button>
+          )}
+        </div>
+      ))}
+      {bids.length === 0 && <p className="text-xs text-gray-400 text-center py-2">No bids broadcasted inside this orbit yet.</p>}
+    </div>
+  );
+};
 
 interface Tutor {
   id: string;
@@ -43,6 +74,10 @@ interface TuitionRequest {
   gradeLevel: string;
   budget: string;
   createdAt: any;
+  difficulty?: string;
+  budget_range?: { min: number; max: number };
+  location?: { zip: string };
+  orbit_status?: string;
 }
 
 interface TuitionHubProps {
@@ -71,14 +106,24 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
     subject: '',
     topic: '',
     gradeLevel: '',
-    budget: ''
+    budget: '',
+    difficulty: 'Beginner',
+    minBudget: '',
+    maxBudget: '',
+    location: ''
   });
   const [isPostingRequest, setIsPostingRequest] = useState(false);
   const [editingRequestId, setEditingRequestId] = useState<string | null>(null);
   const [certFile, setCertFile] = useState<File | null>(null);
 
+  const [selectedRequestForBids, setSelectedRequestForBids] = useState<string | null>(null);
+  const [bidForm, setBidForm] = useState({ amount: '', message: '' });
+
   const [value, loading, error] = useCollection(collection(db, 'tutors'));
   const [requestsValue] = useCollection(query(collection(db, 'tuition_requests')));
+  
+  const [currentUserTutor] = useDocument(auth.currentUser ? doc(db, 'tutors', auth.currentUser.uid) : null);
+  const tutorStatus = currentUserTutor?.data()?.verificationStatus || 'Unregistered';
 
   const tutors = value?.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tutor)) || [];
   const tuitionRequests = requestsValue?.docs.map(doc => ({ id: doc.id, ...doc.data() } as TuitionRequest)) || [];
@@ -100,7 +145,9 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
           subject: requestForm.subject,
           topic: requestForm.topic,
           gradeLevel: requestForm.gradeLevel,
-          budget: requestForm.budget,
+          difficulty: requestForm.difficulty,
+          budget_range: { min: parseFloat(requestForm.minBudget || '0'), max: parseFloat(requestForm.maxBudget || '0') },
+          location: { zip: requestForm.location },
         });
         toast.success('Request updated successfully!');
       } else {
@@ -110,14 +157,18 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
           subject: requestForm.subject,
           topic: requestForm.topic,
           gradeLevel: requestForm.gradeLevel,
-          budget: requestForm.budget,
+          difficulty: requestForm.difficulty,
+          budget_range: { min: parseFloat(requestForm.minBudget || '0'), max: parseFloat(requestForm.maxBudget || '0') },
+          location: { zip: requestForm.location },
+          orbit_status: 'Open',
+          notified_tutors: [],
           createdAt: serverTimestamp()
         });
         toast.success('Request sent successfully!');
       }
       setIsPostingRequest(false);
       setEditingRequestId(null);
-      setRequestForm({ subject: '', topic: '', gradeLevel: '', budget: '' });
+      setRequestForm({ subject: '', topic: '', gradeLevel: '', budget: '', difficulty: 'Beginner', minBudget: '', maxBudget: '', location: '' });
     } catch (err) {
       toast.error(editingRequestId ? 'Failed to update request' : 'Failed to send request');
     }
@@ -138,10 +189,40 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
       subject: req.subject,
       topic: req.topic,
       gradeLevel: req.gradeLevel,
-      budget: req.budget || ''
+      budget: req.budget || '',
+      difficulty: (req as any).difficulty || 'Beginner',
+      minBudget: (req as any).budget_range?.min?.toString() || '',
+      maxBudget: (req as any).budget_range?.max?.toString() || '',
+      location: (req as any).location?.zip || ''
     });
     setEditingRequestId(req.id);
     setIsPostingRequest(true);
+  };
+
+  const handlePlaceBid = async (requestId: string) => {
+    if (!auth.currentUser || !bidForm.amount.trim()) return;
+    try {
+      const { setDoc, doc } = await import('firebase/firestore');
+      await setDoc(doc(db, 'tuition_requests', requestId, 'bids', auth.currentUser.uid), {
+        tutorId: auth.currentUser.uid,
+        tutorName: auth.currentUser.displayName || 'Anonymous',
+        amount: parseFloat(bidForm.amount),
+        message: bidForm.message,
+        createdAt: serverTimestamp()
+      });
+      toast.success('Bid placed successfully! 🛰️');
+      setBidForm({ amount: '', message: '' });
+    } catch { toast.error('Failed to place bid'); }
+  };
+
+  const handleAssignTutor = async (requestId: string, tutorId: string) => {
+    try {
+      await updateDoc(doc(db, 'tuition_requests', requestId), {
+        orbit_status: 'Assigned',
+        assignedTutorId: tutorId
+      });
+      toast.success('Tutor assigned to orbit! 🎉');
+    } catch { toast.error('Failed to assign tutor'); }
   };
 
   const handleBecomeTutor = async () => {
@@ -167,7 +248,8 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
         certUrl = data.secure_url;
       }
 
-      await addDoc(collection(db, 'tutors'), {
+      const { setDoc, doc } = await import('firebase/firestore');
+      await setDoc(doc(db, 'tutors', auth.currentUser.uid), {
         userId: auth.currentUser.uid,
         name: auth.currentUser.displayName || 'Anonymous',
         avatar: auth.currentUser.photoURL || '',
@@ -176,13 +258,14 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
         hourlyRate: parseFloat(tutorForm.hourlyRate),
         experience: tutorForm.experience,
         availability: tutorForm.availability,
-        availableHours: tutorForm.availableHours, // Save available hours
+        availableHours: tutorForm.availableHours, 
         bio: tutorForm.bio,
-        certificate: certUrl, // Save certificate URL
+        certificate: certUrl, 
         rating: 0,
         reviews: 0,
         students: 0,
-        verified: !!certUrl, // Auto-verify if cert provided (simplified logic)
+        verified: false, 
+        verificationStatus: 'Pending',
         createdAt: serverTimestamp()
       });
       toast.success('Tutor profile created successfully!');
@@ -261,6 +344,25 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
               className="pl-12 h-14 bg-white border-0"
             />
           </div>
+
+          {/* Verification Status Banner */}
+          {isLoggedIn && tutorStatus !== 'Unregistered' && tutorStatus !== 'Verified' && (
+            <div className={`mt-4 p-4 rounded-xl border flex items-center gap-3 max-w-2xl ${
+              tutorStatus === 'Rejected' 
+                ? 'bg-red-500/10 border-red-500/30 text-red-100' 
+                : 'bg-amber-500/10 border-amber-500/30 text-amber-100'
+            }`}>
+              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold">Verification {tutorStatus}</p>
+                <p className="text-sm opacity-90">
+                  {tutorStatus === 'Reviewing' 
+                    ? 'Automated scans passed. Waiting for Admin manual review and approval.' 
+                    : 'Your trajectory failed stabilization phase. Please review and try again.'}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -360,13 +462,13 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                 }}
                 className="bg-[#C4A672] hover:bg-[#8B7355] text-white"
               >
-                Become a Tutor
+                {tutorStatus === 'Unregistered' ? 'Become a Tutor' : 'Review Verification'}
               </Button>
               <Dialog open={isPostingRequest} onOpenChange={(open: boolean) => {
                 setIsPostingRequest(open);
                 if (!open) {
                   setEditingRequestId(null);
-                  setRequestForm({ subject: '', topic: '', gradeLevel: '', budget: '' });
+                  setRequestForm({ subject: '', topic: '', gradeLevel: '', budget: '', difficulty: 'Beginner', minBudget: '', maxBudget: '', location: '' });
                 }
               }}>
                 <DialogTrigger asChild>
@@ -385,7 +487,36 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                     <Input placeholder="Subject (e.g. Math)" value={requestForm.subject} onChange={e => setRequestForm({ ...requestForm, subject: e.target.value })} />
                     <Input placeholder="Details (e.g. Need help with Grade 10 Geometry)" value={requestForm.topic} onChange={e => setRequestForm({ ...requestForm, topic: e.target.value })} />
                     <Input placeholder="Grade Level" value={requestForm.gradeLevel} onChange={e => setRequestForm({ ...requestForm, gradeLevel: e.target.value })} />
-                    <Input placeholder="Budget (Optional)" value={requestForm.budget} onChange={e => setRequestForm({ ...requestForm, budget: e.target.value })} />
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-xs">Difficulty</Label>
+                        <select 
+                          value={requestForm.difficulty} 
+                          onChange={e => setRequestForm({ ...requestForm, difficulty: e.target.value })}
+                          className="w-full border rounded h-10 px-3 bg-white text-sm"
+                        >
+                          <option value="Beginner">Beginner</option>
+                          <option value="Intermediate">Intermediate</option>
+                          <option value="Advanced">Advanced</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label className="text-xs">Location (ZIP)</Label>
+                        <Input placeholder="e.g. 54000" value={requestForm.location} onChange={e => setRequestForm({ ...requestForm, location: e.target.value })} />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-xs">Min Budget (Rs.)</Label>
+                        <Input type="number" placeholder="Min" value={requestForm.minBudget} onChange={e => setRequestForm({ ...requestForm, minBudget: e.target.value })} />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Max Budget (Rs.)</Label>
+                        <Input type="number" placeholder="Max" value={requestForm.maxBudget} onChange={e => setRequestForm({ ...requestForm, maxBudget: e.target.value })} />
+                      </div>
+                    </div>
                     <Button onClick={handlePostRequest} className="bg-[#C4A672] text-white">
                       {editingRequestId ? 'Update Request' : 'Send Request'}
                     </Button>
@@ -405,26 +536,86 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
               <h3 className="text-[#2C3E50] text-xl mb-4">Student Requests</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {tuitionRequests.map(req => (
-                  <Card key={req.id} className="p-4 border border-blue-100 bg-blue-50/50">
-                    <div className="flex justify-between items-start mb-2">
-                      <Badge variant="outline" className="bg-white">{req.subject}</Badge>
-                      <div className="flex items-center gap-2">
-                        {auth.currentUser?.uid === req.studentId && (
-                          <div className="flex gap-1">
-                            <button onClick={() => handleEditRequest(req)} className="text-gray-400 hover:text-[#C4A672] transition-colors p-1">
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button onClick={() => handleDeleteRequest(req.id)} className="text-gray-400 hover:text-red-500 transition-colors p-1">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
+                  <Card key={req.id} className="p-5 border border-blue-100 bg-blue-50/30 flex flex-col justify-between hover:shadow-md transition-shadow">
+                    <div>
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex gap-1 flex-wrap">
+                          <Badge variant="outline" className="bg-white">{req.subject}</Badge>
+                          <Badge className={
+                            req.difficulty === 'Advanced' ? 'bg-red-100 text-red-700 border-red-200' :
+                            req.difficulty === 'Intermediate' ? 'bg-orange-100 text-orange-700 border-orange-200' :
+                            'bg-green-100 text-green-700 border-green-200'
+                          } variant="outline">
+                            {req.difficulty || 'Beginner'}
+                          </Badge>
+                          <Badge variant="secondary" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                            Status: {(req as any).orbit_status || 'Open'}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {auth.currentUser?.uid === req.studentId && (
+                            <div className="flex gap-1">
+                              <button onClick={() => handleEditRequest(req)} className="text-gray-400 hover:text-[#C4A672] transition-colors p-1">
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button onClick={() => handleDeleteRequest(req.id)} className="text-gray-400 hover:text-red-500 transition-colors p-1">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <h4 className="font-semibold text-[#2C3E50] mb-1">{req.topic}</h4>
+                      <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
+                        <Users className="w-3.5 h-3.5" /> From {req.studentName}
+                      </p>
+                      
+                      <div className="bg-white/60 p-2 rounded-lg text-xs space-y-1 mb-3">
+                        {(req as any).budget_range && (
+                          <p><span className="text-gray-500">Budget:</span> <span className="font-semibold text-[#C4A672]">Rs. {(req as any).budget_range.min} - {(req as any).budget_range.max}</span></p>
                         )}
-                        <span className="text-xs text-gray-500">From {req.studentName}</span>
+                        {(req as any).location?.zip && (
+                          <p><span className="text-gray-500">Location (ZIP):</span> <span>{(req as any).location.zip}</span></p>
+                        )}
                       </div>
                     </div>
-                    <h4 className="font-medium text-[#2C3E50] mb-1">{req.topic}</h4>
-                    <p className="text-sm text-gray-600 mb-2">{req.gradeLevel}</p>
-                    {req.budget && <p className="text-sm font-semibold text-[#C4A672]">Budget: {req.budget}</p>}
+
+                    <div className="border-t pt-3 mt-auto">
+                      {auth.currentUser?.uid === req.studentId ? (
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button size="sm" className="w-full bg-[#C4A672] hover:bg-[#8B7355] text-white text-xs py-1 h-8">
+                              View Radar 🛰️ Bids
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Bids for "{req.topic}"</DialogTitle>
+                            </DialogHeader>
+                            <BidsList requestId={req.id} onAssign={(tId) => handleAssignTutor(req.id, tId)} isOwner={true} status={(req as any).orbit_status || 'Open'} />
+                          </DialogContent>
+                        </Dialog>
+                      ) : tutorStatus === 'Verified' && (req as any).orbit_status !== 'Assigned' && (
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button size="sm" className="w-full bg-[#2C3E50] hover:bg-[#1a252f] text-white text-xs py-1 h-8">
+                              Express Interest 🚀
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Place a Bid</DialogTitle>
+                              <DialogDescription>Offer your Expertise to this client.</DialogDescription>
+                            </DialogHeader>
+                            <div className="grid gap-3 py-3">
+                              <Input type="number" placeholder="Offer Amount (Rs.)" value={bidForm.amount} onChange={e => setBidForm({ ...bidForm, amount: e.target.value })} />
+                              <Textarea placeholder="Message (Optional)" value={bidForm.message} onChange={e => setBidForm({ ...bidForm, message: e.target.value })} />
+                              <Button onClick={() => handlePlaceBid(req.id)} className="bg-[#C4A672] text-white">Broadcast Bid</Button>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                      )}
+                    </div>
                   </Card>
                 ))}
               </div>

@@ -27,6 +27,48 @@
                     "order": "DESCENDING"
                 }
             ]
+        },
+        {
+            "collectionGroup": "purchases",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "buyerId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "date",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "sales",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "sellerId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "date",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "rentals",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "renterId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "startDate",
+                    "order": "DESCENDING"
+                }
+            ]
         }
     ],
     "fieldOverrides": []

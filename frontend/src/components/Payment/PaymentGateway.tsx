@@ -27,9 +27,9 @@ export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel, c
   const [transactionId, setTransactionId] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
 
-  // Gravitational 2% Platform Stabilization Fee
-  const stabilizationFee = amount * 0.02;
-  const totalAmount = amount + stabilizationFee;
+  // Gravitational 10% Platform Stabilization Fee (Inclusive in listed amount)
+  const stabilizationFee = amount * 0.10;
+  const totalAmount = amount;
 
   // Card details
   const [cardNumber, setCardNumber] = useState('');
@@ -132,11 +132,12 @@ export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel, c
       const createPaymentIntent = httpsCallable(functions, 'createPaymentIntent');
       
       const payload = {
-        amount: amount, // Cloud function handles fee independently but uses base amount
+        amount: amount, 
         type: type,
         itemTitle: itemTitle,
         method: paymentMethod,
-        mobileNumber: mobileNumber
+        mobileNumber: mobileNumber,
+        cartItems: cartItems ? cartItems.map(i => ({ id: i.id, sellerId: i.sellerId, price: i.price })) : []
       };
 
       const response: any = await createPaymentIntent(payload);
@@ -239,12 +240,12 @@ export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel, c
             <div className="absolute top-0 right-0 w-32 h-32 bg-[#C4A672]/5 rounded-full -translate-y-1/2 translate-x-1/2" />
             <h3 className="text-[#2C3E50] mb-3 relative z-10">Orbital Summary</h3>
             <div className="flex justify-between items-center mb-2 relative z-10">
-              <span className="text-gray-600">{itemTitle} (Base Mass)</span>
-              <span className="text-[#2C3E50]">Rs. {amount.toLocaleString()}</span>
+              <span className="text-gray-600">{itemTitle} (Subtotal)</span>
+              <span className="text-[#2C3E50]">Rs. {(amount - stabilizationFee).toLocaleString()}</span>
             </div>
             <div className="flex justify-between items-center mb-2 relative z-10 group">
-              <span className="text-gray-600 border-b border-dashed border-gray-400 cursor-help" title="Mandatory platform fee to maintain network equilibrium">
-                Stabilization Fee (2%)
+              <span className="text-gray-600 border-b border-dashed border-gray-400 cursor-help" title="Platform fee maintaining network equilibrium">
+                Stabilization Fee (10%)
               </span>
               <span className="text-[#2C3E50]">+ Rs. {stabilizationFee.toLocaleString()}</span>
             </div>

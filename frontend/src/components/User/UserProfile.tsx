@@ -23,11 +23,24 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { useDocument } from 'react-firebase-hooks/firestore';
 
+import { ArrowLeft } from 'lucide-react';
+import { PurchaseHistory } from './PurchaseHistory';
+import { SalesHistory } from './SalesHistory';
+import { RentalHistory } from './RentalHistory';
+import { UserCommunities } from './UserCommunities';
+import { UserChats } from './UserChats';
+import { UserExchanges } from './UserExchanges';
+import { NegotiationInbox } from './NegotiationInbox';
+import { Wishlist } from './Wishlist';
+
+
 export function UserProfile() {
   const [isEditing, setIsEditing] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
   const [showAdminSwitchConfirm, setShowAdminSwitchConfirm] = useState(false);
+  const [activeTab, setActiveTab] = useState<'profile' | 'purchases' | 'sales' | 'rentals' | 'wishlist' | 'communities' | 'chats' | 'exchanges' | 'negotiations'>('profile');
+
 
   const user = auth.currentUser;
   const [value, loading, error] = useDocument(
@@ -77,8 +90,8 @@ export function UserProfile() {
         displayName: profile.name,
         personalInfo: {
           phoneNumber: profile.phone
-        }, // Update nested object
-        streetAddress: profile.address, // Save as streetAddress as requested implies distinction, but UI uses 'address'
+        }, 
+        streetAddress: profile.address, 
         state: profile.state
       });
       setIsEditing(false);
@@ -108,7 +121,6 @@ export function UserProfile() {
       async (position) => {
         try {
           const { latitude, longitude } = position.coords;
-          // Use OpenStreetMap Nominatim for reverse geocoding
           const response = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
           );
@@ -147,6 +159,18 @@ export function UserProfile() {
 
   return (
     <div className="space-y-6">
+      {/* Back to Profile Button when in sub-tabs */}
+      {activeTab !== 'profile' && (
+        <Button 
+          variant="outline" 
+          onClick={() => setActiveTab('profile')} 
+          className="bg-white hover:bg-gray-50 text-[#2C3E50]"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to Profile Overview
+        </Button>
+      )}
+
       {/* Profile Header */}
       <div className="bg-white rounded-xl shadow-sm p-6">
         <div className="flex items-start justify-between">
@@ -164,7 +188,7 @@ export function UserProfile() {
               </div>
             </div>
           </div>
-          {!isEditing && (
+          {activeTab === 'profile' && !isEditing && (
             <Button
               onClick={() => setIsEditing(true)}
               className="bg-[#C4A672] hover:bg-[#8B7355] text-white"
@@ -175,245 +199,261 @@ export function UserProfile() {
         </div>
       </div>
 
-      {/* Dashboard Overview */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div onClick={() => navigate('/dashboard/purchases')} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all group">
-          <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-            <ShoppingBag className="w-5 h-5 text-blue-600" />
+      {activeTab === 'profile' ? (
+        <>
+          {/* Dashboard Overview */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div onClick={() => setActiveTab('purchases')} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all group">
+              <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                <ShoppingBag className="w-5 h-5 text-blue-600" />
+              </div>
+              <h3 className="font-medium text-gray-900">Purchases</h3>
+              <p className="text-xs text-gray-500">View history</p>
+            </div>
+            <div onClick={() => setActiveTab('sales')} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all group">
+              <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                <DollarSign className="w-5 h-5 text-green-600" />
+              </div>
+              <h3 className="font-medium text-gray-900">Sales</h3>
+              <p className="text-xs text-gray-500">Track earnings</p>
+            </div>
+            <div onClick={() => setActiveTab('rentals')} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all group">
+              <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                <Calendar className="w-5 h-5 text-orange-600" />
+              </div>
+              <h3 className="font-medium text-gray-900">Rentals</h3>
+              <p className="text-xs text-gray-500">Active & history</p>
+            </div>
+            <div onClick={() => setActiveTab('wishlist')} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all group">
+              <div className="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                <Heart className="w-5 h-5 text-red-600" />
+              </div>
+              <h3 className="font-medium text-gray-900">Wishlist</h3>
+              <p className="text-xs text-gray-500">Saved items</p>
+            </div>
+            <div onClick={() => setActiveTab('communities')} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all group">
+              <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                <Users className="w-5 h-5 text-purple-600" />
+              </div>
+              <h3 className="font-medium text-gray-900">Communities</h3>
+              <p className="text-xs text-gray-500">Groups</p>
+            </div>
+            <div onClick={() => setActiveTab('chats')} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all group">
+              <div className="w-10 h-10 bg-teal-50 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                <MessageCircle className="w-5 h-5 text-teal-600" />
+              </div>
+              <h3 className="font-medium text-gray-900">Chats</h3>
+              <p className="text-xs text-gray-500">Messages</p>
+            </div>
+            <div onClick={() => setActiveTab('exchanges')} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all group">
+              <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                <ArrowLeftRight className="w-5 h-5 text-indigo-600" />
+              </div>
+              <h3 className="font-medium text-gray-900">Exchanges</h3>
+              <p className="text-xs text-gray-500">Swap books</p>
+            </div>
+            <div onClick={() => setActiveTab('negotiations')} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all group">
+              <div className="w-10 h-10 bg-yellow-50 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                <Gavel className="w-5 h-5 text-yellow-600" />
+              </div>
+              <h3 className="font-medium text-gray-900">Negotiations</h3>
+              <p className="text-xs text-gray-500">Offers</p>
+            </div>
           </div>
-          <h3 className="font-medium text-gray-900">Purchases</h3>
-          <p className="text-xs text-gray-500">View history</p>
-        </div>
-        <div onClick={() => navigate('/dashboard/sales')} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all group">
-          <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-            <DollarSign className="w-5 h-5 text-green-600" />
-          </div>
-          <h3 className="font-medium text-gray-900">Sales</h3>
-          <p className="text-xs text-gray-500">Track earnings</p>
-        </div>
-        <div onClick={() => navigate('/dashboard/rentals')} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all group">
-          <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-            <Calendar className="w-5 h-5 text-orange-600" />
-          </div>
-          <h3 className="font-medium text-gray-900">Rentals</h3>
-          <p className="text-xs text-gray-500">Active & history</p>
-        </div>
-        <div onClick={() => navigate('/dashboard/wishlist')} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all group">
-          <div className="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-            <Heart className="w-5 h-5 text-red-600" />
-          </div>
-          <h3 className="font-medium text-gray-900">Wishlist</h3>
-          <p className="text-xs text-gray-500">Saved items</p>
-        </div>
-        <div onClick={() => navigate('/dashboard/communities')} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all group">
-          <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-            <Users className="w-5 h-5 text-purple-600" />
-          </div>
-          <h3 className="font-medium text-gray-900">Communities</h3>
-          <p className="text-xs text-gray-500">Groups</p>
-        </div>
-        <div onClick={() => navigate('/dashboard/chats')} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all group">
-          <div className="w-10 h-10 bg-teal-50 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-            <MessageCircle className="w-5 h-5 text-teal-600" />
-          </div>
-          <h3 className="font-medium text-gray-900">Chats</h3>
-          <p className="text-xs text-gray-500">Messages</p>
-        </div>
-        <div onClick={() => navigate('/dashboard/exchanges')} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all group">
-          <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-            <ArrowLeftRight className="w-5 h-5 text-indigo-600" />
-          </div>
-          <h3 className="font-medium text-gray-900">Exchanges</h3>
-          <p className="text-xs text-gray-500">Swap books</p>
-        </div>
-        <div onClick={() => navigate('/dashboard/negotiations')} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all group">
-          <div className="w-10 h-10 bg-yellow-50 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-            <Gavel className="w-5 h-5 text-yellow-600" />
-          </div>
-          <h3 className="font-medium text-gray-900">Negotiations</h3>
-          <p className="text-xs text-gray-500">Offers</p>
-        </div>
-      </div>
 
-      {/* Personal Information */}
-      <div className="bg-white rounded-xl shadow-sm p-6">
-        <h3 className="text-[#2C3E50] mb-6 flex items-center gap-2">
-          <User className="w-5 h-5" />
-          Personal Information
-        </h3>
+          {/* Personal Information */}
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h3 className="text-[#2C3E50] mb-6 flex items-center gap-2">
+              <User className="w-5 h-5" />
+              Personal Information
+            </h3>
 
-        <div className="grid grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <Label htmlFor="name">Full Name</Label>
-            <Input
-              id="name"
-              value={profile.name}
-              onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-              disabled={!isEditing}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="phone">Phone Number</Label>
-            <Input
-              id="phone"
-              value={profile.phone}
-              onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-              disabled={!isEditing}
-            />
-          </div>
-          <div className="space-y-2 col-span-2">
-            <Label htmlFor="email">Email Address</Label>
-            <Input
-              id="email"
-              type="email"
-              value={auth.currentUser?.email || profile.email}
-              readOnly
-              className="bg-gray-50"
-              disabled
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Location */}
-      <div className="bg-white rounded-xl shadow-sm p-6">
-        <h3 className="text-[#2C3E50] mb-6 flex items-center gap-2 justify-between">
-          <div className="flex items-center gap-2">
-            <MapPin className="w-5 h-5" />
-            Location
-          </div>
-          {isEditing && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleUseCurrentLocation}
-              type="button"
-              className="text-xs"
-            >
-              Use Current Location
-            </Button>
-          )}
-        </h3>
-
-        <div className="grid grid-cols-2 gap-6">
-          <div className="space-y-2 col-span-2">
-            <Label htmlFor="address">Street Address</Label>
-            <Input
-              id="address"
-              value={profile.address}
-              onChange={(e) => setProfile({ ...profile, address: e.target.value })}
-              disabled={!isEditing}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="city">City</Label>
-            <Input
-              id="city"
-              value={profile.city}
-              onChange={(e) => setProfile({ ...profile, city: e.target.value })}
-              disabled={!isEditing}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="state">State</Label>
-            <Input
-              id="state"
-              value={profile.state}
-              onChange={(e) => setProfile({ ...profile, state: e.target.value })}
-              disabled={!isEditing}
-            />
-          </div>
-          <div className="space-y-2 col-span-2">
-            <Label htmlFor="zipCode">ZIP Code</Label>
-            <Input
-              id="zipCode"
-              value={profile.zipCode}
-              onChange={(e) => setProfile({ ...profile, zipCode: e.target.value })}
-              disabled={!isEditing}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Payment Methods */}
-      <div className="bg-white rounded-xl shadow-sm p-6">
-        <h3 className="text-[#2C3E50] mb-6 flex items-center gap-2">
-          <CreditCard className="w-5 h-5" />
-          Payment Methods
-        </h3>
-
-        <div className="space-y-4">
-          <div className="border border-gray-200 rounded-lg p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <CreditCard className="w-6 h-6 text-gray-400" />
-              <div>
-                <p className="text-[#2C3E50]">Visa ending in 1234</p>
-                <p className="text-sm text-gray-500">Expires 12/25</p>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="name">Full Name</Label>
+                <Input
+                  id="name"
+                  value={profile.name}
+                  onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                  disabled={!isEditing}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone Number</Label>
+                <Input
+                  id="phone"
+                  value={profile.phone}
+                  onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                  disabled={!isEditing}
+                />
+              </div>
+              <div className="space-y-2 col-span-2">
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={auth.currentUser?.email || profile.email}
+                  readOnly
+                  className="bg-gray-50"
+                  disabled
+                />
               </div>
             </div>
-            <Button variant="outline" size="sm">Manage</Button>
           </div>
-          <Button variant="outline" className="w-full">
-            Add Payment Method
-          </Button>
-        </div>
-      </div>
 
-      {/* Security */}
-      <div className="bg-white rounded-xl shadow-sm p-6">
-        <h3 className="text-[#2C3E50] mb-6 flex items-center gap-2">
-          <Lock className="w-5 h-5" />
-          Security & Access
-        </h3>
+          {/* Location */}
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h3 className="text-[#2C3E50] mb-6 flex items-center gap-2 justify-between">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-5 h-5" />
+                Location
+              </div>
+              {isEditing && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleUseCurrentLocation}
+                  type="button"
+                  className="text-xs"
+                >
+                  Use Current Location
+                </Button>
+              )}
+            </h3>
 
-        <div className="space-y-4">
-          <Button
-            variant="outline"
-            onClick={() => setShowChangePassword(true)}
-            className="w-full justify-start hover:bg-[#FAF8F3] transition-colors"
-          >
-            <Lock className="w-4 h-4 mr-2" />
-            Change Password
-          </Button>
-          <Separator />
-          <Button
-            variant="outline"
-            onClick={() => setShowAdminSwitchConfirm(true)}
-            className="w-full justify-start hover:bg-blue-50 border-blue-200 text-blue-700 transition-colors"
-          >
-            <Shield className="w-4 h-4 mr-2" />
-            Login as Admin
-          </Button>
-          <Separator />
-          <Button
-            variant="outline"
-            onClick={() => setShowDeleteAccount(true)}
-            className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors"
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Delete Account
-          </Button>
-        </div>
-      </div>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-2 col-span-2">
+                <Label htmlFor="address">Street Address</Label>
+                <Input
+                  id="address"
+                  value={profile.address}
+                  onChange={(e) => setProfile({ ...profile, address: e.target.value })}
+                  disabled={!isEditing}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="city">City</Label>
+                <Input
+                  id="city"
+                  value={profile.city}
+                  onChange={(e) => setProfile({ ...profile, city: e.target.value })}
+                  disabled={!isEditing}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="state">State</Label>
+                <Input
+                  id="state"
+                  value={profile.state}
+                  onChange={(e) => setProfile({ ...profile, state: e.target.value })}
+                  disabled={!isEditing}
+                />
+              </div>
+              <div className="space-y-2 col-span-2">
+                <Label htmlFor="zipCode">ZIP Code</Label>
+                <Input
+                  id="zipCode"
+                  value={profile.zipCode}
+                  onChange={(e) => setProfile({ ...profile, zipCode: e.target.value })}
+                  disabled={!isEditing}
+                />
+              </div>
+            </div>
+          </div>
 
-      {/* Save/Cancel Buttons */}
-      {isEditing && (
-        <div className="flex gap-3">
-          <Button
-            variant="outline"
-            onClick={() => setIsEditing(false)}
-            className="flex-1"
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSave}
-            className="flex-1 bg-[#C4A672] hover:bg-[#8B7355] text-white"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            Save Changes
-          </Button>
+          {/* Payment Methods */}
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h3 className="text-[#2C3E50] mb-6 flex items-center gap-2">
+              <CreditCard className="w-5 h-5" />
+              Payment Methods
+            </h3>
+
+            <div className="space-y-4">
+              <div className="border border-gray-200 rounded-lg p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <CreditCard className="w-6 h-6 text-gray-400" />
+                  <div>
+                    <p className="text-[#2C3E50]">Visa ending in 1234</p>
+                    <p className="text-sm text-gray-500">Expires 12/25</p>
+                  </div>
+                </div>
+                <Button variant="outline" size="sm">Manage</Button>
+              </div>
+              <Button variant="outline" className="w-full">
+                Add Payment Method
+              </Button>
+            </div>
+          </div>
+
+          {/* Security */}
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h3 className="text-[#2C3E50] mb-6 flex items-center gap-2">
+              <Lock className="w-5 h-5" />
+              Security & Access
+            </h3>
+
+            <div className="space-y-4">
+              <Button
+                variant="outline"
+                onClick={() => setShowChangePassword(true)}
+                className="w-full justify-start hover:bg-[#FAF8F3] transition-colors"
+              >
+                <Lock className="w-4 h-4 mr-2" />
+                Change Password
+              </Button>
+              <Separator />
+              <Button
+                variant="outline"
+                onClick={() => setShowAdminSwitchConfirm(true)}
+                className="w-full justify-start hover:bg-blue-50 border-blue-200 text-blue-700 transition-colors"
+              >
+                <Shield className="w-4 h-4 mr-2" />
+                Login as Admin
+              </Button>
+              <Separator />
+              <Button
+                variant="outline"
+                onClick={() => setShowDeleteAccount(true)}
+                className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete Account
+              </Button>
+            </div>
+          </div>
+
+          {/* Save/Cancel Buttons */}
+          {isEditing && (
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setIsEditing(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSave}
+                className="flex-1 bg-[#C4A672] hover:bg-[#8B7355] text-white"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                Save Changes
+              </Button>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          {activeTab === 'purchases' && <PurchaseHistory />}
+          {activeTab === 'sales' && <SalesHistory />}
+          {activeTab === 'rentals' && <RentalHistory />}
+          {activeTab === 'communities' && <UserCommunities />}
+          {activeTab === 'chats' && <UserChats onOpenChat={() => {}} />}
+          {activeTab === 'exchanges' && <UserExchanges />}
+          {activeTab === 'negotiations' && <NegotiationInbox />}
+          {activeTab === 'wishlist' && <Wishlist onNavigateToMarketplace={() => setActiveTab('profile')} />}
         </div>
+
       )}
 
       {/* Modals */}

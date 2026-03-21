@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { apiClient } from '../services/apiClient';
 import { SkillTest } from './SkillTest';
-import { auth } from '../firebase';
+import { auth, db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle, XCircle, Star, Trophy, BookOpen, ArrowRight } from 'lucide-react';
 
-const STEPS = ['Integrity Checksum', 'Scanning Credentials', 'Profile Orbit', 'Cognitive Index'];
+const STEPS = ['Profile Orbit', 'Integrity Checksum', 'Scanning Credentials', 'Cognitive Index'];
 
 // ─── Success / Failure Screen ────────────────────────────────────────────────
 const VerificationCompleteScreen: React.FC<{
@@ -165,6 +165,12 @@ export const TutorVerificationForm: React.FC = () => {
   const [certMetadata, setCertMetadata] = useState({ institution: '', degree: '', year: '' });
 
   const [profileLinks, setProfileLinks] = useState({ github: '', stackoverflow: '' });
+  const [profileData, setProfileData] = useState({
+    bio: '',
+    subject: '',
+    hourlyRate: '',
+    specialization: ''
+  });
 
   const storage = getStorage();
   const navigate = useNavigate();
@@ -205,12 +211,12 @@ export const TutorVerificationForm: React.FC = () => {
       const idUrl = await handleFileUpload(idFile, `verification/${userId}/${Date.now()}_id`);
       const selfieUrl = await handleFileUpload(selfieFile, `verification/${userId}/${Date.now()}_selfie`);
       const result: any = await apiClient.verifyIdentity({ idUrl, selfieUrl });
-      if (result.status === 'grounded') {
+      if (result.status === 'grounded' || result.status === 'Rejected') {
         setError(result.message || 'Atmospheric Re-entry denied. Integrity Checksum failed twice.');
         return;
       }
       setVerificationStatus((prev: any) => ({ ...prev, identity: result }));
-      setCurrentStep(1);
+      setCurrentStep(2); // Next is Credentials
     } catch (err: any) {
       setError(err.message || 'Identity verification failed.');
     } finally { setLoading(false); }
@@ -229,23 +235,36 @@ export const TutorVerificationForm: React.FC = () => {
         graduationYear: Number(certMetadata.year)
       });
       setVerificationStatus((prev: any) => ({ ...prev, certificate: result }));
-      setCurrentStep(2);
+      setCurrentStep(3); // Next is Skill Test
     } catch (err: any) {
       setError(err.message || 'Certificate verification failed.');
     } finally { setLoading(false); }
   };
 
   const handleProfileSubmit = async () => {
+    if (!profileData.bio.trim() || !profileData.subject.trim()) {
+      setError('Please fill in Bio and Primary Subject.');
+      return;
+    }
     setLoading(true); setError(null);
     try {
-      const result: any = await apiClient.verifyProfiles({
-        githubUsername: profileLinks.github,
-        stackOverflowId: profileLinks.stackoverflow
-      });
-      setVerificationStatus((prev: any) => ({ ...prev, profiles: result }));
-      setCurrentStep(3);
+      const { setDoc, doc } = await import('firebase/firestore');
+      await setDoc(doc(db, 'tutors', auth.currentUser!.uid), {
+        userId: auth.currentUser!.uid,
+        name: auth.currentUser!.displayName || 'Anonymous',
+        avatar: auth.currentUser!.photoURL || '',
+        bio: profileData.bio,
+        subject: profileData.subject,
+        hourlyRate: parseFloat(profileData.hourlyRate || '0'),
+        specialization: profileData.specialization,
+        verificationStatus: 'Pending',
+        verified: false,
+        createdAt: new Date()
+      }, { merge: true });
+      
+      setCurrentStep(1); // Move to Integrity Checksum
     } catch (err: any) {
-      setError(err.message || 'Profile verification failed.');
+      setError(err.message || 'Profile initialization failed.');
     } finally { setLoading(false); }
   };
 
@@ -306,7 +325,35 @@ export const TutorVerificationForm: React.FC = () => {
 
         {currentStep === 0 && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-semibold text-[#2C3E50]">Phase 1: Integrity Checksum</h2>
+            <h2 className="text-2xl font-semibold text-[#2C3E50]">Phase 1: Profile Orbit</h2>
+            <p className="text-sm text-gray-600">Establish your baseline profile information for students to discover.</p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Primary Subject</label>
+                <input type="text" value={profileData.subject} onChange={e => setProfileData(prev => ({ ...prev, subject: e.target.value }))} className="w-full border p-2 rounded" placeholder="e.g. Mathematics" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Specialization</label>
+                <input type="text" value={profileData.specialization} onChange={e => setProfileData(prev => ({ ...prev, specialization: e.target.value }))} className="w-full border p-2 rounded" placeholder="e.g. Calculus & Algebra" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Hourly Rate (Rs.)</label>
+                <input type="number" value={profileData.hourlyRate} onChange={e => setProfileData(prev => ({ ...prev, hourlyRate: e.target.value }))} className="w-full border p-2 rounded" placeholder="e.g. 1500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Bio</label>
+                <textarea value={profileData.bio} onChange={e => setProfileData(prev => ({ ...prev, bio: e.target.value }))} className="w-full border p-2 rounded h-24" placeholder="Describe your teaching style and experience..." />
+              </div>
+            </div>
+            <button onClick={handleProfileSubmit} disabled={loading} className="w-full bg-[#C4A672] text-white py-3 rounded hover:bg-[#8B7355] transition-colors disabled:opacity-50">
+              {loading ? 'Initializing Orbit...' : 'Initiate Profile Orbit'}
+            </button>
+          </div>
+        )}
+
+        {currentStep === 1 && (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-semibold text-[#2C3E50]">Phase 2: Integrity Checksum</h2>
             <p className="text-sm text-gray-600">Establish your physical baseline against government registries. Failsafe limit: 2 attempts.</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -324,9 +371,9 @@ export const TutorVerificationForm: React.FC = () => {
           </div>
         )}
 
-        {currentStep === 1 && (
+        {currentStep === 2 && (
           <div className="space-y-6">
-            <h2 className="text-2xl font-semibold text-[#2C3E50]">Phase 2: Scanning Credentials</h2>
+            <h2 className="text-2xl font-semibold text-[#2C3E50]">Phase 3: Scanning Credentials</h2>
             <p className="text-sm text-gray-600">Upload your academic payloads for authenticity processing.</p>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Upload Degree Data (PDF, JPG, PNG)</label>
@@ -343,30 +390,11 @@ export const TutorVerificationForm: React.FC = () => {
           </div>
         )}
 
-        {currentStep === 2 && (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-semibold text-[#2C3E50]">Phase 3: Profile Orbit</h2>
-            <p className="text-sm text-gray-600">Link external nodes. This builds your network gravity.</p>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">GitHub Coordinates (Username)</label>
-              <input type="text" value={profileLinks.github} onChange={(e) => setProfileLinks(prev => ({ ...prev, github: e.target.value }))} className="w-full border p-2 rounded" placeholder="e.g. octocat" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Stack Overflow User ID</label>
-              <input type="text" value={profileLinks.stackoverflow} onChange={(e) => setProfileLinks(prev => ({ ...prev, stackoverflow: e.target.value }))} className="w-full border p-2 rounded" placeholder="e.g. 123456" />
-            </div>
-            <button onClick={handleProfileSubmit} disabled={loading} className="w-full bg-[#C4A672] text-white py-3 rounded hover:bg-[#8B7355] transition-colors disabled:opacity-50">
-              {loading ? 'Establishing Link...' : 'Synchronize Profiles'}
-            </button>
-            <button onClick={() => setCurrentStep(3)} className="text-sm text-gray-500 underline text-center w-full block mt-2 hover:text-[#C4A672]">Bypass Orbit</button>
-          </div>
-        )}
-
         {currentStep === 3 && (
           <div className="space-y-6">
             <h2 className="text-2xl font-semibold text-center mb-6 text-[#2C3E50]">Final Phase: Cognitive Index Evaluation</h2>
             <p className="text-center text-sm text-gray-600 mb-6">Prove your Knowledge Mass to complete stabilization.</p>
-            <SkillTest subject="Computer Science" onComplete={handleSkillComplete} />
+            <SkillTest subject={profileData.subject || "General"} onComplete={handleSkillComplete} />
           </div>
         )}
       </div>

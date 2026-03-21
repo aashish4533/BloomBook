@@ -52,11 +52,10 @@ export const verifyIdentity = onCall({ cors: "*", memory: "1GiB", timeoutSeconds
       extractedText = "MOCK_ID_TEXT_FOR_DEV_TESTING";
     }
 
-    // Mock Face Match Logic (Robust against library failures)
-    if (extractedText.length > 5) {
-      matchScore = 0.85;
-      isMatch = true;
-    }
+    // Phase 2: Name Matching OCR Verification
+    const userDoc = await admin.firestore().collection("users").doc(request.auth.uid).get();
+    const profileName = userDoc.data()?.name || userDoc.data()?.displayName || "";
+    const nameMatches = extractedText.toLowerCase().includes(profileName.toLowerCase()) || isMatch; // isMatch is previous face match mock
 
     // 5. Fetch previous verification attempts (Integrity Checksums)
     const verificationRef = admin.firestore()
@@ -71,17 +70,18 @@ export const verifyIdentity = onCall({ cors: "*", memory: "1GiB", timeoutSeconds
        if (existingData?.failedAttempts) {
          failedAttempts = existingData.failedAttempts;
        }
-       if (existingData?.status === "grounded") {
+       if (existingData?.status === "Rejected" || existingData?.status === "grounded") {
          throw new HttpsError("permission-denied", "Integrity Checksum critical failure. Orbit permanently grounded.");
        }
     }
 
-    if (!isMatch) {
+    if (!nameMatches) {
        failedAttempts += 1;
     }
     
-    const isGrounded = failedAttempts >= 2 && !isMatch;
-    const finalStatus = isGrounded ? "grounded" : (isMatch ? "pending_certificates" : "failed");
+    const isGrounded = failedAttempts >= 2 && !nameMatches;
+    // Phase 3 States: Pending, Reviewing, Verified, Rejected
+    const finalStatus = isGrounded ? "Rejected" : (nameMatches ? "Reviewing" : "Pending");
 
     await verificationRef.set({
       uid: request.auth.uid,
@@ -89,11 +89,20 @@ export const verifyIdentity = onCall({ cors: "*", memory: "1GiB", timeoutSeconds
       selfieUrl,
       ocrText: extractedText,
       faceMatchScore: matchScore,
-      isIdentityVerified: isMatch,
+      isIdentityVerified: nameMatches,
       failedAttempts: failedAttempts,
       status: finalStatus,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
+
+    // Also update tutors document if it exists to keep in sync
+    const tutorSnapshot = await admin.firestore().collection("tutors").where("userId", "==", request.auth.uid).limit(1).get();
+    if (!tutorSnapshot.empty) {
+      await tutorSnapshot.docs[0].ref.update({
+        verificationStatus: finalStatus,
+        idUrl
+      });
+    }
 
     if (isGrounded) {
        return {

@@ -6,7 +6,9 @@ import { ChatMessage } from '../Chat/ChatMessage';
 import { toast } from 'sonner';
 import { db } from '../../firebase';
 import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useNeuralPrivacy } from '../../hooks/useNeuralPrivacy';
+import { Skeleton } from '../ui/skeleton';
 
 interface Message {
   id: string;
@@ -40,6 +42,7 @@ interface GroupChatProps {
 export function GroupChat({ communityId, communityName, onBack, currentUserId }: GroupChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  const [loadingMessages, setLoadingMessages] = useState(true);
   const [newMessage, setNewMessage] = useState('');
   const [selectedImages, setSelectedImages] = useState<{ file: File; preview: string }[]>([]);
   const [showMembers, setShowMembers] = useState(false);
@@ -110,6 +113,7 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
         snapshot.docs.map(d => reconstructMessage(d.data(), d.id))
       );
       setMessages(decrypted);
+      setLoadingMessages(false);
     });
 
     const unsubMembers = onSnapshot(
@@ -166,48 +170,25 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
         }));
       }
 
-      if (editingMessage) {
-        // --- Edit Mode ---
-        const messageRef = doc(db, 'communities', communityId, 'messages', editingMessage.id);
-        const updatePayload: any = {
-          edited: true,
-          updatedAt: serverTimestamp(),
-        };
+        const functions = getFunctions();
+        const callChat = httpsCallable(functions, 'handleGroupChatMessage');
 
-        if (Object.keys(encryptions).length > 0) {
-          updatePayload.encryptions = encryptions;
-          const { deleteField } = await import('firebase/firestore');
-          updatePayload.ciphertext = deleteField();
-          updatePayload.iv = deleteField();
-        } else if (newMessage.trim()) {
-          updatePayload.content = newMessage.trim();
-        }
-
-        const { updateDoc } = await import('firebase/firestore');
-        await updateDoc(messageRef, updatePayload);
-        setEditingMessage(null);
-      } else {
-        // --- Create Mode ---
         const payload: any = {
-          senderId: currentUserId,
-          senderName: 'You',
-          senderAvatar: 'ME',
-          ...(Object.keys(encryptions).length > 0
-            ? { encryptions }
-            : { content: newMessage.trim() }),
-          ...(imageUrls.length > 0 && { images: imageUrls }),
-          timestamp: serverTimestamp(),
+          action: 'create',
+          communityId,
+          content: newMessage.trim(),
+          encryptions: Object.keys(encryptions).length > 0 ? encryptions : undefined,
+          images: imageUrls.length > 0 ? imageUrls : undefined,
+          replyTo: replyingTo ? { id: replyingTo.id, senderName: replyingTo.senderName } : undefined
         };
 
-        if (replyingTo) {
-          payload.replyTo = {
-            id: replyingTo.id,
-            senderName: replyingTo.senderName,
-          };
+        if (editingMessage) {
+          payload.action = 'edit';
+          payload.messageId = editingMessage.id;
         }
 
-        await addDoc(collection(db, 'communities', communityId, 'messages'), payload);
-      }
+        await callChat(payload);
+        if (editingMessage) setEditingMessage(null);
 
       setNewMessage('');
       setSelectedImages([]);
@@ -220,8 +201,9 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
 
   const handleDeleteMessage = async (messageId: string) => {
     try {
-      const { deleteDoc } = await import('firebase/firestore');
-      await deleteDoc(doc(db, 'communities', communityId, 'messages', messageId));
+      const functions = getFunctions();
+      const callChat = httpsCallable(functions, 'handleGroupChatMessage');
+      await callChat({ action: 'delete', communityId, messageId });
     } catch (err) {
       toast.error('Failed to delete message');
     }
@@ -229,11 +211,9 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
 
   const handleReactToMessage = async (messageId: string, emoji: string) => {
     try {
-      const { setDoc } = await import('firebase/firestore');
-      await setDoc(
-        doc(db, 'communities', communityId, 'messages', messageId, 'reactions', currentUserId),
-        { emoji, timestamp: serverTimestamp() }
-      );
+      const functions = getFunctions();
+      const callChat = httpsCallable(functions, 'handleGroupChatMessage');
+      await callChat({ action: 'react', communityId, messageId, emoji });
     } catch (err) {
       toast.error('Failed to react');
     }
@@ -315,6 +295,20 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
               {!initialized && (
                 <div className="text-center text-sm text-gray-500 py-8 animate-pulse">
                   Initializing Gravitational Shield…
+                </div>
+              )}
+
+              {loadingMessages && initialized && (
+                <div className="space-y-4 py-4">
+                  {[1, 2, 3].map((_, i) => (
+                    <div key={i} className={`flex items-end gap-2 ${i % 2 === 0 ? 'flex-row' : 'flex-row-reverse'}`}>
+                      <Skeleton className="w-8 h-8 rounded-full" />
+                      <div className="space-y-2 max-w-[70%]">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-12 w-48 rounded-2xl" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 

@@ -124,6 +124,8 @@ export * from "./verification/profiles";
 export * from "./verification/skillTest";
 export * from "./verification/reviews";
 export * from "./notifications";
+export * from "./tuitionMatching";
+export * from "./chat";
 export * from "./corsConfig";
 
 export const onCommunityMessageCreate = onDocumentCreated(

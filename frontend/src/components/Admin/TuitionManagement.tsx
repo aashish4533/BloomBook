@@ -35,6 +35,9 @@ interface Tutor {
   userId: string;
   bio?: string;
   certificate?: string;
+  verificationStatus?: string;
+  idUrl?: string;
+  testScore?: number;
   createdAt?: any;
 }
 
@@ -65,8 +68,8 @@ export function TuitionManagement() {
   const requests: TuitionRequest[] = requestsSnap?.docs.map(d => ({ id: d.id, ...d.data() } as TuitionRequest)) || [];
 
   // ── Computed stats ──────────────────────────────────────────────────────────
-  const verifiedCount = tutors.filter(t => t.verified).length;
-  const unverifiedCount = tutors.length - verifiedCount;
+  const verifiedCount = tutors.filter(t => t.verificationStatus === 'Verified' || t.verified).length;
+  const unverifiedCount = tutors.filter(t => t.verificationStatus === 'Reviewing' || (!t.verified && t.verificationStatus !== 'Verified')).length;
   const avgRating = tutors.length
     ? (tutors.reduce((s, t) => s + (t.rating || 0), 0) / tutors.length).toFixed(1)
     : '—';
@@ -79,16 +82,19 @@ export function TuitionManagement() {
       t.subject?.toLowerCase().includes(search.toLowerCase());
     const matchesFilter =
       filterVerified === 'all' ||
-      (filterVerified === 'verified' && t.verified) ||
-      (filterVerified === 'unverified' && !t.verified);
+      (filterVerified === 'verified' && (t.verificationStatus === 'Verified' || t.verified)) ||
+      (filterVerified === 'unverified' && t.verificationStatus !== 'Verified');
     return matchesSearch && matchesFilter;
   });
 
   // ── Actions ─────────────────────────────────────────────────────────────────
-  const handleVerifyTutor = async (tutor: Tutor) => {
+  const handleVerifyTutor = async (tutor: Tutor, approve: boolean) => {
     try {
-      await updateDoc(doc(db, 'tutors', tutor.id), { verified: !tutor.verified });
-      toast.success(tutor.verified ? `${tutor.name} unverified` : `${tutor.name} verified ✓`);
+      await updateDoc(doc(db, 'tutors', tutor.id), { 
+        verified: approve,
+        verificationStatus: approve ? 'Verified' : 'Rejected'
+      });
+      toast.success(approve ? `${tutor.name} approved ✓` : `${tutor.name} rejected`);
     } catch {
       toast.error('Failed to update verification status');
     }
@@ -227,7 +233,7 @@ export function TuitionManagement() {
                 Tutors Awaiting Verification ({unverifiedCount})
               </h3>
               <div className="space-y-3">
-                {tutors.filter(t => !t.verified).map(tutor => (
+                {tutors.filter(t => t.verificationStatus === 'Reviewing' || (!t.verified && t.verificationStatus !== 'Verified' && t.verificationStatus !== 'Rejected')).map(tutor => (
                   <div key={tutor.id} className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-100">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-[#C4A672] rounded-full flex items-center justify-center text-white font-bold text-sm">
@@ -242,10 +248,19 @@ export function TuitionManagement() {
                       <Button
                         size="sm"
                         className="bg-green-600 hover:bg-green-700 text-white h-8 text-xs"
-                        onClick={() => handleVerifyTutor(tutor)}
+                        onClick={() => handleVerifyTutor(tutor, true)}
                       >
                         <CheckCircle className="w-3.5 h-3.5 mr-1" />
-                        Verify
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-red-300 text-red-600 hover:bg-red-50 h-8 text-xs"
+                        onClick={() => handleVerifyTutor(tutor, false)}
+                      >
+                        <XCircle className="w-3.5 h-3.5 mr-1" />
+                        Reject
                       </Button>
                       <Button
                         size="sm"
@@ -331,10 +346,10 @@ export function TuitionManagement() {
                         <p className="text-sm text-gray-500">{tutor.subject}</p>
                       </div>
                       <Badge
-                        variant={tutor.verified ? 'default' : 'secondary'}
-                        className={tutor.verified ? 'bg-green-100 text-green-700 border-green-200' : 'bg-amber-100 text-amber-700 border-amber-200'}
+                        variant={tutor.verificationStatus === 'Verified' ? 'default' : 'secondary'}
+                        className={tutor.verificationStatus === 'Verified' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-amber-100 text-amber-700 border-amber-200'}
                       >
-                        {tutor.verified ? 'Verified' : 'Pending'}
+                        {tutor.verificationStatus || 'Pending'}
                       </Badge>
                     </div>
 
@@ -371,13 +386,13 @@ export function TuitionManagement() {
                       </Button>
                       <Button
                         size="sm"
-                        className={`text-xs h-7 ${tutor.verified ? 'bg-amber-500 hover:bg-amber-600' : 'bg-green-600 hover:bg-green-700'} text-white`}
-                        onClick={() => handleVerifyTutor(tutor)}
+                        className={`text-xs h-7 ${tutor.verificationStatus === 'Verified' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-green-600 hover:bg-green-700'} text-white`}
+                        onClick={() => handleVerifyTutor(tutor, tutor.verificationStatus !== 'Verified')}
                       >
-                        {tutor.verified ? (
-                          <><XCircle className="w-3 h-3 mr-1" />Unverify</>
+                        {tutor.verificationStatus === 'Verified' ? (
+                          <><XCircle className="w-3 h-3 mr-1" />Reject</>
                         ) : (
-                          <><CheckCircle className="w-3 h-3 mr-1" />Verify</>
+                          <><CheckCircle className="w-3 h-3 mr-1" />Approve</>
                         )}
                       </Button>
                       <Button
@@ -498,7 +513,8 @@ export function TuitionManagement() {
                     { label: 'Experience', value: selectedTutor.experience || '—' },
                     { label: 'Hourly Rate', value: `Rs. ${selectedTutor.hourlyRate}` },
                     { label: 'Availability', value: selectedTutor.availability || '—' },
-                    { label: 'Status', value: selectedTutor.verified ? '✅ Verified' : '⏳ Pending' },
+                    { label: 'Status', value: selectedTutor.verificationStatus || 'Pending' },
+                    { label: 'Cognitive Score', value: selectedTutor.testScore ? `${selectedTutor.testScore}%` : 'N/A' },
                   ].map(item => (
                     <div key={item.label} className="bg-gray-50 rounded-lg p-3">
                       <p className="text-xs text-gray-500 mb-1">{item.label}</p>
@@ -528,6 +544,17 @@ export function TuitionManagement() {
                   </div>
                 )}
 
+                {selectedTutor.idUrl && (
+                  <div>
+                    <p className="text-xs text-gray-500 mb-2">ID Proof Document (OCR Checked)</p>
+                    <img
+                      src={selectedTutor.idUrl}
+                      alt="ID Document"
+                      className="w-full max-h-48 object-cover rounded-lg border border-gray-200 mb-2"
+                    />
+                  </div>
+                )}
+
                 {selectedTutor.certificate && (
                   <div>
                     <p className="text-xs text-gray-500 mb-2">Certificate</p>
@@ -544,10 +571,10 @@ export function TuitionManagement() {
 
                 <div className="flex gap-3 pt-2">
                   <Button
-                    className={`flex-1 ${selectedTutor.verified ? 'bg-amber-500 hover:bg-amber-600' : 'bg-green-600 hover:bg-green-700'} text-white`}
-                    onClick={() => { handleVerifyTutor(selectedTutor); setSelectedTutor(null); }}
+                    className={`flex-1 ${selectedTutor.verificationStatus === 'Verified' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-green-600 hover:bg-green-700'} text-white`}
+                    onClick={() => { handleVerifyTutor(selectedTutor, selectedTutor.verificationStatus !== 'Verified'); setSelectedTutor(null); }}
                   >
-                    {selectedTutor.verified ? 'Revoke Verification' : 'Verify Tutor'}
+                    {selectedTutor.verificationStatus === 'Verified' ? 'Revoke Verification / Reject' : 'Approve & Verify'}
                   </Button>
                   <Button
                     variant="outline"
