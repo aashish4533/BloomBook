@@ -237,8 +237,9 @@ export const handlePaymentWebhook = onRequest(async (req, res) => {
         sellerPayout: txData.sellerPayout,
         status: txData.type === 'rent' ? 'active' : 'completed',
         transactionRef: txDoc.id,
-        createdAt: FieldValue.serverTimestamp()
+        ...(txData.type === 'rent' ? { createdAt: FieldValue.serverTimestamp() } : { timestamp: FieldValue.serverTimestamp() })
       });
+
 
       // Automated Notification triggers 
       await db.collection("notifications").add({

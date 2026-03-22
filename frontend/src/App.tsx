@@ -53,7 +53,13 @@ import { Wishlist } from './components/User/Wishlist';
 import { UserCommunities } from './components/User/UserCommunities';
 import { UserChats } from './components/User/UserChats';
 import { UserExchanges } from './components/User/UserExchanges';
+import { ExchangesPage } from './components/pages/ExchangesPage';
 import { NegotiationInbox } from './components/User/NegotiationInbox';
+
+// AI Integration
+import { AIChatbox } from './components/Chat/AIChatbox';
+import { AIAssistantPage } from './components/AIAssistantPage';
+
 
 // Admin Dashboard Sub-components
 import { UserManagement } from './components/Admin/UserManagement';
@@ -65,7 +71,7 @@ import { NotesManagement } from './components/Admin/NotesManagement';
 import { SystemSettings } from './components/Admin/SystemSettings';
 import { TuitionManagement } from './components/Admin/TuitionManagement';
 import { Button } from './components/ui/button';
-import { AIChatbox } from './components/Chat/AIChatbox';
+
 
 // Wrappers for components that need navigation or location state
 function SellBookFlowWrapper() {
@@ -238,6 +244,7 @@ function AppContent() {
 
             <Route path="/tuition" element={<TuitionHubWrapper />} />
             <Route path="/notes" element={<NotesHub />} />
+            <Route path="/assistant" element={<AIAssistantPage />} />
             <Route path="/tracking/:orderId" element={<DeliveryTracking />} />
 
             <Route path="/dashboard" element={<UserDashboard onLogout={handleLogout} />}>
@@ -257,16 +264,17 @@ function AppContent() {
 
           {/* Admin Routes */}
           <Route element={<AdminRoute />}>
-            <Route path="/admin/dashboard" element={<AdminDashboard onLogout={handleLogout} />}>
-              <Route index element={<UserManagement />} />
-              <Route path="books" element={<BookInventory />} />
+            <Route path="/admin" element={<AdminDashboard onLogout={handleLogout} />}>
+              <Route path="users" element={<UserManagement />} />
+              <Route path="inventory" element={<BookInventory />} />
               <Route path="rentals" element={<RentalManagement />} />
               <Route path="transactions" element={<TransactionHistory />} />
+              <Route path="communities" element={<CommunityManagement />} />
               <Route path="notes" element={<NotesManagement />} />
               <Route path="tuition" element={<TuitionManagement />} />
-              <Route path="communities" element={<CommunityManagement />} />
               <Route path="announcements" element={<AdminAnnouncementsWrapper />} />
               <Route path="settings" element={<SystemSettings />} />
+              <Route index element={<Navigate to="users" replace />} />
             </Route>
           </Route>
         </Route>
@@ -274,7 +282,7 @@ function AppContent() {
         {/* Catch all */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      <AIChatbox />
+      {user && <AIChatbox />}
     </Router>
   );
 }

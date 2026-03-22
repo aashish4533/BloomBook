@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { auth, db } from '../../firebase';
+import { collection, query, where, onSnapshot, doc, updateDoc, getDocs } from 'firebase/firestore';
 import { MessageSquare, Send, X, Bot, User, Loader2 } from 'lucide-react';
+
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { Input } from '../ui/input';
@@ -14,12 +17,54 @@ interface Message {
 
 export function AIChatbox() {
   const [isOpen, setIsOpen] = useState(false);
+  const [hasNotification, setHasNotification] = useState(false);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const functions = getFunctions();
+  const currentUserId = auth.currentUser?.uid;
+
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const q = query(
+      collection(db, 'notifications'),
+      where('userId', '==', currentUserId),
+      where('type', '==', 'ai_assistant'),
+      where('read', '==', false)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setHasNotification(!snapshot.empty);
+    });
+
+    return () => unsubscribe();
+  }, [currentUserId]);
+
+  useEffect(() => {
+    const handleToggle = () => setIsOpen(prev => !prev);
+    window.addEventListener('toggleAIChat', handleToggle);
+    return () => window.removeEventListener('toggleAIChat', handleToggle);
+  }, []);
+
+  const toggleChat = async () => {
+    if (!isOpen && hasNotification && currentUserId) {
+      const q = query(
+        collection(db, 'notifications'),
+        where('userId', '==', currentUserId),
+        where('type', '==', 'ai_assistant'),
+        where('read', '==', false)
+      );
+      
+      const snapshot = await getDocs(q);
+      snapshot.forEach((notificationDoc) => {
+        updateDoc(doc(db, 'notifications', notificationDoc.id), { read: true });
+      });
+    }
+    setIsOpen(!isOpen);
+  };
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -55,12 +100,20 @@ export function AIChatbox() {
   return (
     <div className="fixed bottom-6 right-6 z-50">
       {!isOpen ? (
-        <Button 
-          onClick={() => setIsOpen(true)}
-          className="rounded-full h-14 w-14 shadow-lg bg-[#C4A672] hover:bg-[#8B7355]"
-        >
-          <MessageSquare className="text-white" />
-        </Button>
+        <div className="relative">
+          <Button 
+            onClick={toggleChat}
+            className="rounded-full h-14 w-14 shadow-lg bg-[#C4A672] hover:bg-[#8B7355] relative"
+          >
+            <MessageSquare className="text-white" />
+          </Button>
+          {hasNotification && (
+            <span className="absolute -top-1 -right-1 flex h-4 w-4">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500 border border-white"></span>
+            </span>
+          )}
+        </div>
       ) : (
         <Card className="w-80 sm:w-96 h-[500px] flex flex-col shadow-2xl border-[#C4A672]/30">
           {/* Header */}

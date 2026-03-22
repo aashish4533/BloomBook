@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Home, ShoppingBag, Calendar, DollarSign, User, LogIn, UserPlus, LogOut, ChevronDown, UserCircle2, History, Heart, Settings, Users, Search, ArrowLeftRight, BookOpen, Sprout, Menu, Info, Phone, FileText, HelpCircle, Shield, ChevronRight, GraduationCap } from 'lucide-react';
+import { Home, ShoppingBag, Calendar, DollarSign, User, LogIn, UserPlus, LogOut, ChevronDown, UserCircle2, History, Heart, Settings, Users, Search, ArrowLeftRight, BookOpen, Sprout, Menu, Info, Phone, FileText, HelpCircle, Shield, ChevronRight, GraduationCap, Bot } from 'lucide-react';
 import { Button } from './ui/button';
 import { NotificationBell } from './NotificationBell';
 import { Link, useLocation } from 'react-router-dom';
@@ -207,6 +207,15 @@ export function Navbar({
                 <>
                   {/* Notification Bell */}
                   <NotificationBell />
+
+                  {/* AI Assistant Button */}
+                  <button 
+                    onClick={() => window.dispatchEvent(new CustomEvent('toggleAIChat'))}
+                    className="relative p-2 text-[#2C3E50] hover:bg-gray-100/10 rounded-lg transition-colors"
+                    title="AI Assistant"
+                  >
+                    <Bot className="w-6 h-6" />
+                  </button>
 
                   {/* Profile Dropdown */}
                   <div className="relative" ref={dropdownRef}>

@@ -11,15 +11,17 @@ interface Purchase {
   bookTitle: string;
   author: string;
   price: number;
-  date: string;
+  timestamp?: any;
   status: 'completed' | 'shipped' | 'delivered';
 }
+
 
 export function PurchaseHistory() {
   const [user, loadingUser] = useAuthState(auth);
   const [purchasesSnapshot, loadingPurchases, error] = useCollection(
-    user ? query(collection(db, 'purchases'), where('buyerId', '==', user.uid), orderBy('date', 'desc')) : null
+    user ? query(collection(db, 'purchases'), where('userId', '==', user.uid), orderBy('timestamp', 'desc')) : null
   );
+
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -68,10 +70,11 @@ export function PurchaseHistory() {
               <div className="flex items-center gap-4 text-sm text-gray-500">
                 <span>Order #{purchase.id}</span>
                 <span>•</span>
-                <span>{new Date(purchase.date).toLocaleDateString()}</span>
+                <span>{purchase.timestamp ? (typeof purchase.timestamp === 'string' ? new Date(purchase.timestamp) : purchase.timestamp.toDate()).toLocaleDateString() : 'N/A'}</span>
                 <span>•</span>
-                <span className="text-[#C4A672]">${purchase.price.toFixed(2)}</span>
+                <span className="text-[#C4A672]">${purchase.price ? purchase.price.toFixed(2) : '0.00'}</span>
               </div>
+
             </div>
           ))}
           {purchases.length === 0 && (

@@ -160,3 +160,28 @@ export const onNegotiationCreated = onDocumentCreated("negotiations/{negotiation
         logger.error("Failed to process negotiation notification", error);
     }
 });
+
+/**
+ * Triggered when a new user document is created.
+ * Initializes the "Neural Welcome" notification for the AI Assistant.
+ */
+export const onUserCreated = onDocumentCreated("users/{userId}", async (event) => {
+    const userId = event.params.userId;
+    
+    try {
+        await db.collection("notifications").add({
+            userId: userId,
+            type: "ai_assistant", // Used by the frontend to filter for the chatbot badge
+            title: "Welcome to BloomBook!",
+            message: "I am your AI Assistant. Click the chat icon below if you need help finding books or tutors.",
+            read: false,
+            timestamp: Timestamp.now(),
+            icon: "bot", 
+            link: "#ai-chat" // Specific anchor to trigger the chatbox
+        });
+        logger.info(`Neural Welcome signal sent to user ${userId}`);
+    } catch (error) {
+        logger.error("Failed to send Neural Welcome signal", error);
+    }
+});
+
