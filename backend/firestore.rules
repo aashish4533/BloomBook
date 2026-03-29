@@ -65,7 +65,12 @@ service cloud.firestore {
       // Subcollection for Group Chat messages
       match /messages/{messageId} {
         allow read: if isAuthenticated() && exists(/databases/$(database)/documents/communities/$(communityId)/members/$(request.auth.uid));
-        allow write: if false; // All writes via Cloud Function proxy
+        
+        // Community Equilibrium: Anti-Impersonation & Membership Validation
+        allow create: if isAuthenticated() && 
+                      exists(/databases/$(database)/documents/communities/$(communityId)/members/$(request.auth.uid)) &&
+                      request.resource.data.senderId == request.auth.uid;
+        allow update, delete: if false;
 
         // Reaction Subcollections
         match /reactions/{userId} {
@@ -217,7 +222,8 @@ service cloud.firestore {
     match /tuition_requests/{requestId} {
       allow read: if true;
       allow create: if isAuthenticated() && request.resource.data.studentId == request.auth.uid;
-      allow update, delete: if isAuthenticated() && resource.data.studentId == request.auth.uid;
+      // Orbital Oversight: Manual Override for Admins
+      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.studentId == request.auth.uid);
 
       // --- Bids Sub-collection ---
       match /bids/{tutorId} {
@@ -236,8 +242,19 @@ service cloud.firestore {
       allow read: if true;
       // Allow creation only as Pending
       allow create: if isAuthenticated() && (!('verificationStatus' in request.resource.data) || request.resource.data.verificationStatus == 'Pending');
+      
+      // Orbital Oversight: Manual Override for Admins
       allow update: if isAuthenticated() && (request.auth.uid == tutorId || isAdmin()) && 
                     (!('verificationStatus' in request.resource.data) || request.resource.data.verificationStatus == resource.data.verificationStatus || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // --- The Cognitive Shield (AI Assistant Security) ---
+    match /ai_assistant_chats/{chatId} {
+      // Isolate Conversations
+      allow read, update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // Rate Control (Block generic creates, limit via functions/timestamps if needed)
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
     }
 
     // --- Neural Privacy ---

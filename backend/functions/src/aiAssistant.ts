@@ -22,27 +22,33 @@ export const generateAssistantResponse = onCall(
     }
 
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new HttpsError("failed-precondition", "Gemini API Key missing from Secret Manager.");
-    }
 
     try {
-      // 2. Neural Scan (Fetch Live Inventory)
+      if (!apiKey) {
+        throw new HttpsError("failed-precondition", "Atmospheric Distortion: Neural Core (GEMINI_API_KEY) missing from Secret Manager.");
+      }
+
       const db = getFirestore();
-      const booksSnapshot = await db.collection("books")
-        .orderBy("createdAt", "desc")
-        .limit(5)
-        .get();
-        
-      const inventoryData = booksSnapshot.docs.map(doc => {
-        const b = doc.data();
-        const availability = b.status || "Available";
-        return `- Title: "${b.title}", Author: ${b.author}, Availability: ${availability} for ${b.type}`;
-      }).join("\n");
+      let inventoryData = "";
+      try {
+        const booksSnapshot = await db.collection("books")
+          .where("isSold", "==", false)
+          .orderBy("createdAt", "desc")
+          .limit(5)
+          .get();
+          
+        inventoryData = booksSnapshot.docs.map(doc => {
+          const b = doc.data();
+          const availability = b.status || "Available";
+          return `- Title: "${b.title}", Author: ${b.author || 'Unknown'}, Availability: ${availability} for ${b.type || 'Sale/Rent'}`;
+        }).join("\n");
+      } catch (error) {
+        logger.warn("Neural Scan warning: Firestore books query failed (possible index building). Continuing with blank inventory.", error);
+        inventoryData = "No live inventory currently synced.";
+      }
 
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
+      
       // 3. System Instructions (Rule Enforcement Protocol)
       const systemInstructions = `
         CORE IDENTITY: You are the "BloomBook AI Assistant," a specialized guide for the Web-Based Platform for Book Reselling and Renting.
@@ -64,14 +70,19 @@ export const generateAssistantResponse = onCall(
         ${inventoryData || "No books currently available."}
       `;
 
+      const model = genAI.getGenerativeModel({ 
+        model: "gemini-1.5-flash",
+        systemInstruction: systemInstructions
+      });
+
       // 4. Cognitive Processing
       const chat = model.startChat({
         history: history || [],
         generationConfig: { maxOutputTokens: 500 },
       });
 
-      // Combine instructions with user prompt for strict adherence
-      const result = await chat.sendMessage(`${systemInstructions}\n\nUser Query: ${prompt}`);
+      // Send the clean user prompt
+      const result = await chat.sendMessage(prompt);
       const response = await result.response;
 
       return { text: response.text() };

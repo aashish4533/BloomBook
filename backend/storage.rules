@@ -8,9 +8,13 @@ service firebase.storage {
         firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Restrict verification bucket to specific user & Admins
+    // Neural Vault: Restrict verification buckets to specific user & Admins (Lockdown list operation)
+    match /verifications/{userId}/{allPaths=**} {
+      allow read, list: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
     match /verification/{userId}/{allPaths=**} {
-      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow read, list: if request.auth != null && (request.auth.uid == userId || isAdmin());
       allow write: if request.auth != null && request.auth.uid == userId;
     }
     

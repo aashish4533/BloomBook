@@ -90,8 +90,12 @@ export function AIChatbox() {
       }) as any;
 
       setMessages(prev => [...prev, { role: 'model', parts: [{ text: result.data.text }] }]);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Assistant Error:", error);
+      setMessages(prev => [...prev, { 
+        role: 'model', 
+        parts: [{ text: "⚠️ Atmospheric Distortion: Neural Core desynchronized. Please stabilize parameters or retry later." }] 
+      }]);
     } finally {
       setIsLoading(false);
     }

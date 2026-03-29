@@ -36,6 +36,7 @@ export function Navbar({
     { id: 'home', label: 'Home', icon: Home, path: '/' },
     { id: 'tuition', label: 'Tuition', icon: GraduationCap, path: '/tuition' },
     { id: 'notes', label: 'Material', icon: FileText, path: '/notes' },
+    { id: 'assistant', label: 'AI Assistant', icon: Bot, path: '/assistant' },
     { id: 'buy', label: 'Buy', icon: ShoppingBag, path: '/marketplace' },
     { id: 'rent', label: 'Rent', icon: Calendar, path: '/rent' },
     { id: 'exchange', label: 'Exchange', icon: ArrowLeftRight, path: '/exchange' },
@@ -209,13 +210,17 @@ export function Navbar({
                   <NotificationBell />
 
                   {/* AI Assistant Button */}
-                  <button 
-                    onClick={() => window.dispatchEvent(new CustomEvent('toggleAIChat'))}
-                    className="relative p-2 text-[#2C3E50] hover:bg-gray-100/10 rounded-lg transition-colors"
+                  <Link 
+                    to="/assistant"
+                    className={`relative p-2 rounded-lg transition-colors ${
+                      isActive('/assistant') 
+                        ? 'bg-[#C4A672]/20 text-[#C4A672]' 
+                        : 'text-[#2C3E50] hover:bg-gray-100/10'
+                    }`}
                     title="AI Assistant"
                   >
                     <Bot className="w-6 h-6" />
-                  </button>
+                  </Link>
 
                   {/* Profile Dropdown */}
                   <div className="relative" ref={dropdownRef}>
