@@ -9,7 +9,7 @@ if (!admin.apps.length) {
 /**
  * Verifies academic certificates using OCR.
  */
-export const verifyCertificate = onCall({ cors: "*", memory: "1GiB", timeoutSeconds: 120 }, async (request) => {
+export const verifyCertificate = onCall({ cors: true, memory: "1GiB", timeoutSeconds: 120 }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "User must be logged in.");
   }

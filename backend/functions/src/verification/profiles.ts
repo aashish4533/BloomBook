@@ -10,7 +10,7 @@ if (!admin.apps.length) {
 /**
  * Verifies professional profiles from GitHub and StackOverflow.
  */
-export const verifyProfiles = onCall({ cors: "*" }, async (request) => {
+export const verifyProfiles = onCall({ cors: true }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "User must be logged in.");
   }

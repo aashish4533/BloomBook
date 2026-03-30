@@ -18,7 +18,7 @@ faceapi.env.monkeyPatch({ Canvas, Image, ImageData } as any);
 /**
  * Verifies user identity using OCR and mocked face matching.
  */
-export const verifyIdentity = onCall({ cors: "*", memory: "1GiB", timeoutSeconds: 120 }, async (request) => {
+export const verifyIdentity = onCall({ cors: true, memory: "1GiB", timeoutSeconds: 120 }, async (request) => {
   // 1. Authentication check
   if (!request.auth) {
     throw new HttpsError(
@@ -41,15 +41,22 @@ export const verifyIdentity = onCall({ cors: "*", memory: "1GiB", timeoutSeconds
     let isMatch = false;
 
     // Try OCR - Fail gracefully if it crashes
+    let worker: any = null;
     try {
-      const worker = await createWorker("eng");
+      worker = await createWorker("eng", 1, {
+        logger: () => {},
+        cachePath: "/tmp",
+      });
       const ret = await worker.recognize(idUrl);
       extractedText = ret.data.text;
-      await worker.terminate();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (ocrError: any) {
       logger.error("OCR Failed (using mock text):", ocrError);
       extractedText = "MOCK_ID_TEXT_FOR_DEV_TESTING";
+    } finally {
+      if (worker) {
+        await worker.terminate();
+      }
     }
 
     // Phase 2: Name Matching OCR Verification

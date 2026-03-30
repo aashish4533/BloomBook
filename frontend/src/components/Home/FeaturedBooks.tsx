@@ -34,7 +34,8 @@ export function FeaturedBooks({ activeTab, onNavigateToBook, onExplore }: Featur
   useEffect(() => {
     const fetchBooks = async () => {
       // Fetched 8 items to make the carousel worthwhile
-      const q = query(collection(db, 'books'), where('type', '==', activeTab), limit(8));
+      const mappedType = activeTab === 'rent' ? 'rent' : 'sale';
+      const q = query(collection(db, 'books'), where('availableFor', 'array-contains', mappedType), limit(8));
       const snapshot = await getDocs(q);
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Book));
       setBooks(data);
@@ -82,15 +83,15 @@ export function FeaturedBooks({ activeTab, onNavigateToBook, onExplore }: Featur
                     {activeTab === 'rent' && book.rentalPrice ? (
                       <div className="flex flex-col">
                         <span className="text-[#C4A672] text-xl">
-                          ${book.rentalPrice.monthly}/mo
+                          Rs. {book.rentalPrice.monthly}/mo
                         </span>
                         <span className="text-gray-500 text-xs">
-                          ${book.rentalPrice.weekly}/wk
+                          Rs. {book.rentalPrice.weekly}/wk
                         </span>
                       </div>
                     ) : (
                       <span className="text-[#C4A672] text-2xl">
-                        ${book.price}
+                        Rs. {book.price}
                       </span>
                     )}
 

@@ -291,7 +291,7 @@ export function ExchangeBookFlow({ onClose }: ExchangeBookFlowProps) {
                 const q = query(
                     collection(db, 'books'),
                     where('userId', '==', user.uid),
-                    where('type', '==', 'exchange')
+                    where('availableFor', 'array-contains', 'exchange')
                 );
                 const snapshot = await getDocs(q);
                 const books = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Book));

@@ -14,7 +14,7 @@ const openai = new OpenAI({
 /**
  * Generates a skill test using OpenAI.
  */
-export const requestSkillTest = onCall({ cors: "*" }, async (request) => {
+export const requestSkillTest = onCall({ cors: true }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "User must be logged in.");
   }
@@ -102,7 +102,7 @@ export const requestSkillTest = onCall({ cors: "*" }, async (request) => {
 /**
  * Submits a skill test and calculates the score.
  */
-export const submitSkillTest = onCall({ cors: "*" }, async (request) => {
+export const submitSkillTest = onCall({ cors: true }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "User must be logged in.");
   }

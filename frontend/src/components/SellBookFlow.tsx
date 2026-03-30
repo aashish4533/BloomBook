@@ -321,7 +321,7 @@ export function SellBookFlow({ onClose }: SellBookFlowProps) {
         const q = query(
           collection(db, 'books'),
           where('userId', '==', user.uid),
-          where('type', '==', 'sell')
+          where('availableFor', 'array-contains', 'sale')
         );
         const snapshot = await getDocs(q);
         const books = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Book));

@@ -9,7 +9,7 @@ if (!admin.apps.length) {
 /**
  * Adds a review for a tutor and updates the tutor's average rating.
  */
-export const addReview = onCall({ cors: "*" }, async (request) => {
+export const addReview = onCall({ cors: true }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "User must be logged in.");
   }
