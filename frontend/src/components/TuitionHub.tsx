@@ -26,7 +26,7 @@ const BidsList: React.FC<{ requestId: string; onAssign: (tutorId: string) => voi
   return (
     <div className="space-y-3 mt-4 bg-gray-50 p-4 rounded-xl border">
       <h5 className="font-semibold text-sm text-[#2C3E50] flex items-center gap-1">
-        <Users className="w-4 h-4 text-[#C4A672]" /> 
+        <Users className="w-4 h-4 text-[#C4A672]" />
         Active Bids ({bids.length})
       </h5>
       {bids.map((b: any) => (
@@ -63,6 +63,7 @@ interface Tutor {
   availability: string;
   availableHours: string; // New field
   userId: string;
+  bio?: string;
 }
 
 interface TuitionRequest {
@@ -88,6 +89,7 @@ interface TuitionHubProps {
 export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
+  const [selectedTutor, setSelectedTutor] = useState<Tutor | null>(null);
   const navigate = useNavigate();
 
   const [isRegistering, setIsRegistering] = useState(false);
@@ -121,7 +123,7 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
 
   const [value, loading, error] = useCollection(collection(db, 'tutors'));
   const [requestsValue] = useCollection(query(collection(db, 'tuition_requests')));
-  
+
   const [currentUserTutor] = useDocument(auth.currentUser ? doc(db, 'tutors', auth.currentUser.uid) : null);
   const tutorStatus = currentUserTutor?.data()?.verificationStatus || 'Unregistered';
 
@@ -258,13 +260,13 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
         hourlyRate: parseFloat(tutorForm.hourlyRate),
         experience: tutorForm.experience,
         availability: tutorForm.availability,
-        availableHours: tutorForm.availableHours, 
+        availableHours: tutorForm.availableHours,
         bio: tutorForm.bio,
-        certificate: certUrl, 
+        certificate: certUrl,
         rating: 0,
         reviews: 0,
         students: 0,
-        verified: false, 
+        verified: false,
         verificationStatus: 'Pending',
         createdAt: serverTimestamp()
       });
@@ -347,17 +349,16 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
 
           {/* Verification Status Banner */}
           {isLoggedIn && tutorStatus !== 'Unregistered' && tutorStatus !== 'Verified' && (
-            <div className={`mt-4 p-4 rounded-xl border flex items-center gap-3 max-w-2xl ${
-              tutorStatus === 'Rejected' 
-                ? 'bg-red-500/10 border-red-500/30 text-red-100' 
+            <div className={`mt-4 p-4 rounded-xl border flex items-center gap-3 max-w-2xl ${tutorStatus === 'Rejected'
+                ? 'bg-red-500/10 border-red-500/30 text-red-100'
                 : 'bg-amber-500/10 border-amber-500/30 text-amber-100'
-            }`}>
+              }`}>
               <AlertCircle className="w-5 h-5 flex-shrink-0" />
               <div>
                 <p className="font-semibold">Verification {tutorStatus}</p>
                 <p className="text-sm opacity-90">
-                  {tutorStatus === 'Reviewing' 
-                    ? 'Automated scans passed. Waiting for Admin manual review and approval.' 
+                  {tutorStatus === 'Reviewing'
+                    ? 'Automated scans passed. Waiting for Admin manual review and approval.'
                     : 'Your trajectory failed stabilization phase. Please review and try again.'}
                 </p>
               </div>
@@ -487,12 +488,12 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                     <Input placeholder="Subject (e.g. Math)" value={requestForm.subject} onChange={e => setRequestForm({ ...requestForm, subject: e.target.value })} />
                     <Input placeholder="Details (e.g. Need help with Grade 10 Geometry)" value={requestForm.topic} onChange={e => setRequestForm({ ...requestForm, topic: e.target.value })} />
                     <Input placeholder="Grade Level" value={requestForm.gradeLevel} onChange={e => setRequestForm({ ...requestForm, gradeLevel: e.target.value })} />
-                    
+
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <Label className="text-xs">Difficulty</Label>
-                        <select 
-                          value={requestForm.difficulty} 
+                        <select
+                          value={requestForm.difficulty}
                           onChange={e => setRequestForm({ ...requestForm, difficulty: e.target.value })}
                           className="w-full border rounded h-10 px-3 bg-white text-sm"
                         >
@@ -543,8 +544,8 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                           <Badge variant="outline" className="bg-white">{req.subject}</Badge>
                           <Badge className={
                             req.difficulty === 'Advanced' ? 'bg-red-100 text-red-700 border-red-200' :
-                            req.difficulty === 'Intermediate' ? 'bg-orange-100 text-orange-700 border-orange-200' :
-                            'bg-green-100 text-green-700 border-green-200'
+                              req.difficulty === 'Intermediate' ? 'bg-orange-100 text-orange-700 border-orange-200' :
+                                'bg-green-100 text-green-700 border-green-200'
                           } variant="outline">
                             {req.difficulty || 'Beginner'}
                           </Badge>
@@ -569,7 +570,7 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                       <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
                         <Users className="w-3.5 h-3.5" /> From {req.studentName}
                       </p>
-                      
+
                       <div className="bg-white/60 p-2 rounded-lg text-xs space-y-1 mb-3">
                         {(req as any).budget_range && (
                           <p><span className="text-gray-500">Budget:</span> <span className="font-semibold text-[#C4A672]">Rs. {(req as any).budget_range.min} - {(req as any).budget_range.max}</span></p>
@@ -686,27 +687,38 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                       <p className="text-xs text-gray-500">Starting at</p>
                       <p className="text-[#C4A672] text-xl">Rs. {tutor.hourlyRate}/hr</p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2 justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e: React.MouseEvent) => {
+                          e.stopPropagation();
+                          setSelectedTutor(tutor);
+                        }}
+                      >
+                        View Profile
+                      </Button>
                       <Button
                         size="sm"
                         className="bg-[#C4A672] hover:bg-[#8B7355] text-white"
-                        onClick={() => {
+                        onClick={(e: React.MouseEvent) => {
+                          e.stopPropagation();
                           if (!isLoggedIn) {
                             toast.error("Please login to book a session");
                             navigate('/login');
                             return;
                           }
-                          // Placeholder for booking logic
                           toast.info("Booking flow coming soon!");
                         }}
                       >
-                        Book Session
+                        Book
                       </Button>
                       <Button
                         size="sm"
                         variant="outline"
                         className="border-[#C4A672] text-[#C4A672] hover:bg-[#C4A672]/10"
-                        onClick={() => {
+                        onClick={(e: React.MouseEvent) => {
+                          e.stopPropagation();
                           if (isLoggedIn) {
                             navigate('/chat', { state: { otherUser: { id: tutor.userId, name: tutor.name, avatar: tutor.avatar, online: true } } });
                           } else {
@@ -715,7 +727,7 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                           }
                         }}
                       >
-                        Hire Tutor
+                        Hire
                       </Button>
                     </div>
                   </div>
@@ -758,7 +770,84 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
             </Card>
           </div>
         </div>
-      </div >
+      {/* Tutor Profile Modal */}
+      <Dialog open={!!selectedTutor} onOpenChange={(open: boolean) => !open && setSelectedTutor(null)}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Tutor Profile</DialogTitle>
+          </DialogHeader>
+          {selectedTutor && (
+            <div className="space-y-6 py-4">
+              <div className="flex items-center gap-4">
+                <ImageWithFallback
+                  src={selectedTutor.avatar}
+                  alt={selectedTutor.name}
+                  className="w-20 h-20 rounded-full object-cover border-2 border-[#C4A672]"
+                />
+                <div>
+                  <h2 className="text-xl font-bold text-[#2C3E50]">{selectedTutor.name}</h2>
+                  <p className="text-[#C4A672] font-medium">{selectedTutor.subject}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Badge variant={selectedTutor.availability === 'Available' ? 'default' : 'secondary'}>
+                      {selectedTutor.availability}
+                    </Badge>
+                    {selectedTutor.verified && (
+                      <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">
+                        Verified ✓
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold text-gray-900 mb-1">About Me</h4>
+                <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg border">
+                  {selectedTutor.bio || "No biography provided yet."}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-500">Specialization</p>
+                  <p className="font-medium text-[#2C3E50]">{selectedTutor.specialization}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Hourly Rate</p>
+                  <p className="font-medium text-[#C4A672]">Rs. {selectedTutor.hourlyRate}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Experience</p>
+                  <p className="font-medium text-[#2C3E50]">{selectedTutor.experience || 'Not specified'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Available Hours</p>
+                  <p className="font-medium text-[#2C3E50]">{selectedTutor.availableHours || 'Flexible'}</p>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                <Button variant="outline" onClick={() => setSelectedTutor(null)}>
+                  Close
+                </Button>
+                <Button
+                  className="bg-[#C4A672] hover:bg-[#8B7355] text-white"
+                  onClick={() => {
+                    if (isLoggedIn) {
+                      navigate('/chat', { state: { otherUser: { id: selectedTutor.userId, name: selectedTutor.name, avatar: selectedTutor.avatar, online: true } } });
+                    } else {
+                      toast.error("Please login to message this tutor");
+                    }
+                  }}
+                >
+                  Message Tutor
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div >
+  </div >
   );
 }

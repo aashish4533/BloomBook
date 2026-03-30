@@ -218,8 +218,13 @@ export const TutorVerificationForm: React.FC = () => {
       setVerificationStatus((prev: any) => ({ ...prev, identity: result }));
       setCurrentStep(2); // Next is Credentials
     } catch (err: any) {
-      setError(err.message || 'Identity verification failed.');
-    } finally { setLoading(false); }
+      console.error("Integrity Checksum Complete Error Object:", err);
+      console.error("Error Code:", err.code);
+      console.error("Error Details:", err.details);
+      setError(err.message || 'Identity verification failed due to an internal server error. Please check the console.');
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const handleCertificateSubmit = async () => {

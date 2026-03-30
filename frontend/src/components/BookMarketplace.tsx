@@ -431,6 +431,30 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
             </Button>
           </div>
         )}
+        {/* Help Section */}
+        <div className="mt-16 bg-white rounded-xl shadow-sm p-8 text-center border border-gray-100">
+          <h3 className="text-[#2C3E50] text-xl font-semibold mb-2">Can't find a specific book?</h3>
+          <p className="text-gray-600 mb-6">Our academic navigation team can help you locate specific textbooks or literature.</p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Button 
+              onClick={() => navigate('/contact')} 
+              variant="outline"
+              className="border-[#C4A672] text-[#C4A672] hover:bg-[#C4A672]/10 w-full sm:w-auto"
+            >
+              Contact Support
+            </Button>
+            <Button 
+              onClick={() => window.location.href = 'mailto:aashish.maheshwari65@gmail.com'} 
+              variant="ghost"
+              className="text-gray-500 hover:text-gray-800 w-full sm:w-auto"
+            >
+              Email aashish.maheshwari65@gmail.com
+            </Button>
+          </div>
+          <p className="text-center text-sm mb-6">
+          © 2025 BookBloom. All rights reserved.
+        </p>
+        </div>
       </div>
     </div>
   );

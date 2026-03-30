@@ -41,10 +41,20 @@ export function AddBookModal({ onClose }: AddBookModalProps) {
     }
 
     try {
+      const availableFor = [];
+      if (price > 0) availableFor.push('sale');
+      if (rentalPrice > 0) availableFor.push('rent');
+
+      let type = 'sell';
+      if (availableFor.includes('sale') && availableFor.includes('rent')) type = 'both';
+      else if (availableFor.includes('rent')) type = 'rent';
+
       await addDoc(collection(db, 'books'), {
         ...formData,
         price,
         rentalPrice,
+        type,
+        availableFor,
         createdAt: new Date()
       });
       toast.success('Book added successfully');
@@ -104,7 +114,7 @@ export function AddBookModal({ onClose }: AddBookModalProps) {
               <Label htmlFor="category">Category</Label>
               <Select
                 value={formData.category}
-                onValueChange={(value) => setFormData({ ...formData, category: value })}
+                onValueChange={(value: string) => setFormData({ ...formData, category: value })}
               >
                 <SelectTrigger id="category">
                   <SelectValue />
@@ -122,7 +132,7 @@ export function AddBookModal({ onClose }: AddBookModalProps) {
               <Label htmlFor="condition">Condition</Label>
               <Select
                 value={formData.condition}
-                onValueChange={(value) => setFormData({ ...formData, condition: value })}
+                onValueChange={(value: string) => setFormData({ ...formData, condition: value })}
               >
                 <SelectTrigger id="condition">
                   <SelectValue />

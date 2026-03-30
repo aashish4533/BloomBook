@@ -1,5 +1,6 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
+import * as path from "path";
 import * as faceapi from "face-api.js";
 import * as canvas from "canvas";
 import { createWorker } from "tesseract.js";
@@ -15,10 +16,25 @@ const { Canvas, Image, ImageData } = canvas;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 faceapi.env.monkeyPatch({ Canvas, Image, ImageData } as any);
 
+let modelsLoaded = false;
+async function loadFaceApiModels() {
+  if (modelsLoaded) return;
+  const modelsPath = path.join(__dirname, "../../models");
+  try {
+    await faceapi.nets.ssdMobilenetv1.loadFromDisk(modelsPath);
+    await faceapi.nets.faceLandmark68Net.loadFromDisk(modelsPath);
+    await faceapi.nets.faceRecognitionNet.loadFromDisk(modelsPath);
+    modelsLoaded = true;
+    logger.info("Face-API models loaded successfully.");
+  } catch (error) {
+    logger.error("Failed to load Face-API models:", error);
+  }
+}
+
 /**
  * Verifies user identity using OCR and mocked face matching.
  */
-export const verifyIdentity = onCall({ cors: true, memory: "1GiB", timeoutSeconds: 120 }, async (request) => {
+export const verifyIdentity = onCall({ cors: "*", memory: "2GiB", timeoutSeconds: 120 }, async (request) => {
   // 1. Authentication check
   if (!request.auth) {
     throw new HttpsError(
@@ -34,6 +50,8 @@ export const verifyIdentity = onCall({ cors: true, memory: "1GiB", timeoutSecond
       "Both ID URL and Selfie URL are required."
     );
   }
+
+  await loadFaceApiModels();
 
   try {
     let extractedText = "";

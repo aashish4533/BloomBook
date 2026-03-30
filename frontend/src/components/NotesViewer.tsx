@@ -217,7 +217,7 @@ export function NotesViewer({
             )}
             <iframe
               src={url}
-              className="w-full h-full border-none"
+              className="w-full h-full min-h-[80vh] border-none"
               title="PDF Viewer"
               onLoad={() => setIframeLoading(false)}
             />
@@ -238,7 +238,7 @@ export function NotesViewer({
             )}
             <iframe
               src={`https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`}
-              className="w-full h-full border-none"
+              className="w-full h-full min-h-[80vh] border-none"
               title="Document Viewer"
               onLoad={() => setIframeLoading(false)}
             />
@@ -292,7 +292,7 @@ export function NotesViewer({
 
       <div className="flex-1 flex overflow-hidden">
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col grow">
           {/* Toolbar */}
           <div className="bg-[#2A2A2A] border-b border-gray-700 px-6 py-3 flex-shrink-0">
             <div className="max-w-7xl mx-auto flex items-center justify-between">

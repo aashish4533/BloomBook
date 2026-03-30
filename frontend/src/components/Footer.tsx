@@ -12,6 +12,7 @@ export function Footer() {
           <Link to="/sell" className="hover:opacity-80 transition-opacity">Resell</Link>
           <Link to="/announcements" className="hover:opacity-80 transition-opacity">Announcements</Link>
           <Link to="/about" className="hover:opacity-80 transition-opacity">About</Link>
+          <Link to="/contact" className="hover:opacity-80 transition-opacity">Contact</Link>
         </nav>
 
         <p className="text-center text-sm mb-6">
