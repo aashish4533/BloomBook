@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { auth } from '../firebase';
 import { MessageSquare, Send, Bot, User, Loader2, Sparkles, GraduationCap, Compass, BookOpen, Clock, Menu } from 'lucide-react';
@@ -46,18 +47,28 @@ export function AIAssistantPage() {
     setIsLoading(true);
 
     try {
-      const generateResponse = httpsCallable(functions, 'generateAssistantResponse');
+      // 1. Add a 30-second timeout safeguard to the callable function
+      const generateResponse = httpsCallable(functions, 'generateAssistantResponse', {
+        timeout: 30000 
+      });
+      
       const result = await generateResponse({ 
         prompt: messageText, 
         history: messages 
       }) as any;
-
-      setMessages(prev => [...prev, { role: 'model', parts: [{ text: result.data.text }] }]);
+      
+      // 2. Safely check for the text payload
+      if (result.data && result.data.text) {
+        setMessages(prev => [...prev, { role: 'model', parts: [{ text: result.data.text }] }]);
+      } else {
+        throw new Error("Invalid payload received from AI core.");
+      }
     } catch (error: any) {
-      console.error("Assistant Error:", error);
+      console.error("Neural Link Error:", error);
+      // 3. Show an error bubble in the UI so the user isn't left guessing
       setMessages(prev => [...prev, { 
         role: 'model', 
-        parts: [{ text: "⚠️ Atmospheric Distortion: Neural Core desynchronized. Please stabilize parameters or retry later." }] 
+        parts: [{ text: "⚠️ Atmospheric interference. I could not reach the Bloom Matrix. Please check your backend connection or API keys and try again." }] 
       }]);
     } finally {
       setIsLoading(false);
@@ -107,14 +118,14 @@ export function AIAssistantPage() {
   );
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-[#FAF8F3] overflow-hidden relative">
+    <div className="flex h-[calc(100dvh-4rem)] min-h-[calc(100dvh-4rem)] bg-[#FAF8F3] overflow-hidden relative">
       {/* Sidebar - Desktop */}
       <div className="hidden md:flex w-72 bg-white border-r border-[#C4A672]/20 flex-col p-4">
         <SidebarContent />
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col h-full">
+      <div className="flex-1 flex flex-col h-full min-h-0">
         {/* Chat Header for Mobile */}
         <div className="bg-white border-b border-[#C4A672]/20 p-4 flex items-center justify-between shadow-sm md:hidden">
             <div className="flex items-center gap-3">
@@ -198,18 +209,20 @@ export function AIAssistantPage() {
           ) : (
             <div className="space-y-6 max-w-4xl mx-auto w-full pb-4">
               {messages.map((msg, i) => (
-                <div key={i} className={`flex gap-3 md:gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                <div key={i} className={`flex items-start gap-4 w-full ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
                   <Avatar className="w-8 h-8 md:w-9 md:h-9 border border-gray-100 flex-shrink-0 mt-1">
                     <AvatarFallback className={msg.role === 'user' ? 'bg-[#2C3E50] text-white' : 'bg-[#C4A672]/10'}>
                       {msg.role === 'user' ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5 text-[#C4A672]" />}
                     </AvatarFallback>
                   </Avatar>
-                  <div className={`p-3 md:p-4 rounded-2xl max-w-[85%] md:max-w-[75%] shadow-sm ${
+                  <div className={`p-4 rounded-2xl max-w-[85%] md:max-w-[70%] w-fit shadow-sm overflow-hidden ${
                     msg.role === 'user' 
                     ? 'bg-gradient-to-r from-[#C4A672] to-[#B69661] text-white rounded-tr-none' 
                     : 'bg-white border border-[#C4A672]/10 text-gray-800 rounded-tl-none'
                   }`}>
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.parts[0].text}</p>
+                    <div className="text-sm leading-relaxed whitespace-pre-wrap break-words overflow-x-auto prose prose-sm max-w-none">
+                      <ReactMarkdown>{msg.parts[0].text}</ReactMarkdown>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -238,17 +251,17 @@ export function AIAssistantPage() {
               >
                 <div className="relative flex-grow">
                   <Input
-                    placeholder="Query the Bloom Matrix..."
+                    placeholder="Query the Bloom Matrix about books, tutors, and learning orbits..."
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     disabled={isLoading}
-                    className="w-full pr-12 py-6 rounded-xl border-[#C4A672]/30 focus:ring-[#C4A672] focus:border-[#C4A672] shadow-sm text-sm bg-white"
+                    className="w-full pr-14 h-14 rounded-xl border-[#C4A672]/30 focus:ring-[#C4A672] focus:border-[#C4A672] shadow-sm text-sm bg-white"
                   />
                   <Button 
                       type="submit" 
                       size="icon" 
                       disabled={isLoading || !input.trim()} 
-                      className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 bg-[#C4A672] hover:bg-[#8B7355] rounded-lg transition-transform hover:scale-105 active:scale-95"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 h-8 w-8 bg-[#C4A672] hover:bg-[#8B7355] rounded-lg transition-transform hover:scale-105 active:scale-95"
                   >
                     <Send className="w-4 h-4 text-white" />
                   </Button>

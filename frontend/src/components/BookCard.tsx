@@ -118,7 +118,7 @@ export function BookCard({ book, onClick }: BookCardProps) {
             <div className="flex items-center gap-2">
               <span className="text-[#C4A672] text-xl font-bold">
                 {book.availableFor?.includes('sale') ? `Rs. ${book.price.toLocaleString()}` :
-                  book.availableFor?.includes('rent') ? `Rs. ${book.rentPrice?.toLocaleString() || '?'}/term` :
+                  book.availableFor?.includes('rent') ? `Rs. ${(book.rentPrice || book.price)?.toLocaleString() || '?'}/term` :
                     'Exchange Only'}
               </span>
             </div>

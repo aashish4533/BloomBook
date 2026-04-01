@@ -57,8 +57,8 @@ export function LocationStep({ initialData, onNext, onBack }: LocationStepProps)
     if (!formData.state.trim()) newErrors.state = 'State is required';
     if (!formData.zipCode.trim()) {
       newErrors.zipCode = 'ZIP code is required';
-    } else if (!/^\d{5}(-\d{4})?$/.test(formData.zipCode)) {
-      newErrors.zipCode = 'Please enter a valid ZIP code';
+    } else if (formData.zipCode.trim().length < 3) {
+      newErrors.zipCode = 'Please enter a valid postal code';
     }
 
     setErrors(newErrors);
