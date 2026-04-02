@@ -42,14 +42,34 @@ export function BookDetailsStep({ initialData, onNext, onCancel, isExchange = fa
   const conditions = ['New', 'Like New', 'Good', 'Fair', 'Poor'];
 
   const validateISBN = (isbn: string) => {
-    // Remove hyphens and spaces
-    const cleanISBN = isbn.replace(/[-\s]/g, '');
-
-    // Check if it's either ISBN-10 or ISBN-13
-    if (cleanISBN.length === 10 || cleanISBN.length === 13) {
-      return /^[0-9X]+$/.test(cleanISBN);
+    // Normalize: strip hyphens and spaces
+    const clean = isbn.replace(/[-\s]/g, '');
+    
+    // Validate ISBN-10 (Legacy) or SBN with a leading 0
+    if (clean.length === 10) {
+      if (!/^[0-9]{9}[0-9X]$/i.test(clean)) return false;
+      let sum = 0;
+      for (let i = 0; i < 9; i++) {
+        sum += parseInt(clean.charAt(i)) * (10 - i);
+      }
+      let checkDigit = clean.charAt(9).toUpperCase();
+      sum += checkDigit === 'X' ? 10 : parseInt(checkDigit);
+      return sum % 11 === 0;
     }
-    return false;
+    
+    // Validate ISBN-13 (Current Global Standard / EAN-13)
+    if (clean.length === 13) {
+      if (!/^[0-9]{13}$/.test(clean)) return false;
+      let sum = 0;
+      for (let i = 0; i < 12; i++) {
+        sum += parseInt(clean.charAt(i)) * (i % 2 === 0 ? 1 : 3);
+      }
+      let check = 10 - (sum % 10);
+      if (check === 10) check = 0;
+      return check === parseInt(clean.charAt(12));
+    }
+    
+    return false; // Fails length checks
   };
 
   const handleISBNLookup = async (isbnOverride?: string) => {
@@ -97,11 +117,11 @@ export function BookDetailsStep({ initialData, onNext, onCancel, isExchange = fa
     }
   };
 
-  const handleScanComplete = (isbn: string) => {
-    setFormData(prev => ({ ...prev, isbn: isbn }));
+  const handleScanComplete = (rawIsbn: string) => {
+    const cleanIsbn = rawIsbn.replace(/[-\s]/g, '');
+    setFormData(prev => ({ ...prev, isbn: cleanIsbn }));
     setShowScanner(false);
-    // Automatically trigger lookup after scan
-    handleISBNLookup(isbn);
+    handleISBNLookup(cleanIsbn);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -190,7 +210,12 @@ export function BookDetailsStep({ initialData, onNext, onCancel, isExchange = fa
   const handleSubmitForm = (e: React.FormEvent) => {
     e.preventDefault();
     if (validateForm()) {
-      onNext(formData);
+      // Ensure the ISBN passed to the parent is fully normalized
+      const normalizedData = {
+        ...formData,
+        isbn: formData.isbn.replace(/[-\s]/g, '').toUpperCase()
+      };
+      onNext(normalizedData);
     }
   };
 
