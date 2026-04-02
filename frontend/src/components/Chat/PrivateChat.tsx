@@ -85,7 +85,7 @@ export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId }: Privat
 
   return (
     <div className="fixed inset-0 bg-gray-100 flex items-center justify-center p-4 z-50">
-      <div className="w-full max-w-2xl bg-white rounded-lg shadow-xl overflow-hidden flex flex-col h-[600px]">
+      <div className="w-full max-w-2xl bg-white rounded-lg shadow-xl overflow-hidden flex flex-col h-[calc(100dvh-2rem)] max-h-[800px]">
 
         {/* Header (Added to support Back navigation) */}
         <div className="bg-[#C4A672] p-4 flex items-center text-white shadow-sm">
@@ -96,7 +96,7 @@ export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId }: Privat
         </div>
 
         {/* User's Original UI Structure - Flex 1 to fill remaining space */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {/* Messages Area */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
             {messages.map((msg) => {
@@ -114,7 +114,7 @@ export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId }: Privat
           </div>
 
           {/* Input Area */}
-          <form onSubmit={sendMessage} className="p-4 border-t bg-white flex gap-2">
+          <form onSubmit={sendMessage} className="p-4 border-t bg-white flex gap-2 shrink-0">
             <input
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}

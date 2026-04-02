@@ -18,7 +18,7 @@ import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 // ─── Bids Sub-Collection List Component ──────────────────────────────────────
-const BidsList: React.FC<{ requestId: string; onAssign: (tutorId: string) => void; isOwner: boolean; status: string }> = ({ requestId, onAssign, isOwner, status }) => {
+const BidsList: React.FC<{ requestId: string; onAssign: (tutorId: string) => void; isOwner: boolean; status: string; navigate: any }> = ({ requestId, onAssign, isOwner, status, navigate }) => {
   const { collection } = require('firebase/firestore');
   const [bidsSnap] = useCollection(collection(db, 'tuition_requests', requestId, 'bids'));
   const bids = bidsSnap?.docs.map(d => ({ id: d.id, ...d.data() })) || [];
@@ -26,21 +26,31 @@ const BidsList: React.FC<{ requestId: string; onAssign: (tutorId: string) => voi
   return (
     <div className="space-y-3 mt-4 bg-gray-50 p-4 rounded-xl border">
       <h5 className="font-semibold text-sm text-[#2C3E50] flex items-center gap-1">
-        <Users className="w-4 h-4 text-[#C4A672]" />
+        <Users className="w-4 h-4 text-[#C4A672]" /> 
         Active Bids ({bids.length})
       </h5>
       {bids.map((b: any) => (
-        <div key={b.id} className="p-3 bg-white rounded-lg border shadow-sm flex justify-between items-center">
+        <div key={b.id} className="p-3 bg-white rounded-lg border shadow-sm flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center">
           <div>
             <p className="font-medium text-sm text-[#2C3E50]">{b.tutorName}</p>
             <p className="text-xs text-[#C4A672] font-semibold">Rs. {b.amount}</p>
             {b.message && <p className="text-xs text-gray-500 mt-1">"{b.message}"</p>}
           </div>
-          {isOwner && status !== 'Assigned' && (
-            <Button size="sm" onClick={() => onAssign(b.tutorId)} className="bg-green-600 hover:bg-green-700 text-white h-8 text-xs">
-              Assign
+          <div className="flex gap-2">
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={() => navigate('/chat', { state: { otherUser: { id: b.tutorId, name: b.tutorName, avatar: '', online: true } } })}
+              className="h-8 text-xs border-[#C4A672] text-[#C4A672] hover:bg-[#C4A672]/10"
+            >
+              Message
             </Button>
-          )}
+            {isOwner && status !== 'Assigned' && (
+              <Button size="sm" onClick={() => onAssign(b.tutorId)} className="bg-green-600 hover:bg-green-700 text-white h-8 text-xs">
+                Assign
+              </Button>
+            )}
+          </div>
         </div>
       ))}
       {bids.length === 0 && <p className="text-xs text-gray-400 text-center py-2">No bids broadcasted inside this orbit yet.</p>}
@@ -593,7 +603,7 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                             <DialogHeader>
                               <DialogTitle>Bids for "{req.topic}"</DialogTitle>
                             </DialogHeader>
-                            <BidsList requestId={req.id} onAssign={(tId) => handleAssignTutor(req.id, tId)} isOwner={true} status={(req as any).orbit_status || 'Open'} />
+                            <BidsList requestId={req.id} onAssign={(tId) => handleAssignTutor(req.id, tId)} isOwner={true} status={(req as any).orbit_status || 'Open'} navigate={navigate} />
                           </DialogContent>
                         </Dialog>
                       ) : tutorStatus === 'Verified' && (req as any).orbit_status !== 'Assigned' && (
@@ -722,12 +732,12 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                           if (isLoggedIn) {
                             navigate('/chat', { state: { otherUser: { id: tutor.userId, name: tutor.name, avatar: tutor.avatar, online: true } } });
                           } else {
-                            toast.error("Please login to hire a tutor");
+                            toast.error("Please login to message a tutor");
                             navigate('/login');
                           }
                         }}
                       >
-                        Hire
+                        Message Tutor
                       </Button>
                     </div>
                   </div>

@@ -1,26 +1,10 @@
-// Updated src/components/Home/FeaturedBooks.tsx
 import { useState, useEffect } from 'react';
-import { BookOpen, DollarSign, Calendar } from 'lucide-react';
-import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
+import { collection, query, where, limit, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { collection, query, where, getDocs, limit } from 'firebase/firestore';
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '../ui/carousel';
-
-interface Book {
-  id: string;
-  title: string;
-  author: string;
-  price: number;
-  condition: string;
-  image: string;
-  type: 'buy' | 'sell' | 'rent';
-  rentalPrice?: {
-    weekly?: number;
-    monthly?: number;
-    yearly?: number;
-  };
-}
+import { BookCard } from '../BookCard';
+import { Book } from '../BookMarketplace';
+import { Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface FeaturedBooksProps {
   activeTab: 'buy' | 'sell' | 'rent';
@@ -30,111 +14,65 @@ interface FeaturedBooksProps {
 
 export function FeaturedBooks({ activeTab, onNavigateToBook, onExplore }: FeaturedBooksProps) {
   const [books, setBooks] = useState<Book[]>([]);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchBooks = async () => {
-      // Fetched 8 items to make the carousel worthwhile
-      const mappedType = activeTab === 'rent' ? 'rent' : 'sale';
-      const q = query(collection(db, 'books'), where('availableFor', 'array-contains', mappedType), limit(8));
-      const snapshot = await getDocs(q);
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Book));
-      setBooks(data);
+    const fetchFeaturedBooks = async () => {
+      try {
+        setLoading(true);
+        // Query the latest active books for the home page
+        const q = query(
+          collection(db, 'books'),
+          where('status', '==', 'active'),
+          limit(8)
+        );
+        const snapshot = await getDocs(q);
+        const fetchedBooks = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Book[];
+        setBooks(fetchedBooks);
+      } catch (error) {
+        console.error("Error fetching featured books:", error);
+      } finally {
+        setLoading(false);
+      }
     };
-    fetchBooks();
-  }, [activeTab]);
+
+    fetchFeaturedBooks();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-20">
+        <Loader2 className="w-8 h-8 animate-spin text-[#C4A672]" />
+      </div>
+    );
+  }
 
   return (
-    <div className="w-full relative">
-      <Carousel
-        opts={{
-          align: "start",
-          loop: true,
-        }}
-        className="w-full"
-      >
-        <CarouselContent className="-ml-2 md:-ml-4">
-          {books.map((book) => (
-            <CarouselItem key={book.id} className="pl-2 md:pl-4 md:basis-1/2 lg:basis-1/4">
-              <div
-                className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group h-full"
-                onClick={() => onNavigateToBook(book.id)}
-              >
-                {/* Book Image */}
-                <div className="relative h-64 bg-gray-100 overflow-hidden">
-                  <img
-                    src={book.image}
-                    alt={book.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <Badge className="absolute top-3 right-3 bg-[#C4A672] text-white border-0">
-                    {book.condition}
-                  </Badge>
-                </div>
-
-                {/* Book Info */}
-                <div className="p-4">
-                  <h3 className="text-[#2C3E50] mb-1 line-clamp-1 group-hover:text-[#C4A672] transition-colors">
-                    {book.title}
-                  </h3>
-                  <p className="text-gray-600 text-sm mb-3">{book.author}</p>
-
-                  {/* Price */}
-                  <div className="flex items-center justify-between">
-                    {activeTab === 'rent' && book.rentalPrice ? (
-                      <div className="flex flex-col">
-                        <span className="text-[#C4A672] text-xl">
-                          Rs. {book.rentalPrice.monthly}/mo
-                        </span>
-                        <span className="text-gray-500 text-xs">
-                          Rs. {book.rentalPrice.weekly}/wk
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-[#C4A672] text-2xl">
-                        Rs. {book.price}
-                      </span>
-                    )}
-
-                    <Button
-                      size="sm"
-                      className="bg-[#2C3E50] hover:bg-[#1a252f] text-white"
-                    >
-                      {activeTab === 'buy' && 'View'}
-                      {activeTab === 'sell' && 'List'}
-                      {activeTab === 'rent' && 'Rent'}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CarouselItem>
-          ))}
-
-          {/* View All Card */}
-          <CarouselItem className="pl-2 md:pl-4 md:basis-1/2 lg:basis-1/4">
-            <div
-              onClick={onExplore}
-              className="bg-gradient-to-br from-[#C4A672] to-[#8B7355] rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-shadow cursor-pointer flex items-center justify-center min-h-[320px] h-full group"
-            >
-              <div className="text-center text-white p-6">
-                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-white/30 transition-colors">
-                  {activeTab === 'buy' && <BookOpen className="w-8 h-8" />}
-                  {activeTab === 'sell' && <DollarSign className="w-8 h-8" />}
-                  {activeTab === 'rent' && <Calendar className="w-8 h-8" />}
-                </div>
-                <h3 className="text-xl mb-2">Browse All</h3>
-                <p className="text-white/90 mb-4">
-                  Explore {activeTab === 'buy' ? 'thousands of' : 'all'} books
-                </p>
-                <div className="text-white/90 group-hover:text-white transition-colors">
-                  View More →
-                </div>
-              </div>
-            </div>
-          </CarouselItem>
-        </CarouselContent>
-        <CarouselPrevious className="hidden md:flex" />
-        <CarouselNext className="hidden md:flex" />
-      </Carousel>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      {books.length > 0 ? (
+        books.map(book => (
+          <BookCard 
+            key={book.id} 
+            book={book} 
+            onClick={() => {
+              if (onNavigateToBook) {
+                onNavigateToBook(book.id);
+              } else {
+                navigate(`/book/${book.id}`);
+              }
+            }} 
+          />
+        ))
+      ) : (
+        <div className="col-span-full text-center text-gray-500 py-12 bg-white rounded-xl shadow-sm border border-gray-100">
+          <h3 className="text-lg font-medium text-[#2C3E50] mb-2">No Books Available</h3>
+          <p>Check back later for new listings!</p>
+        </div>
+      )}
     </div>
   );
 }
