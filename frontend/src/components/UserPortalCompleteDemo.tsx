@@ -1,3 +1,6 @@
+import { useState, useEffect } from 'react';
+import { collection, onSnapshot, query, limit } from 'firebase/firestore';
+import { db } from '../firebase';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import {
@@ -17,10 +20,39 @@ import {
   BookOpen,
   MapPin,
   CreditCard,
-  X
+  X,
+  LogOut,
+  Loader2
 } from 'lucide-react';
 
 export function UserPortalCompleteDemo() {
+  const [books, setBooks] = useState<any[]>([]);
+  const [tuitionRequests, setTuitionRequests] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribeBooks = onSnapshot(query(collection(db, 'books'), limit(2)), (snapshot) => {
+      setBooks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setIsLoading(false);
+    });
+
+    const unsubscribeTuition = onSnapshot(query(collection(db, 'tuition_requests'), limit(2)), (snapshot) => {
+      setTuitionRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    return () => {
+      unsubscribeBooks();
+      unsubscribeTuition();
+    };
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-[#C4A672] animate-spin" />
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-7xl mx-auto">
@@ -124,30 +156,34 @@ export function UserPortalCompleteDemo() {
             </div>
 
             {/* Sample Purchase Card */}
-            <div className="border border-gray-200 rounded-lg p-4 mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-[#2C3E50]">To Kill a Mockingbird</h4>
-                <Badge className="bg-green-100 text-green-800">Delivered</Badge>
+            {books.length > 0 ? books.map((book, idx) => (
+              <div key={book.id || idx} className="border border-gray-200 rounded-lg p-4 mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-[#2C3E50]">{book.title || 'Unknown Title'}</h4>
+                  <Badge className="bg-green-100 text-green-800">Delivered</Badge>
+                </div>
+                <p className="text-sm text-gray-600 mb-2">by {book.author || 'Unknown Author'}</p>
+                <div className="flex items-center gap-3 text-sm text-gray-500 mb-3">
+                  <span>Order #{idx + 1}</span>
+                  <span>•</span>
+                  <span>Nov 01, 2024</span>
+                  <span>•</span>
+                  <span className="text-[#C4A672]">${book.price || '15.99'}</span>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" className="flex-1">
+                    <Eye className="w-4 h-4 mr-2" />
+                    Details
+                  </Button>
+                  <Button size="sm" variant="outline" className="flex-1">
+                    <Download className="w-4 h-4 mr-2" />
+                    Receipt
+                  </Button>
+                </div>
               </div>
-              <p className="text-sm text-gray-600 mb-2">by Harper Lee</p>
-              <div className="flex items-center gap-3 text-sm text-gray-500 mb-3">
-                <span>Order #1</span>
-                <span>•</span>
-                <span>Nov 01, 2024</span>
-                <span>•</span>
-                <span className="text-[#C4A672]">$15.99</span>
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" className="flex-1">
-                  <Eye className="w-4 h-4 mr-2" />
-                  Details
-                </Button>
-                <Button size="sm" variant="outline" className="flex-1">
-                  <Download className="w-4 h-4 mr-2" />
-                  Receipt
-                </Button>
-              </div>
-            </div>
+            )) : (
+              <div className="text-center p-4 text-gray-500">No recent purchases found.</div>
+            )}
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <h4 className="text-sm text-blue-900 mb-2">Features:</h4>

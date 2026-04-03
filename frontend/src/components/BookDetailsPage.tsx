@@ -86,7 +86,7 @@ export function BookDetailsPage() {
     };
 
     const handleBuyNow = () => {
-        console.log('Buying book:', book.id);
+
         setShowPurchase(true);
     };
 
@@ -98,7 +98,7 @@ export function BookDetailsPage() {
         }
 
         const sellerId = book.userId || book.seller?.id;
-        console.log("Seller ID:", sellerId);
+
 
         if (!sellerId) {
             toast.error("Unable to contact seller: Seller ID missing");

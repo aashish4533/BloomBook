@@ -718,9 +718,11 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                             navigate('/login');
                             return;
                           }
-                          toast.info("Booking flow coming soon!");
-                        }}
-                      >
+                          navigate('/chat', { state: { 
+                             otherUser: { id: tutor.userId, name: tutor.name, avatar: tutor.avatar, online: true },
+                             bookContext: { title: `1hr Tuition Session: ${tutor.subject}`, price: tutor.hourlyRate }
+                          }});
+                        }}>
                         Book
                       </Button>
                       <Button
@@ -857,7 +859,7 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
           )}
         </DialogContent>
       </Dialog>
-    </div >
-  </div >
+    </div>
+  </div>
   );
 }

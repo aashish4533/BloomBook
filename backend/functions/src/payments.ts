@@ -43,8 +43,8 @@ export const createPaymentIntent = onCall(
 
       const { amount, type, itemTitle, method, mobileNumber, cartItems } = request.data;
 
-      if (!amount || !itemTitle || !method) {
-        throw new HttpsError("invalid-argument", "Missing required telemetry (amount, itemTitle, or method).");
+      if (!amount || typeof amount !== 'number' || amount <= 0 || !itemTitle || !method) {
+        throw new HttpsError("invalid-argument", "Invalid payload: Amount must be a positive number, and telemetry must be intact.");
       }
 
       const db = getFirestore();

@@ -7,6 +7,7 @@ import { Loader2, FileWarning, ZoomIn, ZoomOut, Maximize, Minimize, EyeOff } fro
 import { Button } from './ui/button';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
+import DOMPurify from 'dompurify';
 
 // Use UNPKG for PDF.js worker
 const pdfjsVersion = '3.11.174';
@@ -257,7 +258,7 @@ export const FilePreview: React.FC<FilePreviewProps> = ({ fileUrl, fileType, isT
                     <BlurOverlay />
                     <div
                         className={`prose max-w-none transition-all duration-200 ${type === 'xlsx' ? 'table-auto' : ''}`}
-                        dangerouslySetInnerHTML={{ __html: content }}
+                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }}
                         style={{
                             zoom: fitToScreen ? '1' : scale,
                             // Basic styling for the raw HTML table

@@ -2,6 +2,13 @@ import { useState, useEffect } from 'react';
 import { Mic, MicOff, X } from 'lucide-react';
 import { Button } from './ui/button';
 
+declare global {
+  interface Window {
+    SpeechRecognition: any;
+    webkitSpeechRecognition: any;
+  }
+}
+
 interface VoiceSearchModalProps {
   onClose: () => void;
   onSearchComplete: (query: string) => void;
@@ -13,24 +20,68 @@ export function VoiceSearchModal({ onClose, onSearchComplete }: VoiceSearchModal
   const [interimTranscript, setInterimTranscript] = useState('');
 
   useEffect(() => {
-    // Simulate voice recognition (in production, use Web Speech API)
+    let recognition: any = null;
+
     if (isListening) {
-      const timer = setTimeout(() => {
-        const mockTranscript = "Search for science fiction books";
-        setTranscript(mockTranscript);
+      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        setInterimTranscript("Speech recognition is not supported in this browser.");
         setIsListening(false);
-      }, 2000);
+        return;
+      }
 
-      // Simulate interim results
-      const interimTimer = setTimeout(() => {
-        setInterimTranscript("Search for...");
-      }, 500);
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
 
-      return () => {
-        clearTimeout(timer);
-        clearTimeout(interimTimer);
+      recognition.onstart = () => {
+        setIsListening(true);
+        setInterimTranscript('');
       };
+
+      recognition.onresult = (event: any) => {
+        let interim = '';
+        let final = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            final += event.results[i][0].transcript;
+          } else {
+            interim += event.results[i][0].transcript;
+          }
+        }
+        
+        if (final) {
+            setTranscript(prev => prev + final); // Append in case of continuous
+        }
+        if (interim) setInterimTranscript(interim);
+      };
+
+      recognition.onerror = (event: any) => {
+        if (event.error === 'not-allowed') {
+          setInterimTranscript("Microphone access denied.");
+        }
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      try {
+        recognition.start();
+      } catch (err) {
+        setIsListening(false);
+      }
     }
+
+    return () => {
+      if (recognition) {
+        try { recognition.stop(); } catch(e){}
+      }
+    };
   }, [isListening]);
 
   const handleSearch = () => {

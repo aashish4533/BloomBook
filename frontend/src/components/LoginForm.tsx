@@ -33,7 +33,7 @@ export function LoginForm({ onLogin }: LoginFormProps) {
       toast.error(error.message);
     }
     if (user) {
-      console.log('Login successful');
+
       if (onLogin) onLogin();
       navigate('/');
     }
@@ -51,7 +51,7 @@ export function LoginForm({ onLogin }: LoginFormProps) {
   const handleGoogleLogin = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
-      console.log('Google login successful');
+
       if (onLogin) onLogin();
       navigate('/');
     } catch (err: any) {
@@ -62,7 +62,7 @@ export function LoginForm({ onLogin }: LoginFormProps) {
   const handleFacebookLogin = async () => {
     try {
       await signInWithPopup(auth, facebookProvider);
-      console.log('Facebook login successful');
+
       if (onLogin) onLogin();
       navigate('/');
     } catch (err: any) {

@@ -1,6 +1,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
+import { ImageAnnotatorClient } from "@google-cloud/vision";
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -26,9 +27,14 @@ export const verifyCertificate = onCall({ cors: true, memory: "1GiB", timeoutSec
   }
 
   try {
-    // In a production environment, OCR would be performed by an external service
-    // or properly configured Cloud Vision API. Tesseract.js causes EROFS in CFs.
-    const extractedText = `MOCK_CERTIFICATE_TEXT: ${institutionName} ${degreeName}`;
+    let extractedText = "";
+    try {
+      const client = new ImageAnnotatorClient();
+      const [result] = await client.textDetection(certificateUrl);
+      extractedText = result.fullTextAnnotation?.text || "";
+    } catch (ocrError: any) {
+      logger.error("Cloud Vision OCR Failed:", ocrError);
+    }
 
     const lowerText = extractedText.toLowerCase();
 

@@ -21,10 +21,9 @@ export function FeaturedBooks({ activeTab, onNavigateToBook, onExplore }: Featur
     const fetchFeaturedBooks = async () => {
       try {
         setLoading(true);
-        // Query the latest active books for the home page
+        // Fetch any latest books (removing strict status filter)
         const q = query(
           collection(db, 'books'),
-          where('status', '==', 'active'),
           limit(8)
         );
         const snapshot = await getDocs(q);
@@ -34,7 +33,7 @@ export function FeaturedBooks({ activeTab, onNavigateToBook, onExplore }: Featur
         })) as Book[];
         setBooks(fetchedBooks);
       } catch (error) {
-        console.error("Error fetching featured books:", error);
+        console.error("🔥 FIREBASE FETCH ERROR (FeaturedBooks):", error);
       } finally {
         setLoading(false);
       }

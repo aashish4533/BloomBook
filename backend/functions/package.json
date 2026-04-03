@@ -15,6 +15,8 @@
   },
   "main": "lib/index.js",
   "dependencies": {
+    "@google-cloud/vision": "^5.3.5",
+    "@google/genai": "^1.48.0",
     "@google/generative-ai": "^0.24.1",
     "@tensorflow/tfjs-node": "^4.22.0",
     "axios": "^1.13.5",

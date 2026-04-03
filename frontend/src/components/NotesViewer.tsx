@@ -111,7 +111,7 @@ export function NotesViewer({
   }, [id]);
 
   // Debug: verify file URL data is arriving
-  console.log('NotesViewer — URL:', url);
+
 
   const previewType = url ? getPreviewType(url) : 'unsupported';
 

@@ -60,7 +60,17 @@ export function ExchangeRequestCard({ request, isIncoming }: ExchangeRequestCard
                 status: 'accepted',
                 updatedAt: serverTimestamp()
             });
-            // TODO: Update book statuses logic could go here or via Cloud Functions
+
+            // Update both books' statuses to prevent double-selling
+            await updateDoc(doc(db, 'books', request.requestedBookId), {
+                status: 'exchanged',
+                isSold: true
+            });
+            await updateDoc(doc(db, 'books', request.offeredBookId), {
+                status: 'exchanged',
+                isSold: true
+            });
+
             toast.success('Exchange accepted!');
         } catch (err) {
             toast.error('Failed to accept exchange');

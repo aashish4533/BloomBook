@@ -36,7 +36,7 @@ if (import.meta.env.VITE_USE_EMULATOR === 'true') {
   connectFirestoreEmulator(db, '127.0.0.1', 8080);
   connectStorageEmulator(storage, '127.0.0.1', 9199);
   connectFunctionsEmulator(functions, "127.0.0.1", 5001);
-  console.log("🔥 Connected to Firebase Emulators");
+
 }
 
 // Export all necessary services

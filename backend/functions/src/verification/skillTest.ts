@@ -1,15 +1,14 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
-import { OpenAI } from "openai";
 import * as logger from "firebase-functions/logger";
+import { defineSecret } from "firebase-functions/params";
+import { GoogleGenAI } from "@google/genai";
+
+const geminiApiKey = defineSecret("GEMINI_API_KEY");
 
 if (!admin.apps.length) {
   admin.initializeApp();
 }
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build",
-});
 
 /**
  * Generates a skill test using OpenAI.
@@ -25,7 +24,7 @@ export const requestSkillTest = onCall({ cors: true }, async (request) => {
   }
 
   try {
-    if (!process.env.OPENAI_API_KEY) {
+    if (!geminiApiKey.value()) {
       const mockQuestions = [
         {
           id: 1,
@@ -61,16 +60,19 @@ export const requestSkillTest = onCall({ cors: true }, async (request) => {
       `strings), answer (string - must match one of the options exactly). ` +
       `Do not include any markdown formatting.`;
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.7,
+    const ai = new GoogleGenAI({ apiKey: geminiApiKey.value() });
+    const response = await ai.models.generateContent({
+        model: "gemini-1.5-flash",
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json"
+        }
     });
 
-    const content = completion.choices[0].message.content;
+    const content = response.text || "[]";
     let questions = [];
     try {
-      questions = JSON.parse(content || "[]");
+      questions = JSON.parse(content);
     } catch (e) {
       throw new Error("Failed to generate valid questions.");
     }
@@ -100,9 +102,9 @@ export const requestSkillTest = onCall({ cors: true }, async (request) => {
 });
 
 /**
- * Submits a skill test and calculates the score.
+ * Submits a skill test and calculates the score via Gemini AI.
  */
-export const submitSkillTest = onCall({ cors: true }, async (request) => {
+export const submitSkillTest = onCall({ cors: true, secrets: [geminiApiKey] }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "User must be logged in.");
   }
@@ -121,21 +123,39 @@ export const submitSkillTest = onCall({ cors: true }, async (request) => {
 
     const testData = testDoc.data();
     const questions = testData?.questions || [];
-    let score = 0;
-    const total = questions.length;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    questions.forEach((q: any) => {
-      if (answers[q.id] === q.answer) {
-        score++;
-      }
-    });
-
-    const percentage = (score / total) * 100;
-    const passed = percentage >= 80;
+    let score = null;
+    let passed = false;
+    let finalStatus = "Pending Manual Review";
+    let feedback = "";
     
-    // Phase 3 States: Pending, Reviewing, Verified, Rejected
-    const finalStatus = passed ? "Reviewing" : "Rejected";
+    try {
+        const ai = new GoogleGenAI({ apiKey: geminiApiKey.value() });
+        const evalPrompt = `Evaluate the student's answers for a skill test on ${testData?.subject}.\n\nQuestions & Correct Answers: ${JSON.stringify(questions)}\n\nStudent Answers: ${JSON.stringify(answers)}\n\nPlease grade this test and provide structured feedback.`;
+
+        const response = await ai.models.generateContent({
+            model: "gemini-1.5-flash",
+            contents: evalPrompt,
+            config: {
+                systemInstruction: `You are an expert tutor evaluator. Output ONLY valid JSON using exactly this schema: { "score": number (0-100), "feedback": "string", "passed": boolean }`,
+                responseMimeType: "application/json"
+            }
+        });
+
+        const raw = response.text || "{}";
+        const parsed = JSON.parse(raw);
+        
+        score = parsed.score;
+        passed = parsed.passed;
+        feedback = parsed.feedback;
+        finalStatus = passed ? "Reviewing" : "Rejected";
+
+    } catch (gradingError) {
+        logger.error("Gemini Grading Failed:", gradingError);
+        score = null;
+        passed = false;
+        feedback = "Automated grading failed or timed out. Awaiting human manual review.";
+        finalStatus = "Pending Manual Review";
+    }
 
     await admin.firestore()
       .collection("verifications")
@@ -144,8 +164,7 @@ export const submitSkillTest = onCall({ cors: true }, async (request) => {
         skillTest: {
           subject: testData?.subject,
           score,
-          total,
-          percentage,
+          feedback,
           passed,
           completedAt: admin.firestore.FieldValue.serverTimestamp(),
         },
@@ -154,7 +173,7 @@ export const submitSkillTest = onCall({ cors: true }, async (request) => {
 
     await testDoc.ref.update({
       status: "completed",
-      result: { score, total, passed },
+      result: { score, passed, feedback },
     });
     
     // Update tutors document if it exists to keep in sync
@@ -162,12 +181,12 @@ export const submitSkillTest = onCall({ cors: true }, async (request) => {
     if (!tutorSnapshot.empty) {
       await tutorSnapshot.docs[0].ref.update({
         verificationStatus: finalStatus,
-        testScore: percentage
+        testScore: score
       });
-      logger.info(`Tutor ${request.auth.uid} position set to ${finalStatus} after Knowledge Mass evaluation.`);
+      logger.info(`Tutor ${request.auth.uid} position set to ${finalStatus} after Neural evaluation.`);
     }
 
-    return { success: true, score, total, passed, finalStatus };
+    return { success: true, score, passed, finalStatus, feedback };
   } catch (error: unknown) {
     logger.error("Test Submission Error:", error);
     throw new HttpsError("internal", (error as Error).message);

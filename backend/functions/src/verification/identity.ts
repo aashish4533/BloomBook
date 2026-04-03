@@ -3,7 +3,7 @@ import * as admin from "firebase-admin";
 import * as path from "path";
 import * as faceapi from "face-api.js";
 import * as canvas from "canvas";
-import { createWorker } from "tesseract.js";
+import { ImageAnnotatorClient } from "@google-cloud/vision";
 import * as logger from "firebase-functions/logger";
 
 // Initialize Firebase Admin if not already initialized
@@ -58,23 +58,14 @@ export const verifyIdentity = onCall({ cors: "*", memory: "2GiB", timeoutSeconds
     let matchScore = 0;
     let isMatch = false;
 
-    // Try OCR - Fail gracefully if it crashes
-    let worker: any = null;
+    // Try OCR using Google Cloud Vision
     try {
-      worker = await createWorker("eng", 1, {
-        logger: () => {},
-        cachePath: "/tmp",
-      });
-      const ret = await worker.recognize(idUrl);
-      extractedText = ret.data.text;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const client = new ImageAnnotatorClient();
+      const [result] = await client.textDetection(idUrl);
+      extractedText = result.fullTextAnnotation?.text || "";
     } catch (ocrError: any) {
-      logger.error("OCR Failed (using mock text):", ocrError);
-      extractedText = "MOCK_ID_TEXT_FOR_DEV_TESTING";
-    } finally {
-      if (worker) {
-        await worker.terminate();
-      }
+      logger.error("Cloud Vision OCR Failed:", ocrError);
+      extractedText = "";
     }
 
     // Phase 2: Name Matching OCR Verification
@@ -105,8 +96,12 @@ export const verifyIdentity = onCall({ cors: "*", memory: "2GiB", timeoutSeconds
     }
     
     const isGrounded = failedAttempts >= 2 && !nameMatches;
-    // Phase 3 States: Pending, Reviewing, Verified, Rejected
-    const finalStatus = isGrounded ? "Rejected" : (nameMatches ? "Reviewing" : "Pending");
+    // Phase 3 States: Pending Manual Review, Verified, Rejected
+    const finalStatus = isGrounded ? "Rejected" : (nameMatches ? "Verified" : "Pending Manual Review");
+
+    if (!nameMatches && !isGrounded) {
+       logger.warn(`Discrepancy: User ${profileName} didn't match extracted text: ${extractedText}`);
+    }
 
     await verificationRef.set({
       uid: request.auth.uid,

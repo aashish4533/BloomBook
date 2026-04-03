@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Camera, X, Check, RotateCw, AlertCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 
 interface BarcodeScannerProps {
   onScanComplete: (isbn: string) => void;
@@ -12,21 +13,69 @@ export function BarcodeScanner({ onScanComplete, onCancel }: BarcodeScannerProps
   const [isScanning, setIsScanning] = useState(false);
   const [scannedCode, setScannedCode] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
+  const [errorText, setErrorText] = useState('');
+  const [scannerInstance, setScannerInstance] = useState<Html5Qrcode | null>(null);
+
+  useEffect(() => {
+    const html5QrCode = new Html5Qrcode("reader");
+    setScannerInstance(html5QrCode);
+
+    return () => {
+      if (html5QrCode.isScanning) {
+        html5QrCode.stop().then(() => {
+          html5QrCode.clear();
+        }).catch(err => console.error("Failed to stop scanner", err));
+      } else {
+        try { html5QrCode.clear(); } catch(e) {}
+      }
+    };
+  }, []);
 
   const handleStartScan = () => {
     setIsScanning(true);
+    setErrorText('');
     
-    // Simulate barcode scanning
-    setTimeout(() => {
-      const mockISBN = '978-' + Math.floor(Math.random() * 10000000000).toString().padStart(10, '0');
-      setScannedCode(mockISBN);
-      setIsScanning(false);
-      setShowSuccess(true);
-      
-      setTimeout(() => {
-        onScanComplete(mockISBN);
-      }, 1500);
-    }, 3000);
+    if (scannerInstance) {
+      scannerInstance.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 150 },
+          formatsToSupport: [Html5QrcodeSupportedFormats.EAN_13]
+        },
+        (decodedText) => {
+          // Success
+          setScannedCode(decodedText);
+          setShowSuccess(true);
+          setIsScanning(false);
+          
+          if (scannerInstance.isScanning) {
+            scannerInstance.stop().catch(err => console.error("Stop failed", err));
+          }
+
+          setTimeout(() => {
+            onScanComplete(decodedText);
+          }, 1500);
+        },
+        (errorMessage) => {
+          // Internal decoding failures can be safely ignored until a barcode is locked
+        }
+      ).catch((err) => {
+         console.error(err);
+         setErrorText("Failed to access camera.");
+         setIsScanning(false);
+      });
+    }
+  };
+
+  const handleStopScan = () => {
+    if (scannerInstance && scannerInstance.isScanning) {
+        scannerInstance.stop().then(() => {
+             setIsScanning(false);
+        }).catch(err => console.error(err));
+    } else {
+        setIsScanning(false);
+    }
   };
 
   return (
@@ -37,7 +86,7 @@ export function BarcodeScanner({ onScanComplete, onCancel }: BarcodeScannerProps
           <div className="flex items-center justify-between">
             <h2 className="text-xl">Scan ISBN Barcode</h2>
             <button
-              onClick={onCancel}
+              onClick={() => { handleStopScan(); onCancel(); }}
               className="text-white/80 hover:text-white"
             >
               <X className="w-6 h-6" />
@@ -48,18 +97,22 @@ export function BarcodeScanner({ onScanComplete, onCancel }: BarcodeScannerProps
         <div className="p-6">
           {/* Camera View */}
           <div className="relative bg-gray-900 rounded-lg overflow-hidden mb-6" style={{ aspectRatio: '4/3' }}>
+            
+            {/* The html5-qrcode reader needs to be permanently in DOM, just hidden if not scanning to avoid breaking instance */}
+            <div 
+              id="reader" 
+              className={`absolute inset-0 w-full h-full object-cover flex items-center justify-center [&>video]:object-cover [&>video]:w-full [&>video]:h-full ${isScanning && !showSuccess ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} 
+            />
+
             {!isScanning && !showSuccess && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-gray-900 z-20">
                 <Camera className="w-16 h-16 mb-4 text-white/60" />
                 <p className="text-sm text-white/80">Position the barcode in the frame</p>
               </div>
             )}
 
             {isScanning && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                {/* Simulated camera feed */}
-                <div className="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900" />
-                
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10">
                 {/* Scanning overlay */}
                 <div className="relative z-10 w-64 h-40 border-4 border-[#C4A672] rounded-lg">
                   <div className="absolute inset-0 border-2 border-dashed border-white/30 rounded-lg animate-pulse" />
@@ -68,12 +121,14 @@ export function BarcodeScanner({ onScanComplete, onCancel }: BarcodeScannerProps
                   <div className="absolute left-0 right-0 h-1 bg-[#C4A672] shadow-lg shadow-[#C4A672]/50 animate-scan" />
                 </div>
 
-                <p className="text-white mt-6 animate-pulse">Scanning...</p>
+                <p className="text-white mt-6 animate-pulse bg-black/50 px-3 py-1 rounded">
+                   {errorText || 'Scanning...'}
+                </p>
               </div>
             )}
 
             {showSuccess && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-green-600/20">
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-green-600/90 z-20">
                 <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mb-4">
                   <Check className="w-12 h-12 text-white" />
                 </div>
@@ -83,10 +138,10 @@ export function BarcodeScanner({ onScanComplete, onCancel }: BarcodeScannerProps
             )}
 
             {/* Corner markers */}
-            <div className="absolute top-4 left-4 w-8 h-8 border-t-2 border-l-2 border-[#C4A672]" />
-            <div className="absolute top-4 right-4 w-8 h-8 border-t-2 border-r-2 border-[#C4A672]" />
-            <div className="absolute bottom-4 left-4 w-8 h-8 border-b-2 border-l-2 border-[#C4A672]" />
-            <div className="absolute bottom-4 right-4 w-8 h-8 border-b-2 border-r-2 border-[#C4A672]" />
+            <div className="absolute top-4 left-4 w-8 h-8 border-t-2 border-l-2 border-[#C4A672] z-10 pointer-events-none" />
+            <div className="absolute top-4 right-4 w-8 h-8 border-t-2 border-r-2 border-[#C4A672] z-10 pointer-events-none" />
+            <div className="absolute bottom-4 left-4 w-8 h-8 border-b-2 border-l-2 border-[#C4A672] z-10 pointer-events-none" />
+            <div className="absolute bottom-4 right-4 w-8 h-8 border-b-2 border-r-2 border-[#C4A672] z-10 pointer-events-none" />
           </div>
 
           {/* Instructions */}
@@ -108,10 +163,9 @@ export function BarcodeScanner({ onScanComplete, onCancel }: BarcodeScannerProps
           {/* Action Buttons */}
           <div className="flex gap-3">
             <Button
-              onClick={onCancel}
+              onClick={() => { handleStopScan(); onCancel(); }}
               variant="outline"
               className="flex-1"
-              disabled={isScanning}
             >
               Cancel
             </Button>
@@ -126,7 +180,7 @@ export function BarcodeScanner({ onScanComplete, onCancel }: BarcodeScannerProps
             )}
             {isScanning && (
               <Button
-                onClick={() => setIsScanning(false)}
+                onClick={handleStopScan}
                 variant="outline"
                 className="flex-1"
               >

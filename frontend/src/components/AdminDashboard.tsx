@@ -10,7 +10,7 @@ import { Button } from './ui/button';
 import { Users, BookOpen, Calendar, DollarSign, Settings, LogOut, BarChart3, Shield, MessageCircle, Bell, FileText, GraduationCap } from 'lucide-react';
 import { Outlet, NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase';
-import { collection, getAggregateFromServer, sum, count, doc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, getAggregateFromServer, sum, count, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -22,9 +22,10 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const currentPath = location.pathname;
-  const [stats, setStats] = useState({ revenue: 0, users: 0, loading: true });
+  const [stats, setStats] = useState({ revenue: 0, users: 0, books: 0, activeBooks: 0, tuitionRequests: 0, rentals: 0, loading: true });
 
   useEffect(() => {
+    let unsubscribe = () => {};
     const init = async () => {
       const user = auth.currentUser;
       if (!user) {
@@ -62,23 +63,34 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
         }
 
         // Fetch Stats
-        const usersColl = collection(db, 'users');
         const txnsColl = collection(db, 'transactions');
 
         try {
-          const [userSnapshot, txnSnapshot] = await Promise.all([
-            getAggregateFromServer(usersColl, { count: count() }),
-            getAggregateFromServer(txnsColl, { revenue: sum('amount') })
-          ]);
+          const txnSnapshot = await getAggregateFromServer(txnsColl, { revenue: sum('amount') });
+          const revenueAmount = txnSnapshot.data().revenue || 0;
 
-          setStats({
-            users: userSnapshot.data().count,
-            revenue: txnSnapshot.data().revenue || 0,
-            loading: false
+          unsubscribe = onSnapshot(doc(db, '_metadata', 'global_stats'), (docSnap) => {
+              if (docSnap.exists()) {
+                  const data = docSnap.data();
+                  setStats({
+                      users: data.totalUsers || 0,
+                      books: data.totalBooks || 0,
+                      activeBooks: data.activeBooks || 0,
+                      tuitionRequests: data.totalTuitionRequests || 0,
+                      rentals: data.totalRentals || 0,
+                      revenue: revenueAmount,
+                      loading: false
+                  });
+              } else {
+                  setStats({ users: 0, books: 0, activeBooks: 0, tuitionRequests: 0, rentals: 0, revenue: revenueAmount, loading: false });
+              }
+          }, (error) => {
+              console.error("Stats fetch failed", error);
+              setStats(prev => ({ ...prev, loading: false }));
           });
+
         } catch (error) {
-          console.error("Stats fetch failed", error);
-          // Fallback or just stop loading
+          console.error("Stats setup failed", error);
           setStats(prev => ({ ...prev, loading: false }));
         }
 
@@ -89,6 +101,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     };
 
     init();
+    return () => unsubscribe();
   }, [navigate]);
 
   const tabs = [
@@ -190,6 +203,24 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                 <p className="text-sm text-gray-600">Active Users</p>
                 <p className="text-xl text-[#2C3E50]">
                   {stats.loading ? '...' : stats.users.toLocaleString()}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-gray-600">Books (Total / Active)</p>
+                <p className="text-xl text-[#2C3E50]">
+                  {stats.loading ? '...' : `${stats.books.toLocaleString()} / ${stats.activeBooks.toLocaleString()}`}
+                </p>
+              </div>
+              <div className="text-right hidden md:block">
+                <p className="text-sm text-gray-600">Ongoing Rentals</p>
+                <p className="text-xl text-[#2C3E50]">
+                  {stats.loading ? '...' : stats.rentals.toLocaleString()}
+                </p>
+              </div>
+              <div className="text-right hidden md:block">
+                <p className="text-sm text-gray-600">Tuition Requests</p>
+                <p className="text-xl text-[#2C3E50]">
+                  {stats.loading ? '...' : stats.tuitionRequests.toLocaleString()}
                 </p>
               </div>
             </div>

@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { Button } from '../ui/button';
-import { useCollection } from 'react-firebase-hooks/firestore';
+import { useCollection, useDocument } from 'react-firebase-hooks/firestore';
 import { db, auth } from '../../firebase';
-import { collection, query, where, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, addDoc, serverTimestamp, doc } from 'firebase/firestore';
 import { Book } from '../BookMarketplace';
 import { Loader2, AlertTriangle, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
@@ -63,9 +63,13 @@ export function ExchangeOfferModal({ requestedBook, onClose, isOpen }: ExchangeO
         }
     };
 
-    // Location check logic (mock for now as we might need zip codes from user profile or book data)
-    // Assuming simple check if specific location strings match or warning
-    const isLocationWarning = false; // TODO: Implement real comparison
+    // Fetch User Profile for real location comparison
+    const [userSnapshot] = useDocument(currentUser ? doc(db, 'users', currentUser.uid) : null);
+    const userLocation = userSnapshot?.data()?.location?.city || userSnapshot?.data()?.location?.zip;
+    const bookLocation = requestedBook.location?.city || requestedBook.location?.zipCode;
+
+    // Location check logic
+    const isLocationWarning = !!(userLocation && bookLocation && userLocation.toLowerCase() !== bookLocation.toLowerCase());
 
     if (!isOpen) return null;
 

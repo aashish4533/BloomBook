@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Book } from './BookMarketplace';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
@@ -25,6 +26,8 @@ export function PurchaseConfirmation({ book, onClose, onBack }: PurchaseConfirma
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'paypal' | 'bank'>('card');
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [purchaseId, setPurchaseId] = useState('');
+  const navigate = useNavigate();
 
   const shippingCost = deliveryMethod === 'shipping' ? 4.99 : 0;
   const tax = (book.price + shippingCost) * 0.08;
@@ -133,6 +136,7 @@ export function PurchaseConfirmation({ book, onClose, onBack }: PurchaseConfirma
       // 4. Update Book Status if needed (Optional but good)
       // await updateDoc(doc(db, 'books', book.id), { status: 'sold' });
 
+      setPurchaseId(purchaseRef.id);
       setStep('success');
     } catch (error) {
       console.error("Purchase error:", error);
@@ -188,7 +192,10 @@ export function PurchaseConfirmation({ book, onClose, onBack }: PurchaseConfirma
               </Button>
               <Button
                 variant="outline"
-                onClick={() => alert('Order tracking feature coming soon!')}
+                onClick={() => {
+                  onClose();
+                  navigate('/tracking/' + purchaseId);
+                }}
                 className="w-full"
               >
                 Track Order

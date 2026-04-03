@@ -54,7 +54,7 @@ export function SignUpForm({ onSignUp }: SignUpFormProps) {
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
           });
-          console.log('Signup successful');
+
           if (onSignUp) onSignUp();
           navigate('/');
         } catch (err) {
@@ -156,7 +156,7 @@ export function SignUpForm({ onSignUp }: SignUpFormProps) {
         });
       }
 
-      console.log('Google signup successful');
+
       if (onSignUp) onSignUp();
       navigate('/');
     } catch (err: any) {
