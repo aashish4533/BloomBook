@@ -20,6 +20,13 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if true;
       allow write: if isAuthenticated() && (isOwner(userId) || isAdmin());
+
+      match /paymentMethods/{document=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+      match /payoutDetails/{document=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
     }
 
     // --- Notifications ---
@@ -47,7 +54,13 @@ service cloud.firestore {
     match /communities/{communityId} {
       allow read: if true;
       allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && resource.data.adminId == request.auth.uid; 
+      // Admin can update any field. Members can only update membership fields (join/leave).
+      allow update: if isAuthenticated() && (
+        // Rule 1: Community admin has full update access
+        resource.data.adminId == request.auth.uid ||
+        // Rule 2: Any authenticated user can update ONLY membership-related fields
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'pending', 'memberCount'])
+      );
       allow delete: if isAuthenticated() && resource.data.adminId == request.auth.uid;
 
       match /members/{memberId} {
@@ -129,9 +142,9 @@ service cloud.firestore {
     }
 
     match /transactions/{transactionId} {
-      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow read: if isAuthenticated() && (resource.data.buyerId == request.auth.uid || resource.data.sellerId == request.auth.uid || isAdmin());
       allow create: if false; // Only via Cloud Function payments trigger
-      allow update: if isAdmin();
+      allow update: if false; // Only via Cloud Function manual proof verification
     }
 
     // --- Purchases ---
@@ -153,7 +166,7 @@ service cloud.firestore {
     
     // --- Chats ---
     match /chats/{chatId} {
-      allow read: if isAuthenticated() && resource.data.participants.hasAny([request.auth.uid]);
+      allow read, update: if isAuthenticated() && resource.data.participants.hasAny([request.auth.uid]);
       allow create: if isAuthenticated() && request.resource.data.participants.hasAny([request.auth.uid]);
       
       match /messages/{messageId} {

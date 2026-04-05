@@ -7,6 +7,8 @@ import { collection, query, where, addDoc, serverTimestamp, doc } from 'firebase
 import { Book } from '../BookMarketplace';
 import { Loader2, AlertTriangle, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
+import { startChatWithUser } from '../../utils/chatUtils';
 
 interface ExchangeOfferModalProps {
     requestedBook: Book;
@@ -18,6 +20,7 @@ export function ExchangeOfferModal({ requestedBook, onClose, isOpen }: ExchangeO
     const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const currentUser = auth.currentUser;
+    const navigate = useNavigate();
 
     // Fetch user's available books
     const [userBooksSnapshot, loading, error] = useCollection(
@@ -55,6 +58,11 @@ export function ExchangeOfferModal({ requestedBook, onClose, isOpen }: ExchangeO
             });
             toast.success('Exchange offer sent!');
             onClose();
+            
+            const targetId = requestedBook.userId || requestedBook.seller?.id;
+            if (targetId) {
+                startChatWithUser(navigate, currentUser.uid, targetId, { name: requestedBook.seller.name, avatar: 'S' }, { id: requestedBook.id, title: `Exchange Offer For: ${requestedBook.title}`, price: 0, image: requestedBook.images[0] });
+            }
         } catch (err) {
             console.error(err);
             toast.error('Failed to send exchange offer');

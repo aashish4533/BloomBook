@@ -3,12 +3,15 @@ import { db, auth } from '../../firebase';
 import {
   collection,
   query,
+  where,
   orderBy,
   onSnapshot,
   addDoc,
-  serverTimestamp
+  serverTimestamp,
+  getDocs
 } from 'firebase/firestore';
 import { ArrowLeft } from 'lucide-react';
+import { P2PAssurancePanel } from '../Payment/P2PAssurancePanel';
 
 interface Message {
   id: string;
@@ -38,6 +41,7 @@ interface PrivateChatProps {
 export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId }: PrivateChatProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [activeTransactionId, setActiveTransactionId] = useState<string | null>(null);
   const dummy = useRef<HTMLDivElement>(null);
 
   // 1. Subscribe to Real-time Updates
@@ -64,6 +68,34 @@ export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId }: Privat
 
     return () => unsubscribe();
   }, [chatId]);
+
+  // Find active P2P transaction between these users
+  useEffect(() => {
+    if (!currentUserId || !otherUser.id) return;
+    
+    const fetchActiveTx = async () => {
+      const q1 = query(collection(db, "transactions"), where("buyerId", "==", currentUserId), where("sellerId", "==", otherUser.id));
+      const q2 = query(collection(db, "transactions"), where("buyerId", "==", otherUser.id), where("sellerId", "==", currentUserId));
+      
+      const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+      let txId = null;
+      
+      const check = (snap: any) => {
+        snap.forEach((d: any) => {
+          const status = d.data().status;
+          if (status === 'locked_for_payment' || status === 'payment_claimed' || status === 'completed') {
+            txId = d.id; // Also showing completed just so they see success, but maybe just pending
+          }
+        });
+      };
+      check(snap1);
+      if (!txId) check(snap2);
+      
+      setActiveTransactionId(txId);
+    };
+    
+    fetchActiveTx();
+  }, [currentUserId, otherUser.id]);
 
   // 2. Send Message Function
   const sendMessage = async (e: React.FormEvent) => {
@@ -96,7 +128,14 @@ export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId }: Privat
         </div>
 
         {/* User's Original UI Structure - Flex 1 to fill remaining space */}
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
+          {/* P2P Assurance Panel Header */}
+          {activeTransactionId && (
+             <div className="z-10 shrink-0 border-b border-gray-200">
+               <P2PAssurancePanel transactionId={activeTransactionId} />
+             </div>
+          )}
+          
           {/* Messages Area */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
             {messages.map((msg) => {

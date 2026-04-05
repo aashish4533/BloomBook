@@ -55,6 +55,7 @@ import { UserChats } from './components/User/UserChats';
 import { UserExchanges } from './components/User/UserExchanges';
 import { ExchangesPage } from './components/pages/ExchangesPage';
 import { NegotiationInbox } from './components/User/NegotiationInbox';
+import { PayoutSettings } from './components/User/PayoutSettings';
 
 // AI Integration
 import { AIChatbox } from './components/Chat/AIChatbox';
@@ -257,6 +258,7 @@ function AppContent() {
               <Route path="chats" element={<UserChats />} />
               <Route path="exchanges" element={<UserExchanges />} />
               <Route path="negotiations" element={<NegotiationInbox />} />
+              <Route path="payout" element={<PayoutSettings />} />
             </Route>
 
             <Route path="/tutor-verification" element={<TutorVerificationForm />} />

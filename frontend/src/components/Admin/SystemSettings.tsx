@@ -13,7 +13,6 @@ import { toast } from 'sonner';
 export function SystemSettings() {
   const [settings, setSettings] = useState({
     // Pricing
-    platformFeePercentage: 10,
     minBookPrice: 1.00,
     maxBookPrice: 500.00,
     defaultRentalDuration: 30,
@@ -76,24 +75,12 @@ export function SystemSettings() {
           </div>
           <div>
             <h3 className="text-[#2C3E50]">Pricing Rules</h3>
-            <p className="text-sm text-gray-600">Configure platform fees and pricing limits</p>
+            <p className="text-sm text-gray-600">Configure pricing limits and rental durations</p>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <Label htmlFor="platformFee">Platform Fee (%)</Label>
-            <Input
-              id="platformFee"
-              type="number"
-              value={settings.platformFeePercentage}
-              onChange={(e) => setSettings({
-                ...settings,
-                platformFeePercentage: parseFloat(e.target.value)
-              })}
-            />
-            <p className="text-xs text-gray-500">Fee charged on each transaction</p>
-          </div>
+
 
           <div className="space-y-2">
             <Label htmlFor="rentalDuration">Default Rental Duration (days)</Label>

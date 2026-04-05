@@ -19,7 +19,9 @@ export interface RentalBook {
   category: string;
   images: string[];
   description: string;
+  userId?: string;
   seller: {
+    id?: string;
     name: string;
     rating: number;
     location: string;

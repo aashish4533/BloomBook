@@ -29,6 +29,7 @@ export function UserDashboard({ onLogout }: UserDashboardProps) {
     { id: 'chats', label: 'Chats', icon: MessageCircle, path: '/dashboard/chats' },
     { id: 'exchanges', label: 'Exchanges', icon: ArrowLeftRight, path: '/dashboard/exchanges' },
     { id: 'negotiations', label: 'Negotiations', icon: Gavel, path: '/dashboard/negotiations' },
+    { id: 'payout', label: 'Payout Settings', icon: DollarSign, path: '/dashboard/payout' },
   ];
 
   if (loading) {

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { LocationData } from '../SellBookFlow';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
@@ -135,6 +136,9 @@ export function LocationStep({ initialData, onNext, onBack }: LocationStepProps)
     e.preventDefault();
     if (validateForm()) {
       onNext(formData);
+    } else {
+      toast.error('Please fill in all required location fields correctly.');
+      console.warn('Validation failed. Missing fields in formData.');
     }
   };
 

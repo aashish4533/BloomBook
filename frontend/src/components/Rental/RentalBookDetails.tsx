@@ -10,9 +10,14 @@ import {
   Package,
   Truck,
   BookOpen,
-  User
+  User,
+  MessageCircle
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { auth } from '../../firebase';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+import { startChatWithUser } from '../../utils/chatUtils';
 
 interface RentalBookDetailsProps {
   book: RentalBook;
@@ -23,6 +28,7 @@ interface RentalBookDetailsProps {
 export function RentalBookDetails({ book, onBack, onRent }: RentalBookDetailsProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<'weekly' | 'monthly' | 'yearly'>('monthly');
   const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'shipping'>('pickup');
+  const navigate = useNavigate();
 
   const getPriceForPeriod = () => {
     return book.rentalOptions[selectedPeriod];
@@ -130,6 +136,32 @@ export function RentalBookDetails({ book, onBack, onRent }: RentalBookDetailsPro
                 <MapPin className="w-4 h-4" />
                 <span>{book.seller.location}</span>
               </div>
+              <Button 
+                variant="outline" 
+                className="w-full mt-4 border-[#C4A672] text-[#C4A672] hover:bg-[#C4A672]/10"
+                onClick={() => {
+                  if (!auth.currentUser) {
+                    toast.error('Please login to chat');
+                    return;
+                  }
+                  
+                  const targetId = book.userId || book.seller?.id;
+                  
+                  if (!targetId) {
+                    toast.error('Seller ID is not available');
+                    return;
+                  }
+                  
+                  if (auth.currentUser.uid === targetId) {
+                    toast.error('You cannot chat with yourself');
+                    return;
+                  }
+                  startChatWithUser(navigate, auth.currentUser.uid, targetId, { name: book.seller.name, avatar: 'S' }, { id: book.id, title: book.title, price: getPriceForPeriod(), image: book.images[0] });
+                }}
+              >
+                <MessageCircle className="w-4 h-4 mr-2" />
+                Message Lender
+              </Button>
             </div>
 
             {/* Delivery Options */}

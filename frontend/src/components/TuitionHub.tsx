@@ -12,6 +12,7 @@ import { db, auth } from '../firebase';
 import { collection, addDoc, serverTimestamp, query, where, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { useCollection, useDocument } from 'react-firebase-hooks/firestore';
 import { toast } from 'sonner';
+import { startChatWithUser } from '../utils/chatUtils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from './ui/dialog';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
@@ -40,7 +41,10 @@ const BidsList: React.FC<{ requestId: string; onAssign: (tutorId: string) => voi
             <Button 
               size="sm" 
               variant="outline"
-              onClick={() => navigate('/chat', { state: { otherUser: { id: b.tutorId, name: b.tutorName, avatar: '', online: true } } })}
+              onClick={() => {
+                const uid = auth.currentUser?.uid;
+                if(uid) startChatWithUser(navigate, uid, b.tutorId, { name: b.tutorName, avatar: '' });
+              }}
               className="h-8 text-xs border-[#C4A672] text-[#C4A672] hover:bg-[#C4A672]/10"
             >
               Message
@@ -713,15 +717,13 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                         className="bg-[#C4A672] hover:bg-[#8B7355] text-white"
                         onClick={(e: React.MouseEvent) => {
                           e.stopPropagation();
-                          if (!isLoggedIn) {
+                          if (!isLoggedIn || !auth.currentUser) {
                             toast.error("Please login to book a session");
                             navigate('/login');
                             return;
                           }
-                          navigate('/chat', { state: { 
-                             otherUser: { id: tutor.userId, name: tutor.name, avatar: tutor.avatar, online: true },
-                             bookContext: { title: `1hr Tuition Session: ${tutor.subject}`, price: tutor.hourlyRate }
-                          }});
+                          const uid = auth.currentUser.uid;
+                          startChatWithUser(navigate, uid, tutor.userId, { name: tutor.name, avatar: tutor.avatar }, { title: `1hr Tuition Session: ${tutor.subject}`, price: tutor.hourlyRate });
                         }}>
                         Book
                       </Button>
@@ -731,8 +733,8 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                         className="border-[#C4A672] text-[#C4A672] hover:bg-[#C4A672]/10"
                         onClick={(e: React.MouseEvent) => {
                           e.stopPropagation();
-                          if (isLoggedIn) {
-                            navigate('/chat', { state: { otherUser: { id: tutor.userId, name: tutor.name, avatar: tutor.avatar, online: true } } });
+                          if (isLoggedIn && auth.currentUser) {
+                            startChatWithUser(navigate, auth.currentUser.uid, tutor.userId, { name: tutor.name, avatar: tutor.avatar });
                           } else {
                             toast.error("Please login to message a tutor");
                             navigate('/login');

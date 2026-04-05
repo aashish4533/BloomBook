@@ -14,6 +14,7 @@ import { db, auth } from '../firebase';
 import { collection, addDoc, serverTimestamp, doc } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { Book } from './BookMarketplace';
+import { startChatWithUser } from '../utils/chatUtils';
 import { useDocument } from 'react-firebase-hooks/firestore';
 import { useWishlist } from '../hooks/useWishlist';
 import { useUserRole } from '../context/UserRoleContext';
@@ -110,21 +111,14 @@ export function BookDetailsPage() {
             return;
         }
 
-        navigate('/chat', {
-            state: {
-                otherUser: {
-                    id: sellerId,
-                    name: book.seller.name,
-                    avatar: book.seller.avatar || 'S',
-                    online: false
-                },
-                bookContext: {
-                    id: book.id,
-                    title: book.title,
-                    price: book.price,
-                    image: book.images?.[0]
-                }
-            }
+        startChatWithUser(navigate, auth.currentUser.uid, sellerId, {
+            name: book.seller.name,
+            avatar: book.seller.avatar || 'S'
+        }, {
+            id: book.id,
+            title: book.title,
+            price: book.price,
+            image: book.images?.[0]
         });
     };
 
