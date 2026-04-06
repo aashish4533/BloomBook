@@ -64,10 +64,9 @@ export const handleGroupChatMessage = onCall(
 
                 const docRef = await messagesRef.add(payload);
                 return { success: true, id: docRef.id };
-
             } else if (action === 'edit') {
                 if (!messageId) throw new HttpsError("invalid-argument", "Missing messageId for edit trigger.");
-                
+
                 const messageRef = messagesRef.doc(messageId);
                 const messageSnap = await messageRef.get();
                 if (!messageSnap.exists) throw new HttpsError("not-found", "Message extinct.");
@@ -87,14 +86,13 @@ export const handleGroupChatMessage = onCall(
 
                 await messageRef.update(updatePayload);
                 return { success: true };
-
             } else if (action === 'delete') {
                 if (!messageId) throw new HttpsError("invalid-argument", "Missing messageId for delete trigger.");
-                
+
                 const messageRef = messagesRef.doc(messageId);
                 const messageSnap = await messageRef.get();
                 if (!messageSnap.exists) throw new HttpsError("not-found", "Message extinct.");
-                
+
                 // Allow owner or Admin to delete. Assuming admin logic can check another doc, full owner check here.
                 if (messageSnap.data()?.senderId !== uid) {
                      throw new HttpsError("permission-denied", "Locked to original uploader securely.");
@@ -102,20 +100,18 @@ export const handleGroupChatMessage = onCall(
 
                 await messageRef.delete();
                 return { success: true };
-
             } else if (action === 'react') {
                 if (!messageId || !emoji) throw new HttpsError("invalid-argument", "Missing messageId or emoji for reaction.");
-                
+
                 const reactRef = messagesRef.doc(messageId).collection("reactions").doc(uid);
                 await reactRef.set({
                     emoji,
-                    timestamp: FieldValue.serverTimestamp()
+                    timestamp: FieldValue.serverTimestamp(),
                 });
                 return { success: true };
             }
 
             throw new HttpsError("invalid-argument", "Unsupported proxy action operation.");
-
         } catch (error: any) {
             logger.error("handleGroupChatMessage collapse:", error);
             throw new HttpsError("internal", error.message || "Operation failed inside atmospheric distortion.");

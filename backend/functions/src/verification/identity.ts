@@ -55,8 +55,8 @@ export const verifyIdentity = onCall({ cors: "*", memory: "2GiB", timeoutSeconds
 
   try {
     let extractedText = "";
-    let matchScore = 0;
-    let isMatch = false;
+    const matchScore = 0;
+    const isMatch = false;
 
     // Try OCR using Google Cloud Vision
     try {
@@ -77,10 +77,10 @@ export const verifyIdentity = onCall({ cors: "*", memory: "2GiB", timeoutSeconds
     const verificationRef = admin.firestore()
       .collection("verifications")
       .doc(request.auth.uid);
-      
+
     const verificationDoc = await verificationRef.get();
     let failedAttempts = 0;
-    
+
     if (verificationDoc.exists) {
        const existingData = verificationDoc.data();
        if (existingData?.failedAttempts) {
@@ -94,7 +94,7 @@ export const verifyIdentity = onCall({ cors: "*", memory: "2GiB", timeoutSeconds
     if (!nameMatches) {
        failedAttempts += 1;
     }
-    
+
     const isGrounded = failedAttempts >= 2 && !nameMatches;
     // Phase 3 States: Pending Manual Review, Verified, Rejected
     const finalStatus = isGrounded ? "Rejected" : (nameMatches ? "Verified" : "Pending Manual Review");
@@ -120,7 +120,7 @@ export const verifyIdentity = onCall({ cors: "*", memory: "2GiB", timeoutSeconds
     if (!tutorSnapshot.empty) {
       await tutorSnapshot.docs[0].ref.update({
         verificationStatus: finalStatus,
-        idUrl
+        idUrl,
       });
     }
 
@@ -129,7 +129,7 @@ export const verifyIdentity = onCall({ cors: "*", memory: "2GiB", timeoutSeconds
           success: false,
           isMatch: false,
           status: "grounded",
-          message: "Atmospheric Re-entry denied. Integrity Checksum failed twice."
+          message: "Atmospheric Re-entry denied. Integrity Checksum failed twice.",
        };
     }
 

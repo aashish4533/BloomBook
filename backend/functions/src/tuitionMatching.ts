@@ -33,7 +33,7 @@ export const onTuitionRequestCreated = onDocumentCreated("tuition_requests/{requ
         const matches: any[] = [];
         const notifiedTutors: string[] = [];
 
-        tutorsSnapshot.forEach(doc => {
+        tutorsSnapshot.forEach((doc) => {
             const tutor = doc.data();
             const tutorSubject = tutor.subject || "";
 
@@ -43,7 +43,7 @@ export const onTuitionRequestCreated = onDocumentCreated("tuition_requests/{requ
                     tutorId: doc.id,
                     name: tutor.name || "Anonymous",
                     avatar: tutor.avatar || "",
-                    matchedAt: Timestamp.now()
+                    matchedAt: Timestamp.now(),
                 });
                 notifiedTutors.push(doc.id);
             }
@@ -58,7 +58,7 @@ export const onTuitionRequestCreated = onDocumentCreated("tuition_requests/{requ
 
         // 2. Populate 'potential_matches' sub-collection
         const batch = db.batch();
-        matches.forEach(match => {
+        matches.forEach((match) => {
             const matchRef = db.collection("tuition_requests").doc(requestId).collection("potential_matches").doc(match.tutorId);
             batch.set(matchRef, match);
 
@@ -72,19 +72,18 @@ export const onTuitionRequestCreated = onDocumentCreated("tuition_requests/{requ
                 read: false,
                 timestamp: Timestamp.now(),
                 icon: "compass", // Maps to generic lookup
-                link: `/tuition-hub`
+                link: `/tuition-hub`,
             });
         });
 
         // Track who we notified to prevent duplicates
         const requestRef = db.collection("tuition_requests").doc(requestId);
         batch.update(requestRef, {
-            notified_tutors: notifiedTutors
+            notified_tutors: notifiedTutors,
         });
 
         await batch.commit();
         logger.info(`Successfully synchronized ${matches.length} triggers for request ${requestId}`);
-
     } catch (error) {
         logger.error("Failed to execute sync matching on request creation", error);
     }

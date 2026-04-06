@@ -65,8 +65,8 @@ export const requestSkillTest = onCall({ cors: true }, async (request) => {
         model: "gemini-1.5-flash",
         contents: prompt,
         config: {
-            responseMimeType: "application/json"
-        }
+            responseMimeType: "application/json",
+        },
     });
 
     const content = response.text || "[]";
@@ -127,7 +127,7 @@ export const submitSkillTest = onCall({ cors: true, secrets: [geminiApiKey] }, a
     let passed = false;
     let finalStatus = "Pending Manual Review";
     let feedback = "";
-    
+
     try {
         const ai = new GoogleGenAI({ apiKey: geminiApiKey.value() });
         const evalPrompt = `Evaluate the student's answers for a skill test on ${testData?.subject}.\n\nQuestions & Correct Answers: ${JSON.stringify(questions)}\n\nStudent Answers: ${JSON.stringify(answers)}\n\nPlease grade this test and provide structured feedback.`;
@@ -137,18 +137,17 @@ export const submitSkillTest = onCall({ cors: true, secrets: [geminiApiKey] }, a
             contents: evalPrompt,
             config: {
                 systemInstruction: `You are an expert tutor evaluator. Output ONLY valid JSON using exactly this schema: { "score": number (0-100), "feedback": "string", "passed": boolean }`,
-                responseMimeType: "application/json"
-            }
+                responseMimeType: "application/json",
+            },
         });
 
         const raw = response.text || "{}";
         const parsed = JSON.parse(raw);
-        
+
         score = parsed.score;
         passed = parsed.passed;
         feedback = parsed.feedback;
         finalStatus = passed ? "Reviewing" : "Rejected";
-
     } catch (gradingError) {
         logger.error("Gemini Grading Failed:", gradingError);
         score = null;
@@ -168,20 +167,20 @@ export const submitSkillTest = onCall({ cors: true, secrets: [geminiApiKey] }, a
           passed,
           completedAt: admin.firestore.FieldValue.serverTimestamp(),
         },
-        status: finalStatus
+        status: finalStatus,
       }, { merge: true });
 
     await testDoc.ref.update({
       status: "completed",
       result: { score, passed, feedback },
     });
-    
+
     // Update tutors document if it exists to keep in sync
     const tutorSnapshot = await admin.firestore().collection("tutors").where("userId", "==", request.auth.uid).limit(1).get();
     if (!tutorSnapshot.empty) {
       await tutorSnapshot.docs[0].ref.update({
         verificationStatus: finalStatus,
-        testScore: score
+        testScore: score,
       });
       logger.info(`Tutor ${request.auth.uid} position set to ${finalStatus} after Neural evaluation.`);
     }

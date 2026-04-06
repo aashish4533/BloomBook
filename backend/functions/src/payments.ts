@@ -3,7 +3,7 @@ import * as logger from "firebase-functions/logger";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 
 /**
- * initiateP2PDeal: 
+ * initiateP2PDeal:
  * Initiates the sequence to dock a manual P2P payment.
  * Creates a transaction document locked for manual payment processing.
  */
@@ -12,11 +12,11 @@ export const initiateP2PDeal = onCall(
   async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'User must be logged in.');
 
-    const { amount, targetUserId, transactionType, itemTitle, cartItems } = request.data; 
+    const { amount, targetUserId, transactionType, itemTitle, cartItems } = request.data;
 
     try {
       const db = getFirestore();
-      
+
       // 1. SECURITY CHECK: Verify the Seller/Lender/Tutor has a receiving account setup
       const payoutSnapshot = await db
         .collection('users').doc(targetUserId)
@@ -25,7 +25,7 @@ export const initiateP2PDeal = onCall(
 
       if (!payoutSnapshot.exists) {
         throw new HttpsError(
-          'failed-precondition', 
+          'failed-precondition',
           'Transaction failed: The seller/lender/tutor has not set up a receiving bank account yet.'
         );
       }
@@ -36,7 +36,7 @@ export const initiateP2PDeal = onCall(
         sellerId: targetUserId,
         userEmail: request.auth.token.email || "Unknown",
         type: transactionType || 'buy',
-        itemTitle: itemTitle || 'Payment', 
+        itemTitle: itemTitle || 'Payment',
         baseAmount: amount, // Total charged
         platformFee: 0, // 0%
         sellerPayout: amount,
@@ -46,11 +46,10 @@ export const initiateP2PDeal = onCall(
         createdAt: FieldValue.serverTimestamp(),
       });
 
-      return { 
+      return {
         transactionId: transactionRef.id,
-        status: 'locked_for_payment'
+        status: 'locked_for_payment',
       };
-
     } catch (error: any) {
       logger.error("Payment Error:", error);
       throw new HttpsError('internal', error.message || 'Payment initialization failed');
@@ -60,8 +59,8 @@ export const initiateP2PDeal = onCall(
 
 /**
  * submitProofOfPayment:
- * Accepts transactionId and proofImageUrl. 
- * Updates the transaction document to status: 'payment_claimed' and sets the proofUrl. 
+ * Accepts transactionId and proofImageUrl.
+ * Updates the transaction document to status: 'payment_claimed' and sets the proofUrl.
  * Triggers a notification to the Seller.
  */
 export const submitProofOfPayment = onCall(
@@ -72,7 +71,7 @@ export const submitProofOfPayment = onCall(
 
     const db = getFirestore();
     const txRef = db.collection("transactions").doc(transactionId);
-    
+
     await db.runTransaction(async (t) => {
       const doc = await t.get(txRef);
       if (!doc.exists) throw new HttpsError('not-found', 'Transaction not found.');
@@ -83,7 +82,7 @@ export const submitProofOfPayment = onCall(
       t.update(txRef, {
         status: 'payment_claimed',
         proofUrl: proofImageUrl,
-        updatedAt: FieldValue.serverTimestamp()
+        updatedAt: FieldValue.serverTimestamp(),
       });
 
       // Notification
@@ -95,7 +94,7 @@ export const submitProofOfPayment = onCall(
         type: "payment_proof",
         transactionId: transactionId,
         read: false,
-        createdAt: FieldValue.serverTimestamp()
+        createdAt: FieldValue.serverTimestamp(),
       });
     });
 
@@ -120,13 +119,13 @@ export const verifyPaymentReceived = onCall(
       const doc = await t.get(txRef);
       if (!doc.exists) throw new HttpsError('not-found', 'Transaction not found.');
       const data = doc.data()!;
-      
+
       if (data.sellerId !== request.auth!.uid) throw new HttpsError('permission-denied', 'Only the seller can verify payment receipt.');
       if (data.status !== 'payment_claimed') throw new HttpsError('failed-precondition', 'Transaction must have proof claimed first.');
 
       t.update(txRef, {
         status: 'completed',
-        updatedAt: FieldValue.serverTimestamp()
+        updatedAt: FieldValue.serverTimestamp(),
       });
 
       // Complete the purchase/rental creation inside the db
@@ -139,7 +138,7 @@ export const verifyPaymentReceived = onCall(
          sellerPayout: data.sellerPayout,
          status: data.type === 'rent' ? 'active' : 'completed',
          transactionRef: transactionId,
-         ...(data.type === 'rent' ? { createdAt: FieldValue.serverTimestamp() } : { timestamp: FieldValue.serverTimestamp() })
+         ...(data.type === 'rent' ? { createdAt: FieldValue.serverTimestamp() } : { timestamp: FieldValue.serverTimestamp() }),
       });
 
       const buyerNotificationRef = db.collection("notifications").doc();
@@ -150,7 +149,7 @@ export const verifyPaymentReceived = onCall(
         type: "payment_complete",
         transactionId: transactionId,
         read: false,
-        createdAt: FieldValue.serverTimestamp()
+        createdAt: FieldValue.serverTimestamp(),
       });
     });
 

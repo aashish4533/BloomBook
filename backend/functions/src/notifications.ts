@@ -31,7 +31,7 @@ export const onRentalCreated = onDocumentCreated("rentals/{rentalId}", async (ev
             read: false,
             timestamp: Timestamp.now(),
             icon: "box", // Using 'box' as a generic placeholder, frontend maps types to icons
-            link: "/dashboard/rentals" // Assuming a rentals dashboard route
+            link: "/dashboard/rentals", // Assuming a rentals dashboard route
         });
         logger.info(`Notification sent to owner ${ownerId} for rental ${event.params.rentalId}`);
     } catch (error) {
@@ -81,7 +81,7 @@ export const onRentalUpdated = onDocumentUpdated("rentals/{rentalId}", async (ev
             message: message,
             read: false,
             timestamp: Timestamp.now(),
-            link: `/rentals/${event.params.rentalId}`
+            link: `/rentals/${event.params.rentalId}`,
         });
         logger.info(`Notification sent to renter ${renterId} for rental status ${status}`);
     } catch (error) {
@@ -100,14 +100,14 @@ export const onNegotiationCreated = onDocumentCreated("negotiations/{negotiation
     const offer = snapshot.data();
     // Assuming structure based on BookDetailModal.tsx:
     // buyerId, buyerName, bookId, bookTitle, sellerName, offerPrice, message, status, ...
-    // Note: The structure in BookDetailModal didn't explicitly show 'sellerId' in the negotiation doc, 
-    // but it did query for the book to get userId. 
+    // Note: The structure in BookDetailModal didn't explicitly show 'sellerId' in the negotiation doc,
+    // but it did query for the book to get userId.
     // HOWEVER, the frontend code in BookDetailModal.tsx ALREADY creates a notification manually via `db.collection('notifications')`.
     // If we rely on this backend trigger, we need to make sure the user works.
     // BUT the negotiation document usually needs the sellerId to be queryable by the seller.
 
     // Let's assume the negotiation document DOES NOT have sellerId if it wasn't saved.
-    // Wait, in BookDetailModal.tsx: 
+    // Wait, in BookDetailModal.tsx:
     // await addDoc(collection(db, 'negotiations'), { ... buyerId, buyerName ... });
     // It DOES NOT save sellerId! It only sends a notification using book.userId.
     // This is a design flaw in the negotiation doc if the seller needs to query "my negotiations".
@@ -135,10 +135,10 @@ export const onNegotiationCreated = onDocumentCreated("negotiations/{negotiation
             return;
         }
 
-        // Check if frontend already sent a notification? 
+        // Check if frontend already sent a notification?
         // The frontend code in BookDetailModal.tsx sends a notification MANUALLY.
         // If we add this, we might duplicate it.
-        // For now, this is a "robust backup" or replacement. 
+        // For now, this is a "robust backup" or replacement.
         // Ideally, we should remove the frontend notification logic, but I can't do that easily without a new plan.
         // I'll implement this, and it will likely duplicate until frontend is cleaned up.
         // Wait, the user asked to "integrate notification backend". This implies replacing or ensuring it works.
@@ -152,10 +152,9 @@ export const onNegotiationCreated = onDocumentCreated("negotiations/{negotiation
             read: false,
             timestamp: Timestamp.now(),
             icon: "tag",
-            link: "/dashboard/sales"
+            link: "/dashboard/sales",
         });
         logger.info(`Notification sent to seller ${sellerId} for negotiation ${event.params.negotiationId}`);
-
     } catch (error) {
         logger.error("Failed to process negotiation notification", error);
     }
@@ -167,7 +166,7 @@ export const onNegotiationCreated = onDocumentCreated("negotiations/{negotiation
  */
 export const onUserCreated = onDocumentCreated("users/{userId}", async (event) => {
     const userId = event.params.userId;
-    
+
     try {
         await db.collection("notifications").add({
             userId: userId,
@@ -176,8 +175,8 @@ export const onUserCreated = onDocumentCreated("users/{userId}", async (event) =
             message: "I am your AI Assistant. Click the chat icon below if you need help finding books or tutors.",
             read: false,
             timestamp: Timestamp.now(),
-            icon: "bot", 
-            link: "#ai-chat" // Specific anchor to trigger the chatbox
+            icon: "bot",
+            link: "#ai-chat", // Specific anchor to trigger the chatbox
         });
         logger.info(`Neural Welcome signal sent to user ${userId}`);
     } catch (error) {

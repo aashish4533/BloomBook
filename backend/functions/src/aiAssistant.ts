@@ -36,8 +36,8 @@ export const generateAssistantResponse = onCall(
           .orderBy("createdAt", "desc")
           .limit(5)
           .get();
-          
-        inventoryData = booksSnapshot.docs.map(doc => {
+
+        inventoryData = booksSnapshot.docs.map((doc) => {
           const b = doc.data();
           const availability = b.status || "Available";
           return `- Title: "${b.title}", Author: ${b.author || 'Unknown'}, Availability: ${availability} for ${b.type || 'Sale/Rent'}`;
@@ -48,7 +48,7 @@ export const generateAssistantResponse = onCall(
       }
 
       const genAI = new GoogleGenerativeAI(apiKey);
-      
+
       // 3. System Instructions (Rule Enforcement Protocol)
       const systemInstructions = `
         CORE IDENTITY: You are the "BloomBook AI Assistant," a specialized guide for the Web-Based Platform for Book Reselling and Renting.
@@ -70,9 +70,9 @@ export const generateAssistantResponse = onCall(
         ${inventoryData || "No books currently available."}
       `;
 
-      const model = genAI.getGenerativeModel({ 
+      const model = genAI.getGenerativeModel({
         model: "gemini-1.5-flash",
-        systemInstruction: systemInstructions
+        systemInstruction: systemInstructions,
       });
 
       // 4. Cognitive Processing

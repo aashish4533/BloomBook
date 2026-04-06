@@ -19,9 +19,9 @@ export const analyticsOnBookCreated = onDocumentCreated("books/{bookId}", async 
     const db = getFirestore();
     const data = event.data?.data();
     const isActive = data?.status === 'active' ? 1 : 0;
-    return db.doc(STATS_DOC).set({ 
+    return db.doc(STATS_DOC).set({
         totalBooks: FieldValue.increment(1),
-        activeBooks: FieldValue.increment(isActive)
+        activeBooks: FieldValue.increment(isActive),
     }, { merge: true });
 });
 
@@ -29,9 +29,9 @@ export const analyticsOnBookDeleted = onDocumentDeleted("books/{bookId}", async 
     const db = getFirestore();
     const data = event.data?.data();
     const isActive = data?.status === 'active' ? -1 : 0;
-    return db.doc(STATS_DOC).set({ 
+    return db.doc(STATS_DOC).set({
         totalBooks: FieldValue.increment(-1),
-        activeBooks: FieldValue.increment(isActive)
+        activeBooks: FieldValue.increment(isActive),
     }, { merge: true });
 });
 

@@ -10,8 +10,8 @@ export const configureStorageCors = onRequest(async (req, res) => {
                 origin: ["*"],
                 method: ["GET", "HEAD", "PUT", "POST", "DELETE", "OPTIONS"],
                 responseHeader: ["Content-Type", "x-goog-resumable"],
-                maxAgeSeconds: 3600
-            }
+                maxAgeSeconds: 3600,
+            },
         ]);
         logger.info("CORS configuration set successfully");
         res.status(200).send("CORS configuration set successfully");
