@@ -14,5 +14,8 @@
   "description": "",
   "devDependencies": {
     "concurrently": "^9.2.1"
+  },
+  "dependencies": {
+    "firebase-functions": "^7.2.3"
   }
 }

@@ -76,13 +76,70 @@ export const P2PAssurancePanel = ({ transactionId }: { transactionId: string }) 
     }
   };
 
+  const handleMethodSelect = async (method: 'online' | 'meetup') => {
+    try {
+      const functions = getFunctions();
+      const selectMethod = httpsCallable(functions, 'selectMeetupMethod');
+      await selectMethod({ transactionId, method });
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to update preferred method");
+    }
+  };
+
+  const handlePhysicalConfirm = async () => {
+    setIsVerifying(true);
+    try {
+      const functions = getFunctions();
+      const confirmHandover = httpsCallable(functions, 'confirmPhysicalHandover');
+      const response = await confirmHandover({ transactionId, role: isBuyer ? 'buyer' : 'seller' });
+      // response.data contains isFullyConfirmed
+      toast.success("Confirmation registered.");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to register confirmation.");
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const method = transaction.meetupMethod || 'online';
+
   return (
     <Card className="m-4 overflow-hidden border-2 border-[#C4A672]/30 shadow-sm relative shrink-0">
-       {/* Background gradient hint */}
        <div className="absolute top-0 right-0 w-32 h-32 bg-[#C4A672]/5 rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
        
        <div className="p-4 relative z-10 flex flex-col gap-4">
-           {transaction.status === 'locked_for_payment' && isBuyer && (
+           {transaction.status === 'locked_for_payment' && (
+             <div className="mb-2 p-3 bg-gray-50 border rounded-lg">
+                <h4 className="text-sm font-semibold mb-2">Deal Method</h4>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input 
+                      type="radio" 
+                      name="dealMethod" 
+                      checked={method === 'online'} 
+                      onChange={() => handleMethodSelect('online')}
+                      disabled={!isBuyer}
+                    /> 
+                    Online Transfer
+                  </label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input 
+                      type="radio" 
+                      name="dealMethod" 
+                      checked={method === 'meetup'} 
+                      onChange={() => handleMethodSelect('meetup')}
+                      disabled={!isBuyer}
+                    /> 
+                    Cash on Meetup
+                  </label>
+                </div>
+                {!isBuyer && <p className="text-xs text-gray-500 mt-2">Only the buyer can change the deal method at this stage.</p>}
+             </div>
+           )}
+
+           {transaction.status === 'locked_for_payment' && isBuyer && method === 'online' && (
                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                    <div className="flex-1">
                        <h4 className="font-semibold text-[#2C3E50]">Action Required: Transfer Funds</h4>
@@ -108,7 +165,7 @@ export const P2PAssurancePanel = ({ transactionId }: { transactionId: string }) 
                </div>
            )}
            
-           {transaction.status === 'locked_for_payment' && isSeller && (
+           {transaction.status === 'locked_for_payment' && isSeller && method === 'online' && (
                <div className="flex items-center gap-3">
                    <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
                        <div className="w-4 h-4 bg-blue-500 rounded-full animate-pulse" />
@@ -120,7 +177,36 @@ export const P2PAssurancePanel = ({ transactionId }: { transactionId: string }) 
                </div>
            )}
 
-           {transaction.status === 'payment_claimed' && isSeller && (
+           {(transaction.status === 'locked_for_payment' || transaction.status === 'payment_claimed') && method === 'meetup' && (
+               <div className="flex flex-col gap-4">
+                   <Alert className="bg-orange-50 border-orange-200 text-orange-800">
+                       <div className="flex items-center">
+                           <AlertCircle className="w-4 h-4 mr-2" />
+                           <span className="font-semibold">Physical Meetup Selected</span> 
+                       </div>
+                       <div className="mt-1 text-sm">
+                           Exchange the item and cash in person. The deal is only completed when BOTH users confirm below.
+                       </div>
+                   </Alert>
+                   
+                   <div className="flex justify-end gap-2">
+                       <Button 
+                         onClick={handlePhysicalConfirm} 
+                         disabled={isVerifying || (isBuyer ? transaction.buyerConfirmedHandover : transaction.sellerConfirmedHandover)} 
+                         className="bg-green-600 hover:bg-green-700 w-full sm:w-auto text-white"
+                       >
+                          {isVerifying ? "Processing..." : 
+                            (isBuyer ? 
+                              (transaction.buyerConfirmedHandover ? "Waiting for Seller..." : "I Have Checked & Received the Item") : 
+                              (transaction.sellerConfirmedHandover ? "Waiting for Buyer..." : "I Have Handed Over & Received Cash")
+                            )
+                          }
+                       </Button>
+                   </div>
+               </div>
+           )}
+
+           {transaction.status === 'payment_claimed' && isSeller && method === 'online' && (
                <div className="flex flex-col gap-4">
                    <Alert className="bg-red-50 border-red-200 text-red-800">
                        <div className="flex items-center">
@@ -147,7 +233,7 @@ export const P2PAssurancePanel = ({ transactionId }: { transactionId: string }) 
                </div>
            )}
 
-           {transaction.status === 'payment_claimed' && isBuyer && (
+           {transaction.status === 'payment_claimed' && isBuyer && method === 'online' && (
                <div className="flex items-center gap-3">
                    <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center shrink-0 text-orange-500">
                        <CheckCircle className="w-5 h-5" />

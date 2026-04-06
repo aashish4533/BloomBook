@@ -156,3 +156,130 @@ export const verifyPaymentReceived = onCall(
     return { success: true };
   }
 );
+
+/**
+ * selectMeetupMethod:
+ * Saves the buyer's choice of transaction methodology.
+ */
+export const selectMeetupMethod = onCall(
+  { cors: true },
+  async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'User must be logged in.');
+    const { transactionId, method } = request.data; // 'online' or 'meetup'
+
+    const db = getFirestore();
+    const txRef = db.collection("transactions").doc(transactionId);
+    
+    await db.runTransaction(async (t) => {
+      const doc = await t.get(txRef);
+      if (!doc.exists) throw new HttpsError('not-found', 'Transaction not found.');
+      const data = doc.data()!;
+      
+      if (data.buyerId !== request.auth!.uid && data.sellerId !== request.auth!.uid) {
+         throw new HttpsError('permission-denied', 'Only participants can update the method.');
+      }
+      
+      if (data.status !== 'locked_for_payment') {
+         throw new HttpsError('failed-precondition', 'Cannot change method after payment has been processed.');
+      }
+
+      t.update(txRef, {
+        meetupMethod: method,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    });
+
+    return { success: true };
+  }
+);
+
+/**
+ * confirmPhysicalHandover:
+ * Allows both buyer and seller to independently verify a physical cash transfer.
+ * If both confirm, it finalizes the transaction.
+ */
+export const confirmPhysicalHandover = onCall(
+  { cors: true },
+  async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'User must be logged in.');
+    const { transactionId, role } = request.data;
+
+    if (role !== 'buyer' && role !== 'seller') {
+      throw new HttpsError('invalid-argument', 'Role must be buyer or seller.');
+    }
+
+    const db = getFirestore();
+    const txRef = db.collection("transactions").doc(transactionId);
+
+    let isFullyConfirmed = false;
+    let finalData: any = {};
+
+    await db.runTransaction(async (t) => {
+      const doc = await t.get(txRef);
+      if (!doc.exists) throw new HttpsError('not-found', 'Transaction not found.');
+      const data = doc.data()!;
+
+      if (role === 'buyer' && data.buyerId !== request.auth!.uid) throw new HttpsError('permission-denied', 'Only the true buyer can confirm.');
+      if (role === 'seller' && data.sellerId !== request.auth!.uid) throw new HttpsError('permission-denied', 'Only the true seller can confirm.');
+
+      const updatePayload: any = { updatedAt: FieldValue.serverTimestamp() };
+      
+      if (role === 'buyer') {
+        updatePayload.buyerConfirmedHandover = true;
+        updatePayload.status = 'payment_claimed'; // Setting to claimed so UI proceeds or signals progress
+      } else if (role === 'seller') {
+        updatePayload.sellerConfirmedHandover = true;
+      }
+
+      const buyerConfirmed = role === 'buyer' ? true : data.buyerConfirmedHandover === true;
+      const sellerConfirmed = role === 'seller' ? true : data.sellerConfirmedHandover === true;
+
+      if (buyerConfirmed && sellerConfirmed) {
+        updatePayload.status = 'completed';
+        isFullyConfirmed = true;
+      }
+
+      t.update(txRef, updatePayload);
+      finalData = { ...data, ...updatePayload };
+
+      if (isFullyConfirmed) {
+        // Complete the purchase/rental creation inside the db
+        const collectionName = data.type === 'rent' ? 'rentals' : 'purchases';
+        const orderRef = db.collection(collectionName).doc();
+        t.set(orderRef, {
+           userId: data.buyerId,
+           bookTitle: data.itemTitle,
+           pricePaid: data.baseAmount,
+           sellerPayout: data.sellerPayout,
+           status: data.type === 'rent' ? 'active' : 'completed',
+           transactionRef: transactionId,
+           ...(data.type === 'rent' ? { createdAt: FieldValue.serverTimestamp() } : { timestamp: FieldValue.serverTimestamp() }),
+        });
+
+        const buyerNotificationRef = db.collection("notifications").doc();
+        t.set(buyerNotificationRef, {
+          userId: data.buyerId,
+          title: "Physical Deal Complete",
+          message: `Both parties verified the physical handover for "${data.itemTitle}". Deal is now complete.`,
+          type: "payment_complete",
+          transactionId: transactionId,
+          read: false,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+        
+        const sellerNotificationRef = db.collection("notifications").doc();
+        t.set(sellerNotificationRef, {
+          userId: data.sellerId,
+          title: "Physical Deal Complete",
+          message: `Both parties verified the physical handover for "${data.itemTitle}". Deal is now complete.`,
+          type: "payment_complete",
+          transactionId: transactionId,
+          read: false,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+      }
+    });
+
+    return { success: true, isFullyConfirmed, status: finalData.status };
+  }
+);

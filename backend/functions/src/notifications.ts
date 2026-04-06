@@ -1,4 +1,5 @@
 import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import * as logger from "firebase-functions/logger";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 
@@ -184,3 +185,69 @@ export const onUserCreated = onDocumentCreated("users/{userId}", async (event) =
     }
 });
 
+/**
+ * Scheduled cron job to run every 24 hours (9 AM).
+ * Notifies borrowers 24-48 hours before their rental returns are due.
+ */
+export const notifyUpcomingRentalReturns = onSchedule(
+  {
+    schedule: "0 9 * * *",
+    timeZone: "Asia/Karachi" // Example timezone
+  },
+  async (event) => {
+    try {
+      const now = new Date();
+      const in24Hours = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      const in48Hours = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+
+      const rentalsSnapshot = await db.collection("rentals")
+          .where("status", "==", "active")
+          .get();
+
+      if (rentalsSnapshot.empty) {
+        logger.info("No active rentals found.");
+        return;
+      }
+
+      let count = 0;
+      const batch = db.batch();
+
+      rentalsSnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (!data.dueDate) return;
+
+        // Parse ISO string to Date object
+        const dueDate = new Date(data.dueDate);
+
+        // Check if the due date falls in the exactly 24 to 48 hours window
+        if (dueDate > in24Hours && dueDate <= in48Hours) {
+          const renterId = data.renterId;
+          const bookTitle = data.bookTitle || "Your Book";
+          if (!renterId) return;
+
+          const notificationRef = db.collection("notifications").doc();
+          batch.set(notificationRef, {
+            userId: renterId,
+            type: "system",
+            title: "Rental Return Reminder ⏰",
+            message: `Friendly reminder: Your rental for "${bookTitle}" is due to be returned on ${dueDate.toLocaleDateString()}. Please prepare for handover!`,
+            read: false,
+            timestamp: Timestamp.now(),
+            icon: "box",
+            link: "/dashboard/rentals",
+          });
+          count++;
+        }
+      });
+
+      if (count > 0) {
+        await batch.commit();
+        logger.info(`Automated Rental Warning Sent: Notified ${count} users about upcoming returns.`);
+      } else {
+        logger.info("No rentals fall tightly into the 24-48hr warning window.");
+      }
+    } catch (error) {
+      logger.error("Failed to run notifyUpcomingRentalReturns cron job", error);
+    }
+  }
+);

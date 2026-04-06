@@ -329,7 +329,7 @@ export function BookDetailsPage() {
                                     className="h-11 border-gray-300 hover:bg-gray-50"
                                 >
                                     <MessageCircle className="w-4 h-4 mr-2" />
-                                    Contact
+                                    Start Chat & Deal
                                 </Button>
                             </div>
                         </div>

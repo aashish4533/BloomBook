@@ -160,7 +160,7 @@ export function RentalBookDetails({ book, onBack, onRent }: RentalBookDetailsPro
                 }}
               >
                 <MessageCircle className="w-4 h-4 mr-2" />
-                Message Lender
+                Start Chat & Deal
               </Button>
             </div>
 

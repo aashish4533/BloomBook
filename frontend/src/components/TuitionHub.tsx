@@ -741,7 +741,7 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                           }
                         }}
                       >
-                        Message Tutor
+                        Start Chat & Deal
                       </Button>
                     </div>
                   </div>
