@@ -99,6 +99,8 @@ export function TrackOrder({ orderId, onBack }: TrackOrderProps) {
               src="https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=100&h=150&fit=crop"
               alt="Book"
               className="w-20 h-28 object-cover rounded-lg shadow-subtle"
+              crossOrigin="anonymous"
+              referrerPolicy="no-referrer"
             />
             <div className="flex-1">
               <h3 className="text-lg text-gray-900 mb-1">The Great Gatsby</h3>

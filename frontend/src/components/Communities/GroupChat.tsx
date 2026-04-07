@@ -351,7 +351,7 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
               <div className="max-w-3xl mx-auto flex gap-2 overflow-x-auto">
                 {selectedImages.map((img, i) => (
                   <div key={i} className="relative flex-shrink-0">
-                    <img src={img.preview} alt="Preview" className="w-20 h-20 object-cover rounded-lg" />
+                    <img src={img.preview} alt="Preview" className="w-20 h-20 object-cover rounded-lg" crossOrigin="anonymous" referrerPolicy="no-referrer" />
                     <button onClick={() => removeImage(i)} className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center">
                       <X className="w-4 h-4" />
                     </button>

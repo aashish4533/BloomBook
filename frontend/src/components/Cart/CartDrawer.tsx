@@ -78,6 +78,8 @@ export function CartDrawer() {
                                                 src={item.image}
                                                 alt={item.title}
                                                 className="h-full w-full object-cover"
+                                                crossOrigin="anonymous"
+                                                referrerPolicy="no-referrer"
                                             />
                                         </div>
                                         <div className="flex-1 min-w-0">

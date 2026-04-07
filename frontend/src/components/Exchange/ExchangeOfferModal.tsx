@@ -125,7 +125,7 @@ export function ExchangeOfferModal({ requestedBook, onClose, isOpen }: ExchangeO
                                         }
                   `}
                                 >
-                                    <img src={book.images[0]} alt={book.title} className="w-16 h-24 object-cover rounded" />
+                                    <img src={book.images[0]} alt={book.title} className="w-16 h-24 object-cover rounded" crossOrigin="anonymous" referrerPolicy="no-referrer" />
                                     <div className="flex-1 min-w-0">
                                         <h4 className="font-medium text-sm text-[#2C3E50] truncate">{book.title}</h4>
                                         <p className="text-xs text-gray-500 truncate">{book.author}</p>

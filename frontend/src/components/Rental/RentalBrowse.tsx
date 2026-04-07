@@ -375,7 +375,7 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
                 {/* Book Image with Photo Count */}
                 {showPhotoPreviews && (
                   <div className="h-48 bg-gray-200 overflow-hidden relative">
-                    <img src={book.images[0]} alt={book.title} className="w-full h-full object-cover" />
+                    <img src={book.images[0]} alt={book.title} className="w-full h-full object-cover" crossOrigin="anonymous" referrerPolicy="no-referrer" />
                     {book.images.length > 1 && (
                       <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
                         <ImageIcon className="w-3 h-3" />

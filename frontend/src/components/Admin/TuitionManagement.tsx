@@ -551,6 +551,8 @@ export function TuitionManagement() {
                       src={selectedTutor.idUrl}
                       alt="ID Document"
                       className="w-full max-h-48 object-cover rounded-lg border border-gray-200 mb-2"
+                      crossOrigin="anonymous"
+                      referrerPolicy="no-referrer"
                     />
                   </div>
                 )}

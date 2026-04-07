@@ -526,6 +526,8 @@ export function PostDetail({ post, onClose, isAdmin, userId }: PostDetailProps &
                     src={img}
                     alt="Post attachment"
                     className="w-full h-64 object-cover rounded-xl border border-gray-100 shadow-sm"
+                    crossOrigin="anonymous"
+                    referrerPolicy="no-referrer"
                   />
                 ))}
               </div>

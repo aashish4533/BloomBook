@@ -259,6 +259,8 @@ export function AnnouncementsPage({ onBack }: AnnouncementsPageProps) {
                         src={announcement.image}
                         alt={announcement.title}
                         className="w-full h-full object-cover"
+                        crossOrigin="anonymous"
+                        referrerPolicy="no-referrer"
                       />
                       {!announcement.published && (
                         <div className="absolute top-4 right-4">

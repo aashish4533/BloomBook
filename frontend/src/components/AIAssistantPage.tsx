@@ -46,7 +46,7 @@ const AIProductCard = ({ productId }: { productId: string }) => {
     <Card className="mt-3 overflow-hidden border-[#C4A672]/30 shadow-sm hover:shadow-md transition-all">
       <div className="flex gap-4 p-3 bg-white">
         <div className="w-16 h-20 bg-gray-100 rounded overflow-hidden flex-shrink-0">
-          <img src={book.image} alt={book.title} className="w-full h-full object-cover" />
+          <img src={book.image} alt={book.title} className="w-full h-full object-cover" crossOrigin="anonymous" referrerPolicy="no-referrer" />
         </div>
         <div className="flex-1 min-w-0">
           <h4 className="text-sm font-bold text-[#2C3E50] truncate">{book.title}</h4>

@@ -140,7 +140,7 @@ export function ExchangeRequestCard({ request, isIncoming }: ExchangeRequestCard
                 <div className="flex-1">
                     <div className="text-xs text-gray-500 mb-1">{isIncoming ? 'Your Book' : 'Requested'}</div>
                     <div className="flex gap-2">
-                        <img src={request.requestedBookImage} className="w-12 h-16 object-cover rounded shadow-sm" alt="" />
+                        <img src={request.requestedBookImage} className="w-12 h-16 object-cover rounded shadow-sm" alt="" crossOrigin="anonymous" referrerPolicy="no-referrer" />
                         <div className="min-w-0">
                             <p className="font-medium text-sm truncate">{request.requestedBookTitle}</p>
                         </div>
@@ -155,7 +155,7 @@ export function ExchangeRequestCard({ request, isIncoming }: ExchangeRequestCard
                 <div className="flex-1 text-right">
                     <div className="text-xs text-gray-500 mb-1">{isIncoming ? 'Offered' : 'Your Offer'}</div>
                     <div className="flex gap-2 flex-row-reverse">
-                        <img src={request.offeredBookImage} className="w-12 h-16 object-cover rounded shadow-sm" alt="" />
+                        <img src={request.offeredBookImage} className="w-12 h-16 object-cover rounded shadow-sm" alt="" crossOrigin="anonymous" referrerPolicy="no-referrer" />
                         <div className="min-w-0 text-right">
                             <p className="font-medium text-sm truncate">{request.offeredBookTitle}</p>
                         </div>

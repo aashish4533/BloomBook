@@ -81,14 +81,14 @@ export function Navbar({
             {/* LEFT SIDE: Hamburger Button + Logo */}
             <div className="flex items-center gap-4">
               {/* Hamburger Button (Visible on mobile/tablet, hides on desktop screens using 'lg:hidden') */}
-              <button 
+              <button
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
                 className="p-2 rounded-md hover:bg-[#8B7355] lg:hidden focus:outline-none transition-colors"
                 aria-label="Toggle Menu"
               >
                 {isMenuOpen ? <X className="w-6 h-6 text-[#2C3E50]" /> : <Menu className="w-6 h-6 text-[#2C3E50]" />}
               </button>
-              
+
               {/* Existing BookBloom Logo Component/Link goes exactly here */}
               <Link to="/" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-2 group">
                 <div className="relative w-10 h-10 flex items-center justify-center bg-[#2C3E50] rounded-lg group-hover:bg-[#1a252f] transition-colors">
@@ -130,13 +130,12 @@ export function Navbar({
                   <>
                     <NotificationBell />
 
-                    <Link 
+                    <Link
                       to="/assistant"
-                      className={`relative p-2 rounded-lg transition-colors ${
-                        isActive('/assistant') 
-                          ? 'bg-[#C4A672]/20 text-[#2C3E50]' 
+                      className={`relative p-2 rounded-lg transition-colors ${isActive('/assistant')
+                          ? 'bg-[#C4A672]/20 text-[#2C3E50]'
                           : 'text-[#2C3E50] hover:bg-[#8B7355] hover:text-white'
-                      }`}
+                        }`}
                       title="AI Assistant"
                     >
                       <Bot className="w-6 h-6" />
@@ -253,7 +252,7 @@ export function Navbar({
 
         {/* Mobile Collapsible Menu */}
         {isMenuOpen && (
-          <div className="lg:hidden absolute top-full left-0 w-full bg-white dark:bg-gray-900 border-t border-gray-200 z-[999] h-screen shadow-[10px_0_30px_rgba(0,0,0,0.15)] flex flex-col p-4 space-y-4 overflow-y-auto">
+          <div className="fixed top-0 left-0 h-[100dvh] w-64 sm:w-80 !bg-white dark:!bg-gray-900 !z-[9999] shadow-[20px_0_50px_rgba(0,0,0,0.5)] flex flex-col p-4 overflow-y-auto !opacity-100">
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.path);
@@ -262,11 +261,10 @@ export function Navbar({
                   key={item.id}
                   to={item.path}
                   onClick={() => setIsMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-3 rounded-lg transition-colors ${
-                    active
+                  className={`flex items-center gap-3 px-3 py-3 rounded-lg transition-colors ${active
                       ? 'bg-[#2C3E50] text-white'
                       : 'text-[#2C3E50] hover:bg-[#C4A672]/10 hover:text-[#C4A672]'
-                  }`}
+                    }`}
                 >
                   <Icon className="w-5 h-5 flex-shrink-0" />
                   <span className="font-medium text-base">{item.label}</span>

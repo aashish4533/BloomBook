@@ -195,6 +195,8 @@ export function NotesViewer({
               src={url}
               alt={title}
               className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+              crossOrigin="anonymous"
+              referrerPolicy="no-referrer"
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = 'none';
                 toast.error('Failed to load image');

@@ -158,7 +158,7 @@ export function GlobalChatWidget() {
                                             <Avatar className="w-10 h-10 border border-gray-200">
                                                 <div className="w-full h-full flex items-center justify-center bg-[#F5F1E8] text-[#C4A672] font-semibold">
                                                     {chat.avatar ? (
-                                                        <img src={chat.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                                                        <img src={chat.avatar} alt="Avatar" className="w-full h-full object-cover" crossOrigin="anonymous" referrerPolicy="no-referrer" />
                                                     ) : (
                                                         chat.name?.[0]?.toUpperCase() || 'C'
                                                     )}

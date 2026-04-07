@@ -134,6 +134,8 @@ export function CreatePost({ onClose, onSubmit }: CreatePostProps) {
                     src={img}
                     alt={`Upload ${index + 1}`}
                     className="w-full h-48 object-cover rounded-lg"
+                    crossOrigin="anonymous"
+                    referrerPolicy="no-referrer"
                   />
                   <button
                     onClick={() => removeImage(index)}

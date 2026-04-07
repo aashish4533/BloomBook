@@ -65,13 +65,15 @@ export function RentalBookDetails({ book, onBack, onRent }: RentalBookDetailsPro
                   src={book.images[0]}
                   alt={book.title}
                   className="w-full h-full object-cover"
+                  crossOrigin="anonymous"
+                  referrerPolicy="no-referrer"
                 />
               </div>
               {book.images.length > 1 && (
                 <div className="p-4 grid grid-cols-3 gap-2">
                   {book.images.slice(1).map((img, idx) => (
                     <div key={idx} className="h-20 bg-gray-200 rounded overflow-hidden">
-                      <img src={img} alt={`${book.title} ${idx + 2}`} className="w-full h-full object-cover" />
+                      <img src={img} alt={`${book.title} ${idx + 2}`} className="w-full h-full object-cover" crossOrigin="anonymous" referrerPolicy="no-referrer" />
                     </div>
                   ))}
                 </div>

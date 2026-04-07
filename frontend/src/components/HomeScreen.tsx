@@ -150,6 +150,8 @@ export function HomeScreen({ isLoggedIn }: HomeScreenProps) {
                 src="https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&q=80&w=1000"
                 alt="Library Atmosphere"
                 className="absolute inset-0 w-full h-full object-cover rounded-2xl shadow-2xl transform -rotate-3 hover:rotate-0 transition-transform duration-700 ease-out border border-[#C4A672]/20"
+                crossOrigin="anonymous"
+                referrerPolicy="no-referrer"
               />
               {/* Floating Badge */}
               <div className="absolute bottom-8 -left-8 bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-xl shadow-xl animate-bounce-slow">

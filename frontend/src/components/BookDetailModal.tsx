@@ -152,7 +152,7 @@ export function BookDetailModal({ book, onClose }: BookDetailModalProps) {
                 <h3 className="text-[#2C3E50] mb-3">Seller Information</h3>
                 <div className="bg-gray-50 rounded-lg p-4 flex items-center gap-4">
                   <div className="w-12 h-12 bg-[#C4A672] rounded-full flex items-center justify-center text-white font-bold text-lg">
-                    {book.seller.avatar ? <img src={book.seller.avatar} alt={book.seller.name} className="w-full h-full rounded-full object-cover" /> : book.seller.name[0]}
+                    {book.seller.avatar ? <img src={book.seller.avatar} alt={book.seller.name} className="w-full h-full rounded-full object-cover" crossOrigin="anonymous" referrerPolicy="no-referrer" /> : book.seller.name[0]}
                   </div>
                   <div>
                     <div className="font-medium text-[#2C3E50]">{book.seller.name}</div>

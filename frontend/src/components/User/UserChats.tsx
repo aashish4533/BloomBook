@@ -242,7 +242,7 @@ export function UserChats({ onOpenChat }: UserChatsProps) {
                 {/* Avatar */}
                 <div className="relative flex-shrink-0">
                   <div className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-[#C4A672] to-[#8B7355]">
-                    <img src={chat.avatar} alt={chat.name} className="w-full h-full object-cover" />
+                    <img src={chat.avatar} alt={chat.name} className="w-full h-full object-cover" crossOrigin="anonymous" referrerPolicy="no-referrer" />
                   </div>
                   {chat.type === 'private' && 'online' in chat && chat.online && (
                     <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>

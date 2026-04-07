@@ -344,6 +344,8 @@ export function CommunitiesBrowse({ onNavigateToDetail, onNavigateToCreate, isLo
                     src={community.image}
                     alt={community.name}
                     className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-300"
+                    crossOrigin="anonymous"
+                    referrerPolicy="no-referrer"
                   />
                   <div className="absolute top-3 right-3 flex gap-2">
                     <Badge variant="secondary" className="bg-white/90 text-gray-700 border-0">
@@ -488,6 +490,8 @@ export function CommunitiesBrowse({ onNavigateToDetail, onNavigateToCreate, isLo
                       src={community.image}
                       alt={community.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      crossOrigin="anonymous"
+                      referrerPolicy="no-referrer"
                     />
                   </div>
 

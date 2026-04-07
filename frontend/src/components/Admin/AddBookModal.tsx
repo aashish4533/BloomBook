@@ -229,7 +229,7 @@ export function AddBookModal({ onClose }: AddBookModalProps) {
               <div className="flex flex-wrap gap-4 items-start">
                 {imagePreviews.map((preview, index) => (
                   <div key={index} className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200">
-                    <img src={preview} alt={`preview-${index}`} className="w-full h-full object-cover" />
+                    <img src={preview} alt={`preview-${index}`} className="w-full h-full object-cover" crossOrigin="anonymous" referrerPolicy="no-referrer" />
                     <button
                       type="button"
                       onClick={() => removeImage(index)}

@@ -110,7 +110,7 @@ export function RentalConfirmation({ book, rentalPeriod, onBack, onConfirm }: Re
               <h2 className="text-[#2C3E50] text-xl mb-4">Rental Summary</h2>
               <div className="flex gap-4">
                 <div className="w-24 h-32 bg-gray-200 rounded overflow-hidden flex-shrink-0">
-                  <img src={book.images[0]} alt={book.title} className="w-full h-full object-cover" />
+                  <img src={book.images[0]} alt={book.title} className="w-full h-full object-cover" crossOrigin="anonymous" referrerPolicy="no-referrer" />
                 </div>
                 <div className="flex-1">
                   <h3 className="text-[#2C3E50] mb-1">{book.title}</h3>

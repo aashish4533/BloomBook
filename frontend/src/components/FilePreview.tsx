@@ -301,6 +301,8 @@ export const FilePreview: React.FC<FilePreviewProps> = ({ fileUrl, fileType, isT
                         src={fileUrl}
                         alt="Preview"
                         className="transition-all duration-200"
+                        crossOrigin="anonymous"
+                        referrerPolicy="no-referrer"
                         style={{
                             maxWidth: fitToScreen ? '100%' : 'none',
                             maxHeight: fitToScreen ? '100%' : 'none',

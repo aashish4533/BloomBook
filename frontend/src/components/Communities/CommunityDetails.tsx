@@ -420,6 +420,8 @@ export function CommunityDetails({ userId }: CommunityDetailsProps) {
           src={community.coverImage}
           alt={community.name}
           className="w-full h-full object-cover opacity-50"
+          crossOrigin="anonymous"
+          referrerPolicy="no-referrer"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
 
@@ -574,6 +576,8 @@ export function CommunityDetails({ userId }: CommunityDetailsProps) {
                         src={post.images[0]}
                         alt="Post attachment"
                         className="w-full h-64 object-cover rounded-lg"
+                        crossOrigin="anonymous"
+                        referrerPolicy="no-referrer"
                       />
                     </div>
                   )}

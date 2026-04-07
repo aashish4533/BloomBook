@@ -217,6 +217,8 @@ export function AnnouncementForm({ announcement, onClose, onSave }: Announcement
                   src={formData.image}
                   alt="Preview"
                   className="w-full h-64 object-cover rounded-lg"
+                  crossOrigin="anonymous"
+                  referrerPolicy="no-referrer"
                 />
                 <button
                   type="button"

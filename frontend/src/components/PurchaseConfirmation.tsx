@@ -419,7 +419,7 @@ export function PurchaseConfirmation({ book, onClose, onBack }: PurchaseConfirma
             <h3 className="text-[#2C3E50] mb-3">Book Details</h3>
             <div className="flex gap-4">
               <div className="w-20 h-28 bg-gray-200 rounded overflow-hidden flex-shrink-0">
-                <img src={book.images[0]} alt={book.title} className="w-full h-full object-cover" />
+                <img src={book.images[0]} alt={book.title} className="w-full h-full object-cover" crossOrigin="anonymous" referrerPolicy="no-referrer" />
               </div>
               <div className="flex-1">
                 <h4 className="text-[#2C3E50]">{book.title}</h4>

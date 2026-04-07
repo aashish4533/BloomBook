@@ -151,7 +151,7 @@ export function UserCommunities({ onNavigateToCommunity, onNavigateToCreate }: U
                 <div className="flex gap-4 p-4">
                   <div className="relative">
                     <div className="w-20 h-20 bg-gradient-to-br from-[#C4A672] to-[#8B7355] rounded-xl overflow-hidden">
-                      <img src={community.image} alt={community.name} className="w-full h-full object-cover" />
+                      <img src={community.image} alt={community.name} className="w-full h-full object-cover" crossOrigin="anonymous" referrerPolicy="no-referrer" />
                     </div>
                     {community.unreadMessages > 0 && (
                       <div className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white text-xs">
@@ -206,7 +206,7 @@ export function UserCommunities({ onNavigateToCommunity, onNavigateToCreate }: U
               >
                 <div className="flex gap-4">
                   <div className="w-16 h-16 bg-gradient-to-br from-[#C4A672] to-[#8B7355] rounded-xl overflow-hidden flex-shrink-0">
-                    <img src={community.image} alt={community.name} className="w-full h-full object-cover" />
+                    <img src={community.image} alt={community.name} className="w-full h-full object-cover" crossOrigin="anonymous" referrerPolicy="no-referrer" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <h4 className="text-[#2C3E50] mb-1 truncate">{community.name}</h4>
@@ -225,7 +225,7 @@ export function UserCommunities({ onNavigateToCommunity, onNavigateToCreate }: U
                       <Button
                         size="sm"
                         className="bg-[#C4A672] hover:bg-[#8B7355] text-white"
-                        onClick={(e) => {
+                        onClick={(e: React.MouseEvent) => {
                           e.stopPropagation();
                           onNavigateToCommunity?.(community.id);
                         }}
