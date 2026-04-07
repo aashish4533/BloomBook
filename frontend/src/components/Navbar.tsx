@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Home, ShoppingBag, Calendar, DollarSign, User, LogIn, UserPlus, LogOut, ChevronDown, UserCircle2, History, Heart, Settings, Users, Search, ArrowLeftRight, BookOpen, Sprout, Menu, Info, Phone, FileText, HelpCircle, Shield, ChevronRight, GraduationCap, Bot } from 'lucide-react';
+import { Home, ShoppingBag, Calendar, DollarSign, User, LogIn, UserPlus, LogOut, ChevronDown, UserCircle2, History, Heart, Settings, Users, Search, ArrowLeftRight, BookOpen, Sprout, Menu, Info, Phone, FileText, HelpCircle, Shield, ChevronRight, GraduationCap, Bot, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { NotificationBell } from './NotificationBell';
 import { Link, useLocation } from 'react-router-dom';
@@ -15,22 +15,37 @@ export function Navbar({
   isLoggedIn,
   onLogout,
 }: NavbarProps) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const currentPage = location.pathname;
 
-  // Close dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowProfileDropdown(false);
+      }
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Prevent scrolling when mobile menu is open
+  useEffect(() => {
+    if (isMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => { document.body.style.overflow = 'unset'; };
+  }, [isMenuOpen]);
 
   const navItems = [
     { id: 'home', label: 'Home', icon: Home, path: '/' },
@@ -60,119 +75,22 @@ export function Navbar({
 
   return (
     <>
-      {/* Desktop Navbar - Fixed Top */}
-      {/* Mobile Top Navbar - Fixed Top */}
-      <nav className="md:hidden fixed top-0 left-0 right-0 bg-[#C4A672] shadow-lg z-50">
-        <div className="px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            {/* Sidebar Menu Trigger (Mobile) */}
-            <Sheet>
-              <SheetTrigger asChild>
-                <button className="flex items-center gap-2 px-3 py-2 bg-[#2C3E50]/10 hover:bg-[#2C3E50]/20 rounded-lg transition-colors">
-                  <Menu className="w-5 h-5 text-[#2C3E50]" />
-                  <span className="text-sm font-bold text-[#2C3E50]"></span>
-                </button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-[300px] bg-[#FAF8F3]">
-                <SheetHeader className="pb-6 border-b border-[#C4A672]/20">
-                  <SheetTitle className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-[#2C3E50] rounded-lg flex items-center justify-center">
-                      <BookOpen className="w-4 h-4 text-white" />
-                    </div>
-                    <span className="text-[#2C3E50] font-bold">BookBloom</span>
-                  </SheetTitle>
-                </SheetHeader>
-                <div className="py-6 space-y-2">
-                  <div className="px-2 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    Academic Resources
-                  </div>
-                  <SheetClose asChild>
-                    <Link to="/tuition" className="flex items-center justify-between p-3 rounded-lg hover:bg-[#C4A672]/10 text-[#2C3E50] group transition-colors">
-                      <div className="flex items-center gap-3">
-                        <GraduationCap className="w-5 h-5 text-[#C4A672]" />
-                        <span className="font-medium">Tuition Hub</span>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#C4A672]" />
-                    </Link>
-                  </SheetClose>
-                  <SheetClose asChild>
-                    <Link to="/notes" className="flex items-center justify-between p-3 rounded-lg hover:bg-[#C4A672]/10 text-[#2C3E50] group transition-colors">
-                      <div className="flex items-center gap-3">
-                        <FileText className="w-5 h-5 text-[#C4A672]" />
-                        <span className="font-medium">Material/Notes</span>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#C4A672]" />
-                    </Link>
-                  </SheetClose>
-
-                  <div className="px-2 mt-6 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    Company
-                  </div>
-                  <SheetClose asChild>
-                    <Link to="/about" className="flex items-center justify-between p-3 rounded-lg hover:bg-[#C4A672]/10 text-[#2C3E50] group transition-colors">
-                      <div className="flex items-center gap-3">
-                        <Info className="w-5 h-5 text-[#C4A672]" />
-                        <span className="font-medium">About Us</span>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#C4A672]" />
-                    </Link>
-                  </SheetClose>
-                  <SheetClose asChild>
-                    <Link to="/contact" className="flex items-center justify-between p-3 rounded-lg hover:bg-[#C4A672]/10 text-[#2C3E50] group transition-colors">
-                      <div className="flex items-center gap-3">
-                        <Phone className="w-5 h-5 text-[#C4A672]" />
-                        <span className="font-medium">Contact Us</span>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#C4A672]" />
-                    </Link>
-                  </SheetClose>
-
-                  <div className="px-2 mt-6 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                    Support
-                  </div>
-                  <SheetClose asChild>
-                    <Link to="/help" className="flex items-center justify-between p-3 rounded-lg hover:bg-[#C4A672]/10 text-[#2C3E50] group transition-colors">
-                      <div className="flex items-center gap-3">
-                        <HelpCircle className="w-5 h-5 text-[#C4A672]" />
-                        <span className="font-medium">Help & FAQ</span>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#C4A672]" />
-                    </Link>
-                  </SheetClose>
-                  <SheetClose asChild>
-                    <Link to="/terms" className="flex items-center justify-between p-3 rounded-lg hover:bg-[#C4A672]/10 text-[#2C3E50] group transition-colors">
-                      <div className="flex items-center gap-3">
-                        <Shield className="w-5 h-5 text-[#C4A672]" />
-                        <span className="font-medium">Terms of Service</span>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-[#C4A672]" />
-                    </Link>
-                  </SheetClose>
-                </div>
-              </SheetContent>
-            </Sheet>
-
-            {/* Logo */}
-            <Link to="/" className="flex items-center gap-2 group">
-              <div className="relative w-8 h-8 flex items-center justify-center bg-[#2C3E50] rounded-lg group-hover:bg-[#1a252f] transition-colors">
-                <BookOpen className="w-5 h-5 text-white" />
-                <Sprout className="w-3 h-3 text-[#C4A672] absolute -top-1 -right-1 animate-bounce-slow" />
-              </div>
-              <span className="text-[#2C3E50] text-lg font-bold tracking-tight">BookBloom</span>
-            </Link>
-          </div>
-
-          {/* Mobile Cart/Bell could go here, but keeping it simple for now */}
-        </div>
-      </nav>
-
-      {/* Desktop Navbar - Sticky Top */}
-      <nav className="hidden md:block sticky top-0 w-full bg-[#C4A672] shadow-lg z-50">
+      <nav className="sticky top-0 w-full bg-[#C4A672] shadow-lg z-50 relative" ref={menuRef}>
         <div className="max-w-7xl mx-auto px-6">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between p-4 w-full">
+            {/* LEFT SIDE: Hamburger Button + Logo */}
             <div className="flex items-center gap-4">
-              {/* Logo */}
-              <Link to="/" className="flex items-center gap-2 group">
+              {/* Hamburger Button (Visible on mobile/tablet, hides on desktop screens using 'lg:hidden') */}
+              <button 
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="p-2 rounded-md hover:bg-[#8B7355] lg:hidden focus:outline-none transition-colors"
+                aria-label="Toggle Menu"
+              >
+                {isMenuOpen ? <X className="w-6 h-6 text-[#2C3E50]" /> : <Menu className="w-6 h-6 text-[#2C3E50]" />}
+              </button>
+              
+              {/* Existing BookBloom Logo Component/Link goes exactly here */}
+              <Link to="/" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-2 group">
                 <div className="relative w-10 h-10 flex items-center justify-center bg-[#2C3E50] rounded-lg group-hover:bg-[#1a252f] transition-colors">
                   <BookOpen className="w-6 h-6 text-white" />
                   <Sprout className="w-4 h-4 text-[#C4A672] absolute -top-1 -right-1 animate-bounce-slow" />
@@ -181,196 +99,199 @@ export function Navbar({
               </Link>
             </div>
 
-            {/* Navigation Items */}
-            <div className="flex items-center gap-1">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const active = isActive(item.path);
-                return (
-                  <Link
-                    key={item.id}
-                    to={item.path}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 font-medium ${active
-                      ? 'bg-[#2C3E50] text-white'
-                      : 'text-[#2C3E50] hover:bg-[#8B7355] hover:text-white'
+            {/* CENTER/RIGHT SIDE: Desktop Links & Profile/Cart */}
+            <div className="flex items-center gap-4">
+              {/* Desktop Navigation (Hidden on mobile, visible on desktop using 'hidden lg:flex') */}
+              <div className="hidden lg:flex items-center gap-6">
+                <div className="flex items-center gap-1">
+                  {navItems.map((item) => {
+                    const Icon = item.icon;
+                    const active = isActive(item.path);
+                    return (
+                      <Link
+                        key={item.id}
+                        to={item.path}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 font-medium ${active
+                          ? 'bg-[#2C3E50] text-white'
+                          : 'text-[#2C3E50] hover:bg-[#8B7355] hover:text-white'
+                          }`}
+                      >
+                        <Icon className={`w-5 h-5 ${active ? 'stroke-[2.5px]' : ''}`} />
+                        <span className="hidden xl:inline">{item.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Keep existing Profile/Cart/Action icons here (Visible on all devices) */}
+              <div className="flex items-center gap-3">
+                {isLoggedIn ? (
+                  <>
+                    <NotificationBell />
+
+                    <Link 
+                      to="/assistant"
+                      className={`relative p-2 rounded-lg transition-colors ${
+                        isActive('/assistant') 
+                          ? 'bg-[#C4A672]/20 text-[#2C3E50]' 
+                          : 'text-[#2C3E50] hover:bg-[#8B7355] hover:text-white'
                       }`}
-                  >
-                    <Icon className={`w-5 h-5 ${active ? 'stroke-[2.5px]' : ''}`} />
-                    <span className="hidden xl:inline">{item.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-
-            {/* Auth Section */}
-            <div className="flex items-center gap-3">
-              {isLoggedIn ? (
-                <>
-                  {/* Notification Bell */}
-                  <NotificationBell />
-
-                  {/* AI Assistant Button */}
-                  <Link 
-                    to="/assistant"
-                    className={`relative p-2 rounded-lg transition-colors ${
-                      isActive('/assistant') 
-                        ? 'bg-[#C4A672]/20 text-[#C4A672]' 
-                        : 'text-[#2C3E50] hover:bg-gray-100/10'
-                    }`}
-                    title="AI Assistant"
-                  >
-                    <Bot className="w-6 h-6" />
-                  </Link>
-
-                  {/* Profile Dropdown */}
-                  <div className="relative" ref={dropdownRef}>
-                    <button
-                      onClick={() => setShowProfileDropdown(!showProfileDropdown)}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#2C3E50] text-white hover:bg-[#1a252f] transition-colors"
+                      title="AI Assistant"
                     >
-                      <div className="w-8 h-8 bg-[#C4A672] rounded-full flex items-center justify-center">
-                        <User className="w-5 h-5 text-white" />
-                      </div>
-                      <span className="hidden lg:inline">Profile</span>
-                      <ChevronDown className={`w-4 h-4 transition-transform ${showProfileDropdown ? 'rotate-180' : ''}`} />
-                    </button>
+                      <Bot className="w-6 h-6" />
+                    </Link>
 
-                    {/* Dropdown Menu */}
-                    {showProfileDropdown && (
-                      <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-                        {/* User Info */}
-                        <div className="px-4 py-3 border-b border-gray-200">
-                          <p className="text-sm text-gray-500">Signed in as</p>
-                          <p className="text-[#2C3E50] truncate">{auth.currentUser?.email}</p>
+                    <div className="relative" ref={dropdownRef}>
+                      <button
+                        onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#2C3E50] text-white hover:bg-[#1a252f] transition-colors"
+                      >
+                        <div className="w-8 h-8 bg-[#C4A672] rounded-full flex items-center justify-center">
+                          <User className="w-5 h-5 text-white" />
                         </div>
+                        <span className="hidden lg:inline">Profile</span>
+                        <ChevronDown className={`w-4 h-4 transition-transform ${showProfileDropdown ? 'rotate-180' : ''}`} />
+                      </button>
 
-                        {/* Quick Links */}
-                        <div className="py-2">
-                          <Link
-                            to="/dashboard"
-                            onClick={() => setShowProfileDropdown(false)}
-                            className="w-full flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
-                          >
-                            <UserCircle2 className="w-5 h-5" />
-                            <div className="text-left">
-                              <p className="text-sm">My Profile</p>
-                              <p className="text-xs text-gray-500">View & edit details</p>
-                            </div>
-                          </Link>
+                      {showProfileDropdown && (
+                        <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                          <div className="px-4 py-3 border-b border-gray-200">
+                            <p className="text-sm text-gray-500">Signed in as</p>
+                            <p className="text-[#2C3E50] truncate">{auth.currentUser?.email}</p>
+                          </div>
 
-                          <Link
-                            to="/dashboard/purchases"
-                            onClick={() => setShowProfileDropdown(false)}
-                            className="w-full flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
-                          >
-                            <History className="w-5 h-5" />
-                            <div className="text-left">
-                              <p className="text-sm">Order History</p>
-                              <p className="text-xs text-gray-500">Purchases & rentals</p>
-                            </div>
-                          </Link>
+                          <div className="py-2">
+                            <Link to="/dashboard" onClick={() => setShowProfileDropdown(false)} className="w-full flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
+                              <UserCircle2 className="w-5 h-5" />
+                              <div className="text-left">
+                                <p className="text-sm">My Profile</p>
+                                <p className="text-xs text-gray-500">View & edit details</p>
+                              </div>
+                            </Link>
 
-                          <Link
-                            to="/wishlist"
-                            onClick={() => setShowProfileDropdown(false)}
-                            className="w-full flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
-                          >
-                            <Heart className="w-5 h-5" />
-                            <div className="text-left">
-                              <p className="text-sm">Wishlist</p>
-                              <p className="text-xs text-gray-500">Saved favorites</p>
-                            </div>
-                          </Link>
+                            <Link to="/dashboard/purchases" onClick={() => setShowProfileDropdown(false)} className="w-full flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
+                              <History className="w-5 h-5" />
+                              <div className="text-left">
+                                <p className="text-sm">Order History</p>
+                                <p className="text-xs text-gray-500">Purchases & rentals</p>
+                              </div>
+                            </Link>
 
-                          <Link
-                            to="/dashboard"
-                            onClick={() => setShowProfileDropdown(false)}
-                            className="w-full flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
-                          >
-                            <Settings className="w-5 h-5" />
-                            <div className="text-left">
-                              <p className="text-sm">Settings</p>
-                              <p className="text-xs text-gray-500">Security & preferences</p>
-                            </div>
-                          </Link>
+                            <Link to="/wishlist" onClick={() => setShowProfileDropdown(false)} className="w-full flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
+                              <Heart className="w-5 h-5" />
+                              <div className="text-left">
+                                <p className="text-sm">Wishlist</p>
+                                <p className="text-xs text-gray-500">Saved favorites</p>
+                              </div>
+                            </Link>
+
+                            <Link to="/dashboard" onClick={() => setShowProfileDropdown(false)} className="w-full flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-100 transition-colors">
+                              <Settings className="w-5 h-5" />
+                              <div className="text-left">
+                                <p className="text-sm">Settings</p>
+                                <p className="text-xs text-gray-500">Security & preferences</p>
+                              </div>
+                            </Link>
+                          </div>
+
+                          <div className="border-t border-gray-200 pt-2">
+                            <button
+                              onClick={() => {
+                                onLogout();
+                                setShowProfileDropdown(false);
+                              }}
+                              className="w-full flex items-center gap-3 px-4 py-2 text-white bg-red-600 hover:bg-red-700 transition-colors"
+                            >
+                              <LogOut className="w-5 h-5" />
+                              <span className="text-sm">Sign Out</span>
+                            </button>
+                          </div>
                         </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <Link to="/login">
+                      <Button
+                        variant="outline"
+                        className="border-[#2C3E50] text-[#2C3E50] hover:bg-[#2C3E50] hover:text-white hidden sm:flex"
+                      >
+                        <LogIn className="w-4 h-4 mr-2" />
+                        Login
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="border-[#2C3E50] text-[#2C3E50] hover:bg-[#2C3E50] hover:text-white sm:hidden"
+                      >
+                        <LogIn className="w-4 h-4" />
+                      </Button>
+                    </Link>
 
-                        {/* Logout */}
-                        <div className="border-t border-gray-200 pt-2">
-                          <button
-                            onClick={() => {
-                              onLogout();
-                              setShowProfileDropdown(false);
-                            }}
-                            className="w-full flex items-center gap-3 px-4 py-2 text-white bg-red-600 hover:bg-red-700 transition-colors"
-                          >
-                            <LogOut className="w-5 h-5" />
-                            <span className="text-sm">Sign Out</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <>
-                  {/* Login Button */}
-                  <Link to="/login">
-                    <Button
-                      variant="outline"
-                      className="border-[#2C3E50] text-[#2C3E50] hover:bg-[#2C3E50] hover:text-white"
-                    >
-                      <LogIn className="w-4 h-4 mr-2" />
-                      Login
-                    </Button>
-                  </Link>
-
-                  {/* Register Button */}
-                  <Link to="/register">
-                    <Button
-                      className="bg-[#2C3E50] text-white hover:bg-[#1a252f]"
-                    >
-                      <UserPlus className="w-4 h-4 mr-2" />
-                      Register
-                    </Button>
-                  </Link>
-                </>
-              )}
+                    <Link to="/register">
+                      <Button
+                        className="bg-[#2C3E50] text-white hover:bg-[#1a252f] hidden sm:flex"
+                      >
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Register
+                      </Button>
+                      <Button
+                        size="icon"
+                        className="bg-[#2C3E50] text-white hover:bg-[#1a252f] sm:hidden"
+                      >
+                        <UserPlus className="w-4 h-4" />
+                      </Button>
+                    </Link>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
-      </nav>
 
-      {/* Mobile Tab Bar - Fixed Bottom */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#C4A672] border-t border-[#8B7355] shadow-lg z-50">
-        <div className="flex items-center justify-around h-16 px-2">
-          {mobileNavItems.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(item.path);
-            const shouldShow = item.showAlways || (item.requireLogin && isLoggedIn);
-            return (
-              shouldShow && (
+        {/* Mobile Collapsible Menu */}
+        {isMenuOpen && (
+          <div className="lg:hidden absolute top-full left-0 w-full bg-white dark:bg-gray-900 border-t border-gray-200 z-[999] h-screen shadow-[10px_0_30px_rgba(0,0,0,0.15)] flex flex-col p-4 space-y-4 overflow-y-auto">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const active = isActive(item.path);
+              return (
                 <Link
                   key={item.id}
                   to={item.path}
-                  className={`flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-colors ${active
-                    ? 'text-[#2C3E50]'
-                    : 'text-[#2C3E50]/60'
-                    }`}
+                  onClick={() => setIsMenuOpen(false)}
+                  className={`flex items-center gap-3 px-3 py-3 rounded-lg transition-colors ${
+                    active
+                      ? 'bg-[#2C3E50] text-white'
+                      : 'text-[#2C3E50] hover:bg-[#C4A672]/10 hover:text-[#C4A672]'
+                  }`}
                 >
-                  <Icon className={`w-6 h-6 ${active ? 'fill-[#2C3E50]' : ''}`} />
-                  <span className="text-xs">{item.label}</span>
+                  <Icon className="w-5 h-5 flex-shrink-0" />
+                  <span className="font-medium text-base">{item.label}</span>
                 </Link>
-              )
-            );
-          })}
-        </div>
-      </nav>
+              );
+            })}
 
-      {/* Spacer for mobile top navbar */}
-      <div className="md:hidden h-16" />
-      {/* Spacer for mobile bottom tab bar */}
-      <div className="md:hidden h-16" />
+            {/* Auth shortcuts in menu for mobile */}
+            {!isLoggedIn && (
+              <div className="pb-2 pt-2 border-t border-gray-100 flex flex-col sm:flex-row gap-3">
+                <Link to="/login" onClick={() => setIsMenuOpen(false)} className="flex-1 w-full">
+                  <Button variant="outline" className="w-full border-[#2C3E50] text-[#2C3E50] hover:bg-[#2C3E50] hover:text-white">
+                    <LogIn className="w-4 h-4 mr-2" /> Login
+                  </Button>
+                </Link>
+                <Link to="/register" onClick={() => setIsMenuOpen(false)} className="flex-1 w-full">
+                  <Button className="w-full bg-[#2C3E50] text-white hover:bg-[#1a252f]">
+                    <UserPlus className="w-4 h-4 mr-2" /> Register
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
+      </nav>
     </>
   );
 }

@@ -21,7 +21,7 @@
     "rules": "backend/storage.rules"
   },
   "hosting": {
-    "public": "frontend/build",
+    "public": "frontend/dist",
     "ignore": [
       "firebase.json",
       "**/.*",

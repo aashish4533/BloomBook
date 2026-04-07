@@ -6,8 +6,9 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Avatar } from '../ui/avatar';
 import { db, auth } from '../../firebase';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, getDoc, doc, orderBy } from 'firebase/firestore';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 interface UserChatsProps {
   onOpenChat?: (chatId: string, type: 'private' | 'group') => void;
@@ -22,6 +23,7 @@ export function UserChats({ onOpenChat }: UserChatsProps) {
   const [totalUnread, setTotalUnread] = useState(0);
   const [loading, setLoading] = useState(true);
   const user = auth.currentUser;
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!user) return;
@@ -29,35 +31,93 @@ export function UserChats({ onOpenChat }: UserChatsProps) {
     const fetchChats = async () => {
       setLoading(true);
       try {
-        // Private chats
+        // Private chats — query the 'chats' collection (matches chatUtils.ts)
         const privateQuery = query(
-          collection(db, 'privateChats'),
-          where('participants', 'array-contains', user.uid),
-          orderBy('lastMessageTimestamp', 'desc')
+          collection(db, 'chats'),
+          where('participants', 'array-contains', user.uid)
         );
         const privateSnap = await getDocs(privateQuery);
-        const privateData = privateSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        // Resolve participant names for each chat
+        const privateData = await Promise.all(
+          privateSnap.docs.map(async (chatDoc) => {
+            const data = chatDoc.data();
+            const otherUid = (data.participants || []).find((p: string) => p !== user.uid);
+            let otherName = 'Unknown User';
+            let otherAvatar = '';
+
+            if (otherUid) {
+              try {
+                const userDoc = await getDoc(doc(db, 'users', otherUid));
+                if (userDoc.exists()) {
+                  const userData = userDoc.data();
+                  otherName = userData.displayName || userData.name || 'User';
+                  otherAvatar = userData.photoURL || userData.avatar || '';
+                }
+              } catch (err) {
+                console.error('Failed to fetch user info:', err);
+              }
+            }
+
+            return {
+              id: chatDoc.id,
+              name: otherName,
+              avatar: otherAvatar,
+              lastMessage: data.lastMessage || 'No messages yet',
+              lastMessageTimestamp: data.lastMessageTimestamp || data.createdAt || null,
+              timestamp: data.lastMessageTimestamp?.toDate
+                ? new Date(data.lastMessageTimestamp.toDate()).toLocaleString()
+                : data.createdAt?.toDate
+                  ? new Date(data.createdAt.toDate()).toLocaleString()
+                  : 'Just now',
+              unread: 0,
+              otherUserId: otherUid,
+              otherUserName: otherName,
+              otherUserAvatar: otherAvatar,
+            };
+          })
+        );
+
+        // Sort by timestamp descending
+        privateData.sort((a, b) => {
+          const aTime = a.lastMessageTimestamp?.toDate?.()?.getTime?.() || 0;
+          const bTime = b.lastMessageTimestamp?.toDate?.()?.getTime?.() || 0;
+          return bTime - aTime;
+        });
+
         setPrivateChats(privateData);
 
         // Group chats (assuming user is member of groups)
-        const groupQuery = query(
-          collection(db, 'groups'),
-          where('members', 'array-contains', user.uid),
-          orderBy('lastMessageTimestamp', 'desc')
-        );
-        const groupSnap = await getDocs(groupQuery);
-        const groupData = groupSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        let groupData: any[] = [];
+        try {
+          const groupQuery = query(
+            collection(db, 'groups'),
+            where('members', 'array-contains', user.uid)
+          );
+          const groupSnap = await getDocs(groupQuery);
+          groupData = groupSnap.docs.map(d => ({
+            id: d.id,
+            ...d.data(),
+            lastMessage: d.data().lastMessage || 'No messages',
+            timestamp: d.data().lastMessageTimestamp?.toDate
+              ? new Date(d.data().lastMessageTimestamp.toDate()).toLocaleString()
+              : 'N/A',
+          }));
+        } catch (err) {
+          // Groups collection may not exist; silently ignore
+          console.warn('Groups query failed (collection may not exist):', err);
+        }
         setGroupChats(groupData);
 
         // Combine and sort
         const combined = [
-          ...privateData.map(c => ({ ...c, type: 'private' })),
-          ...groupData.map(c => ({ ...c, type: 'group' }))
-        ].sort((a, b) => b.lastMessageTimestamp?.toDate().getTime() - a.lastMessageTimestamp?.toDate().getTime());
+          ...privateData.map(c => ({ ...c, type: 'private' as const })),
+          ...groupData.map(c => ({ ...c, type: 'group' as const }))
+        ];
         setAllChats(combined);
 
         // Calculate unread
-        const unread = combined.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+        const unread = combined.reduce((sum, c) => sum + (c.unreadCount || c.unread || 0), 0);
         setTotalUnread(unread);
       } catch (err) {
         toast.error('Failed to fetch chats');
@@ -70,8 +130,10 @@ export function UserChats({ onOpenChat }: UserChatsProps) {
   }, [user]);
 
   const filteredChats = allChats.filter(chat => {
-    const matchesSearch = chat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         chat.lastMessage.toLowerCase().includes(searchQuery.toLowerCase());
+    const chatName = chat.name || '';
+    const chatMsg = chat.lastMessage || '';
+    const matchesSearch = chatName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         chatMsg.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesTab = activeTab === 'all' || 
                       (activeTab === 'private' && chat.type === 'private') ||
                       (activeTab === 'groups' && chat.type === 'group');
@@ -155,7 +217,23 @@ export function UserChats({ onOpenChat }: UserChatsProps) {
           filteredChats.map((chat) => (
             <div
               key={chat.id}
-              onClick={() => onOpenChat?.(chat.id, chat.type)}
+              onClick={() => {
+                if (onOpenChat) {
+                  onOpenChat(chat.id, chat.type);
+                } else {
+                  // Navigate to PrivateChat with the correct state
+                  navigate('/chat', {
+                    state: {
+                      otherUser: {
+                        id: chat.otherUserId,
+                        name: chat.otherUserName || chat.name,
+                        avatar: chat.otherUserAvatar || chat.avatar || '',
+                        online: true
+                      }
+                    }
+                  });
+                }
+              }}
               className={`bg-white rounded-xl border border-gray-200 p-4 hover:border-[#C4A672] hover:shadow-md transition-all cursor-pointer ${
                 chat.unread > 0 ? 'bg-[#F5F1E8]/30' : ''
               }`}

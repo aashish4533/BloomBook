@@ -326,13 +326,17 @@ export function CommunitiesBrowse({ onNavigateToDetail, onNavigateToCreate, isLo
         )}
 
         {/* Communities Grid/List */}
-        {viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {communities.length > 0 ? (
+          <div className={viewMode === 'grid'
+            ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+            : "space-y-4"
+          }>
             {filteredCommunities.map((community) => (
               <div
                 key={community.id}
                 onClick={() => onNavigateToDetail(community.id)}
-                className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group"
+                className={`bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all cursor-pointer group ${viewMode === 'list' ? 'flex flex-row md:items-center' : ''
+                  }`}
               >
                 {/* Image */}
                 <div className="relative h-40 bg-gradient-to-br from-[#C4A672] to-[#8B7355] overflow-hidden">

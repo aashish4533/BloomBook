@@ -352,6 +352,38 @@ export function PostDetail({ post, onClose, isAdmin, userId }: PostDetailProps &
     }
   };
 
+  const handleReaction = async (type: 'like' | 'love' | 'insightful') => {
+    if (!communityId) return;
+    const postRef = doc(db, 'communities', communityId, 'posts', post.id);
+
+    try {
+      const currentReaction = activePost.userReaction;
+
+      if (currentReaction === type) {
+        // Remove reaction
+        await updateDoc(postRef, {
+          [`reactions.${type}`]: increment(-1),
+          userReaction: deleteField()
+        });
+      } else if (currentReaction) {
+        // Swap reaction
+        await updateDoc(postRef, {
+          [`reactions.${currentReaction}`]: increment(-1),
+          [`reactions.${type}`]: increment(1),
+          userReaction: type
+        });
+      } else {
+        // Add new reaction
+        await updateDoc(postRef, {
+          [`reactions.${type}`]: increment(1),
+          userReaction: type
+        });
+      }
+    } catch (err) {
+      toast.error('Failed to update reaction');
+    }
+  };
+
   const renderComment = (comment: Comment, isReply: boolean = false, parentId?: string) => (
     <div key={comment.id} className={`${isReply ? 'ml-12' : ''}`}>
       <div className="flex gap-3 mb-4">
@@ -499,18 +531,33 @@ export function PostDetail({ post, onClose, isAdmin, userId }: PostDetailProps &
               </div>
             )}
 
-            {/* Reaction Summary */}
+            {/* Reaction Summary & Actions */}
             <div className="flex items-center flex-wrap gap-4 pt-4 border-t border-gray-100">
-              <div className="flex gap-4">
-                <div className="flex items-center gap-1.5 text-sm text-gray-600 bg-gray-50 px-3 py-1.5 rounded-full">
+              <div className="flex gap-2">
+                <Button
+                  variant={activePost.userReaction === 'like' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => handleReaction('like')}
+                  className={`flex items-center gap-1.5 h-9 rounded-full px-4 ${activePost.userReaction === 'like' ? 'bg-[#C4A672] text-white' : 'hover:border-[#C4A672] hover:text-[#C4A672]'}`}
+                >
                   <span>👍</span> <span className="font-medium">{activePost.reactions?.like || 0}</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-sm text-gray-600 bg-gray-50 px-3 py-1.5 rounded-full">
+                </Button>
+                <Button
+                  variant={activePost.userReaction === 'love' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => handleReaction('love')}
+                  className={`flex items-center gap-1.5 h-9 rounded-full px-4 ${activePost.userReaction === 'love' ? 'bg-[#C4A672] text-white' : 'hover:border-[#C4A672] hover:text-[#C4A672]'}`}
+                >
                   <span>❤️</span> <span className="font-medium">{activePost.reactions?.love || 0}</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-sm text-gray-600 bg-gray-50 px-3 py-1.5 rounded-full">
+                </Button>
+                <Button
+                  variant={activePost.userReaction === 'insightful' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => handleReaction('insightful')}
+                  className={`flex items-center gap-1.5 h-9 rounded-full px-4 ${activePost.userReaction === 'insightful' ? 'bg-[#C4A672] text-white' : 'hover:border-[#C4A672] hover:text-[#C4A672]'}`}
+                >
                   <span>💡</span> <span className="font-medium">{activePost.reactions?.insightful || 0}</span>
-                </div>
+                </Button>
               </div>
               <span className="flex items-center gap-1.5 ml-auto text-sm text-gray-500">
                 <MessageSquare className="w-4 h-4" />

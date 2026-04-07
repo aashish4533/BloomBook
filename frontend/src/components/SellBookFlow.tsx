@@ -5,8 +5,9 @@ import { LocationStep } from './SellBook/LocationStep';
 import { ReviewStep } from './SellBook/ReviewStep';
 import { SuccessStep } from './SellBook/SuccessStep';
 import { X, Plus, ArrowLeft } from 'lucide-react';
-import { db, auth } from '../firebase';
+import { db, auth, storage } from '../firebase';
 import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { BookCard } from './BookCard';
@@ -123,36 +124,29 @@ function SellBookWizard({ onClose }: { onClose: () => void }) {
       const pages = parseInt(bookData.pages);
       const publishedYear = parseInt(bookData.publishedYear);
 
-      // 3. Upload Images to Cloudinary
+      // 3. Upload Images to Firebase Storage
       const imageUrls: string[] = [];
       if (bookData.imageFiles && bookData.imageFiles.length > 0) {
-        const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-        const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-
-        if (!cloudName || !uploadPreset) {
-          console.error("Cloudinary credentials missing");
-          toast.error("Configuration error: Cloudinary credentials missing");
-          return;
-        }
-
         for (const file of bookData.imageFiles) {
           try {
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('upload_preset', uploadPreset);
+            const uniqueFilename = `${Date.now()}_${file.name}`;
+            const storageRef = ref(storage, `book_images/${user.uid}/${uniqueFilename}`);
+            
+            const uploadTask = uploadBytesResumable(storageRef, file);
 
-            const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-              method: 'POST',
-              body: formData
+            // Wait for upload completion to get the URL
+            const downloadURL = await new Promise<string>((resolve, reject) => {
+              uploadTask.on('state_changed', 
+                null, 
+                (error) => reject(error), 
+                async () => {
+                  const url = await getDownloadURL(uploadTask.snapshot.ref);
+                  resolve(url);
+                }
+              );
             });
 
-            if (!response.ok) {
-              const errorData = await response.json();
-              throw new Error(errorData.error?.message || 'Image upload failed');
-            }
-
-            const data = await response.json();
-            imageUrls.push(data.secure_url);
+            imageUrls.push(downloadURL);
           } catch (uploadErr) {
             console.error("Error uploading file:", file.name, uploadErr);
             toast.error(`Failed to upload ${file.name}`);

@@ -1,37 +1,39 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Helpers
-    function isAdmin() {
-      return request.auth != null && 
-        firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    // Helper: Is the user authenticated?
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
-    // Neural Vault: Restrict verification buckets to specific user & Admins (Lockdown list operation)
-    match /verifications/{userId}/{allPaths=**} {
-      allow read, list: if request.auth != null && (request.auth.uid == userId || isAdmin());
-      allow write: if request.auth != null && request.auth.uid == userId;
-    }
-    match /verification/{userId}/{allPaths=**} {
-      allow read, list: if request.auth != null && (request.auth.uid == userId || isAdmin());
-      allow write: if request.auth != null && request.auth.uid == userId;
-    }
-    
-    // P2P Payment Proofs
-    match /payment_proofs/{transactionId} {
-      allow read: if true;
-      allow write: if request.auth != null && 
-                   request.resource.size < 5 * 1024 * 1024 &&
-                   request.resource.contentType.matches('image/.*');
+    // Helper: Is the file an image and under 5MB?
+    function isImageUnder5MB() {
+      return request.resource.size < 5 * 1024 * 1024 
+             && request.resource.contentType.matches('image/.*');
     }
 
-    // Allow read access to all OTHER files (e.g. public avatars/covers)
-    match /{allPaths=**} {
+    // Book Images
+    match /book_images/{imageId} {
       allow read: if true;
-      allow write: if request.auth != null && 
-                   request.resource.size < 5 * 1024 * 1024 && 
-                   request.resource.contentType.matches('image/.*|application/pdf');
+      allow write: if isAuthenticated() && isImageUnder5MB();
+    }
+
+    // Community Covers
+    match /community_covers/{communityId} {
+      allow read: if true;
+      allow write: if isAuthenticated() && isImageUnder5MB();
+    }
+
+    // Chat Attachments
+    match /chat_attachments/{messageId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isImageUnder5MB();
+    }
+
+    // Tutor Verification Documents
+    match /verifications/{userId}/{docId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || request.auth.token.admin == true);
+      allow write: if isAuthenticated() && request.auth.uid == userId && isImageUnder5MB();
     }
   }
 }

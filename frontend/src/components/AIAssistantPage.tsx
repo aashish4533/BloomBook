@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { auth } from '../firebase';
-import { MessageSquare, Send, Bot, User, Loader2, Sparkles, GraduationCap, Compass, BookOpen, Clock, Menu } from 'lucide-react';
+import { MessageSquare, Send, Bot, User, Loader2, Sparkles, GraduationCap, Compass, BookOpen, Clock, Menu, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -10,17 +10,87 @@ import { ScrollArea } from './ui/scroll-area';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Card } from './ui/card';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from './ui/sheet';
+import { useCart } from '../context/CartContext';
+import { db } from '../firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 interface Message {
   role: 'user' | 'model';
   parts: [{ text: string }];
 }
 
+// ── Interactive AI Product Card ──────────────────────────────────────────────
+const AIProductCard = ({ productId }: { productId: string }) => {
+  const [book, setBook] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const { addToCart } = useCart();
+
+  useEffect(() => {
+    const fetchBook = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'books', productId));
+        if (snap.exists()) setBook({ id: snap.id, ...snap.data() });
+      } catch (err) {
+        console.error('Failed to fetch book for AI card:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchBook();
+  }, [productId]);
+
+  if (loading) return <div className="h-24 w-full bg-gray-100 animate-pulse rounded-lg mt-2" />;
+  if (!book) return null;
+
+  return (
+    <Card className="mt-3 overflow-hidden border-[#C4A672]/30 shadow-sm hover:shadow-md transition-all">
+      <div className="flex gap-4 p-3 bg-white">
+        <div className="w-16 h-20 bg-gray-100 rounded overflow-hidden flex-shrink-0">
+          <img src={book.image} alt={book.title} className="w-full h-full object-cover" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h4 className="text-sm font-bold text-[#2C3E50] truncate">{book.title}</h4>
+          <p className="text-xs text-gray-500 truncate">{book.author}</p>
+          <div className="flex items-center justify-between mt-2">
+            <span className="text-[#C4A672] font-bold text-sm">Rs. {book.price}</span>
+            <Button 
+              size="sm" 
+              onClick={() => addToCart({
+                id: book.id,
+                title: book.title,
+                price: book.price,
+                image: book.image,
+                type: 'buy', // default to buy for cart
+                sellerName: book.sellerName || 'Vendor',
+                sellerId: book.sellerId || ''
+              })}
+              className="h-7 text-[10px] px-2 bg-[#C4A672] hover:bg-[#8B7355]"
+            >
+              Add to Cart
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+};
+
 export function AIAssistantPage() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    const saved = sessionStorage.getItem('bookbloom_ai_messages');
+    try {
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    sessionStorage.setItem('bookbloom_ai_messages', JSON.stringify(messages));
+  }, [messages]);
   
   const functions = getFunctions();
   const user = auth.currentUser;
@@ -77,11 +147,16 @@ export function AIAssistantPage() {
 
   const SidebarContent = () => (
     <>
-      <div className="flex items-center gap-2 mb-6 pb-4 border-b border-[#C4A672]/10">
-        <Link to="/" className="w-8 h-8 bg-gradient-to-r from-[#C4A672] to-[#8B7355] rounded-lg flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-transform" title="Go to Home">
-          <Bot className="w-5 h-5" />
-        </Link>
-        <h2 className="text-[#2C3E50] font-bold text-lg">Academic Navigator</h2>
+      <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#C4A672]/10">
+        <div className="flex items-center gap-2">
+          <Link to="/" className="w-8 h-8 bg-gradient-to-r from-[#C4A672] to-[#8B7355] rounded-lg flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-transform" title="Go to Home">
+            <Bot className="w-5 h-5" />
+          </Link>
+          <h2 className="text-[#2C3E50] font-bold text-lg">Academic Navigator</h2>
+        </div>
+        <Button variant="ghost" size="icon" onClick={() => { setMessages([]); sessionStorage.removeItem('bookbloom_ai_messages'); }} title="Clear Chat">
+          <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-500" />
+        </Button>
       </div>
 
       <div className="flex-1 space-y-4">
@@ -143,10 +218,13 @@ export function AIAssistantPage() {
                 <Link to="/" className="w-8 h-8 bg-[#C4A672] rounded-lg flex items-center justify-center text-white hover:scale-105 active:scale-95 transition-transform" title="Go to Home">
                     <Bot className="w-5 h-5" />
                 </Link>
-                <div className="text-left">
+                <div className="text-left flex-1 pl-2">
                     <h3 className="text-[#2C3E50] font-bold text-sm">BloomBook AI</h3>
                     <p className="text-xs text-green-500 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />Online</p>
                 </div>
+                <Button variant="ghost" size="icon" onClick={() => { setMessages([]); sessionStorage.removeItem('bookbloom_ai_messages'); }} title="Clear Chat">
+                  <Trash2 className="w-5 h-5 text-gray-400 hover:text-red-500" />
+                </Button>
             </div>
         </div>
 
@@ -208,22 +286,48 @@ export function AIAssistantPage() {
             </div>
           ) : (
             <div className="space-y-6 max-w-4xl mx-auto w-full pb-4">
-              {messages.map((msg, i) => (
-                <div key={i} className={`flex items-start gap-4 w-full ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+              {messages.map((message: any, i: number) => (
+                <div key={i} className={`flex items-start gap-4 w-full ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
                   <Avatar className="w-8 h-8 md:w-9 md:h-9 border border-gray-100 flex-shrink-0 mt-1">
-                    <AvatarFallback className={msg.role === 'user' ? 'bg-[#2C3E50] text-white' : 'bg-[#C4A672]/10'}>
-                      {msg.role === 'user' ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5 text-[#C4A672]" />}
+                    <AvatarFallback className={message.role === 'user' ? 'bg-[#2C3E50] text-white' : 'bg-[#C4A672]/10'}>
+                      {message.role === 'user' ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5 text-[#C4A672]" />}
                     </AvatarFallback>
                   </Avatar>
-                  <div className={`p-4 rounded-2xl max-w-[85%] md:max-w-[70%] w-fit shadow-sm overflow-hidden ${
-                    msg.role === 'user' 
-                    ? 'bg-gradient-to-r from-[#C4A672] to-[#B69661] text-white rounded-tr-none' 
-                    : 'bg-white border border-[#C4A672]/10 text-gray-800 rounded-tl-none'
-                  }`}>
-                    <div className="text-sm leading-relaxed whitespace-pre-wrap break-words overflow-x-auto prose prose-sm max-w-none">
-                      <ReactMarkdown>{msg.parts[0].text}</ReactMarkdown>
-                    </div>
+                  <div 
+                  className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm ${
+                    message.role === 'user' 
+                      ? 'bg-[#C4A672] text-white rounded-br-none' 
+                      : 'bg-white border border-gray-100 text-[#2C3E50] rounded-bl-none'
+                  }`}
+                >
+                  <div className="prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-[#2C3E50] prose-pre:text-white">
+                    <ReactMarkdown
+                      components={{
+                        p: ({ children }) => {
+                          const content = React.Children.toArray(children).join('');
+                          const productMatch = content.match(/\[Product: ([^\]]+)\]/);
+                          
+                          if (productMatch) {
+                            const [fullMatch, productId] = productMatch;
+                            const textBefore = content.split(fullMatch)[0];
+                            const textAfter = content.split(fullMatch)[1];
+                            
+                            return (
+                              <div className="mb-2">
+                                <p>{textBefore}</p>
+                                <AIProductCard productId={productId} />
+                                <p>{textAfter}</p>
+                              </div>
+                            );
+                          }
+                          return <p className="mb-2 last:mb-0">{children}</p>;
+                        }
+                      }}
+                    >
+                      {message.parts[0].text}
+                    </ReactMarkdown>
                   </div>
+                </div>
                 </div>
               ))}
               {isLoading && (

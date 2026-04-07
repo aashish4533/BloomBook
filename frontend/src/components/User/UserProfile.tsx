@@ -58,7 +58,8 @@ export function UserProfile() {
     city: '',
     state: '',
     zipCode: '',
-    paymentMethod: ''
+    paymentMethod: '',
+    bio: ''
   });
 
   const { onPasswordChangeSuccess } = useOutletContext<{ onPasswordChangeSuccess: () => void }>() || {};
@@ -70,16 +71,28 @@ export function UserProfile() {
       setProfile(prev => ({
         ...prev,
         ...data,
-        name: data.displayName || prev.name,
+        name: data.displayName || data.name || prev.name,
         email: auth.currentUser?.email || prev.email,
         phone: data.phoneNumber || data.personalInfo?.phoneNumber || data.phone || prev.phone,
         address: data.streetAddress || data.address || prev.address,
-        state: data.state || prev.state
+        state: data.state || prev.state,
+        bio: data.bio || prev.bio
       }));
     } else if (auth.currentUser?.email) {
       setProfile(prev => ({ ...prev, email: auth.currentUser!.email! }));
     }
   }, [value, auth.currentUser]);
+
+  const getMemberSince = () => {
+    if (value && value.exists() && value.data().createdAt) {
+      const date = value.data().createdAt.toDate ? value.data().createdAt.toDate() : new Date(value.data().createdAt);
+      return date.getFullYear().toString();
+    }
+    if (auth.currentUser?.metadata.creationTime) {
+      return new Date(auth.currentUser.metadata.creationTime).getFullYear().toString();
+    }
+    return '2024';
+  };
 
   const handleSave = async () => {
     if (!user) return;
@@ -182,7 +195,7 @@ export function UserProfile() {
               <h2 className="text-[#2C3E50] text-2xl">{profile.name || 'User'}</h2>
               <p className="text-gray-600">{profile.email}</p>
               <div className="flex items-center gap-4 mt-2">
-                <span className="text-sm text-gray-500">Member since 2024</span>
+                <span className="text-sm text-gray-500">Member since {getMemberSince()}</span>
                 <span className="text-sm text-gray-500">•</span>
                 <span className="text-sm text-green-600">Verified Account</span>
               </div>
@@ -288,13 +301,24 @@ export function UserProfile() {
                 />
               </div>
               <div className="space-y-2 col-span-2">
+                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="bio">Bio</label>
+                <textarea
+                  id="bio"
+                  value={profile.bio}
+                  onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
+                  disabled={!isEditing}
+                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  placeholder="Tell us a bit about yourself..."
+                />
+              </div>
+              <div className="space-y-2 col-span-2">
                 <Label htmlFor="email">Email Address</Label>
                 <Input
                   id="email"
                   type="email"
                   value={auth.currentUser?.email || profile.email}
                   readOnly
-                  className="bg-gray-50"
+                  className="bg-gray-50 uppercase"
                   disabled
                 />
               </div>

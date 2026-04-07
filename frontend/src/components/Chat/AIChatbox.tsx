@@ -20,11 +20,23 @@ export function AIChatbox() {
   const [hasNotification, setHasNotification] = useState(false);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('bookbloom_ai_chat');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const functions = getFunctions();
   const currentUserId = auth.currentUser?.uid;
+
+  // Persist messages to sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem('bookbloom_ai_chat', JSON.stringify(messages));
+  }, [messages]);
 
   useEffect(() => {
     if (!currentUserId) return;
@@ -83,18 +95,24 @@ export function AIChatbox() {
     setIsLoading(true);
 
     try {
-      const generateResponse = httpsCallable(functions, 'generateAssistantResponse');
+      const generateResponse = httpsCallable(functions, 'generateAssistantResponse', {
+        timeout: 30000
+      });
       const result = await generateResponse({ 
         prompt: userMessage, 
         history: messages 
       }) as any;
 
-      setMessages(prev => [...prev, { role: 'model', parts: [{ text: result.data.text }] }]);
+      if (result.data && result.data.text) {
+        setMessages(prev => [...prev, { role: 'model', parts: [{ text: result.data.text }] }]);
+      } else {
+        throw new Error('Invalid response from AI');
+      }
     } catch (error: any) {
       console.error("Assistant Error:", error);
       setMessages(prev => [...prev, { 
         role: 'model', 
-        parts: [{ text: "⚠️ Atmospheric Distortion: Neural Core desynchronized. Please stabilize parameters or retry later." }] 
+        parts: [{ text: "Sorry, I'm having trouble connecting to my servers right now. Please try again in a moment." }] 
       }]);
     } finally {
       setIsLoading(false);

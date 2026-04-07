@@ -75,11 +75,11 @@ export function BookCard({ book, onClick }: BookCardProps) {
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
         />
 
-        {/* Wishlist Button - Only for Admins */}
-        {isAdmin && (
+        {/* Wishlist Button - Available for all logged-in users */}
+        {user && (
           <button
             onClick={handleToggleWishlist}
-            className="absolute top-2 left-2 p-1.5 rounded-full bg-white/80 hover:bg-white text-gray-500 hover:text-red-500 transition-colors z-10"
+            className="absolute top-2 left-2 p-1.5 rounded-full bg-white/80 hover:bg-white text-gray-500 hover:text-red-500 shadow-sm transition-colors z-10"
           >
             <Star className={`w-4 h-4 ${isInWishlist(book.id) ? 'fill-red-500 text-red-500' : ''}`} />
           </button>

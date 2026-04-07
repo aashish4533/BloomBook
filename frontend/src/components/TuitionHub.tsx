@@ -8,8 +8,9 @@ import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 
-import { db, auth } from '../firebase';
-import { collection, addDoc, serverTimestamp, query, where, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { db, auth, storage } from '../firebase';
+import { collection, addDoc, serverTimestamp, query, where, deleteDoc, doc, updateDoc, orderBy, getDocs, getDoc, setDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useCollection, useDocument } from 'react-firebase-hooks/firestore';
 import { toast } from 'sonner';
 import { startChatWithUser } from '../utils/chatUtils';
@@ -18,49 +19,8 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
-// ─── Bids Sub-Collection List Component ──────────────────────────────────────
-const BidsList: React.FC<{ requestId: string; onAssign: (tutorId: string) => void; isOwner: boolean; status: string; navigate: any }> = ({ requestId, onAssign, isOwner, status, navigate }) => {
-  const { collection } = require('firebase/firestore');
-  const [bidsSnap] = useCollection(collection(db, 'tuition_requests', requestId, 'bids'));
-  const bids = bidsSnap?.docs.map(d => ({ id: d.id, ...d.data() })) || [];
+// ─── Bids mappings are natively embedded within the Cards ───
 
-  return (
-    <div className="space-y-3 mt-4 bg-gray-50 p-4 rounded-xl border">
-      <h5 className="font-semibold text-sm text-[#2C3E50] flex items-center gap-1">
-        <Users className="w-4 h-4 text-[#C4A672]" /> 
-        Active Bids ({bids.length})
-      </h5>
-      {bids.map((b: any) => (
-        <div key={b.id} className="p-3 bg-white rounded-lg border shadow-sm flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center">
-          <div>
-            <p className="font-medium text-sm text-[#2C3E50]">{b.tutorName}</p>
-            <p className="text-xs text-[#C4A672] font-semibold">Rs. {b.amount}</p>
-            {b.message && <p className="text-xs text-gray-500 mt-1">"{b.message}"</p>}
-          </div>
-          <div className="flex gap-2">
-            <Button 
-              size="sm" 
-              variant="outline"
-              onClick={() => {
-                const uid = auth.currentUser?.uid;
-                if(uid) startChatWithUser(navigate, uid, b.tutorId, { name: b.tutorName, avatar: '' });
-              }}
-              className="h-8 text-xs border-[#C4A672] text-[#C4A672] hover:bg-[#C4A672]/10"
-            >
-              Message
-            </Button>
-            {isOwner && status !== 'Assigned' && (
-              <Button size="sm" onClick={() => onAssign(b.tutorId)} className="bg-green-600 hover:bg-green-700 text-white h-8 text-xs">
-                Assign
-              </Button>
-            )}
-          </div>
-        </div>
-      ))}
-      {bids.length === 0 && <p className="text-xs text-gray-400 text-center py-2">No bids broadcasted inside this orbit yet.</p>}
-    </div>
-  );
-};
 
 interface Tutor {
   id: string;
@@ -93,12 +53,151 @@ interface TuitionRequest {
   budget_range?: { min: number; max: number };
   location?: { zip: string };
   orbit_status?: string;
+  bids?: { tutorId: string; tutorName: string; amount: number; message?: string; timestamp?: string }[];
 }
 
 interface TuitionHubProps {
   onBack: () => void;
   isLoggedIn: boolean;
 }
+
+// ─── Premium Bids Display Component ─────────────────────────────────────────
+interface BidsDisplayProps {
+  requestId: string;
+  legacyBids?: { tutorId: string; tutorName: string; amount: number; message?: string; timestamp?: string }[];
+  isOwner: boolean;
+  onAssignTutor: (tutorId: string) => void;
+}
+
+function BidsDisplay({ requestId, legacyBids, isOwner, onAssignTutor }: BidsDisplayProps) {
+  const [bidsSnapshot] = useCollection(
+    query(
+      collection(db, 'tuition_requests', requestId, 'bids'),
+      orderBy('createdAt', 'desc')
+    )
+  );
+
+  const subcollectionBids = bidsSnapshot?.docs.map((d) => ({
+    id: d.id,
+    ...d.data(),
+  })) as Array<{
+    id: string;
+    amount: number;
+    message?: string;
+    userId: string;
+    userName: string;
+    createdAt: any;
+  }> | undefined;
+
+  const totalBids = (subcollectionBids?.length || 0) + (legacyBids?.length || 0);
+
+  return (
+    <div className="mb-3">
+      <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-1.5">
+          <div className="w-1.5 h-1.5 rounded-full bg-[#C4A672] animate-pulse" />
+          <p className="text-xs font-semibold text-gray-700">
+            Live Bids
+          </p>
+        </div>
+        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#C4A672]/10 text-[#C4A672]">
+          {totalBids}
+        </span>
+      </div>
+
+      {totalBids === 0 ? (
+        <div className="text-center py-3 bg-gray-50/80 rounded-lg border border-dashed border-gray-200">
+          <p className="text-xs text-gray-400">No bids yet — be the first!</p>
+        </div>
+      ) : (
+        <div className="space-y-1.5 max-h-[200px] overflow-y-auto pr-1 custom-scrollbar">
+          {/* Real-time subcollection bids */}
+          {subcollectionBids?.map((bid) => (
+            <div
+              key={bid.id}
+              className="group relative bg-white rounded-lg border border-gray-100 px-3 py-2 hover:border-[#C4A672]/40 hover:shadow-sm transition-all duration-200"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#C4A672] to-[#8B7355] flex items-center justify-center flex-shrink-0">
+                    <span className="text-[10px] font-bold text-white">
+                      {bid.userName?.charAt(0)?.toUpperCase() || '?'}
+                    </span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-[#2C3E50] truncate">
+                      {bid.userName}
+                    </p>
+                    {bid.message && (
+                      <p className="text-[10px] text-gray-500 truncate italic">
+                        "{bid.message}"
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="text-right">
+                    <span className="text-sm font-bold text-[#C4A672]">
+                      Rs. {bid.amount}
+                    </span>
+                    {bid.createdAt?.toDate && (
+                      <p className="text-[9px] text-gray-400">
+                        {new Date(bid.createdAt.toDate()).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+                  {isOwner && (
+                    <button
+                      onClick={() => onAssignTutor(bid.userId)}
+                      className="opacity-0 group-hover:opacity-100 text-[10px] px-2 py-1 rounded bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition-all duration-200 font-medium whitespace-nowrap"
+                    >
+                      Accept
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {/* Legacy embedded bids (backward compatibility) */}
+          {legacyBids?.map((bid, index) => (
+            <div
+              key={`legacy-${index}`}
+              className="bg-gray-50 rounded-lg border border-gray-100 px-3 py-2"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center flex-shrink-0">
+                    <span className="text-[10px] font-bold text-white">
+                      {bid.tutorName?.charAt(0)?.toUpperCase() || '?'}
+                    </span>
+                  </div>
+                  <span className="text-xs font-medium text-gray-600 truncate">
+                    {bid.tutorName}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-sm font-bold text-[#C4A672]">
+                    Rs. {bid.amount}
+                  </span>
+                  {isOwner && (
+                    <button
+                      onClick={() => onAssignTutor(bid.tutorId)}
+                      className="text-[10px] px-2 py-1 rounded bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition-all font-medium"
+                    >
+                      Accept
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -134,9 +233,12 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
 
   const [selectedRequestForBids, setSelectedRequestForBids] = useState<string | null>(null);
   const [bidForm, setBidForm] = useState({ amount: '', message: '' });
+  const [isSubmittingBid, setIsSubmittingBid] = useState(false);
 
   const [value, loading, error] = useCollection(collection(db, 'tutors'));
-  const [requestsValue] = useCollection(query(collection(db, 'tuition_requests')));
+  const [requestsValue] = useCollection(
+    query(collection(db, 'tuition_requests'), orderBy('createdAt', 'desc'))
+  );
 
   const [currentUserTutor] = useDocument(auth.currentUser ? doc(db, 'tutors', auth.currentUser.uid) : null);
   const tutorStatus = currentUserTutor?.data()?.verificationStatus || 'Unregistered';
@@ -178,6 +280,7 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
           location: { zip: requestForm.location },
           orbit_status: 'Open',
           notified_tutors: [],
+          bids: [],
           createdAt: serverTimestamp()
         });
         toast.success('Request sent successfully!');
@@ -217,28 +320,95 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
 
   const handlePlaceBid = async (requestId: string) => {
     if (!auth.currentUser || !bidForm.amount.trim()) return;
+    setIsSubmittingBid(true);
     try {
-      const { setDoc, doc } = await import('firebase/firestore');
-      await setDoc(doc(db, 'tuition_requests', requestId, 'bids', auth.currentUser.uid), {
-        tutorId: auth.currentUser.uid,
-        tutorName: auth.currentUser.displayName || 'Anonymous',
+      await addDoc(collection(db, 'tuition_requests', requestId, 'bids'), {
         amount: parseFloat(bidForm.amount),
         message: bidForm.message,
+        userId: auth.currentUser.uid,
+        userName: auth.currentUser.displayName || 'Anonymous',
         createdAt: serverTimestamp()
       });
       toast.success('Bid placed successfully! 🛰️');
       setBidForm({ amount: '', message: '' });
-    } catch { toast.error('Failed to place bid'); }
+      setSelectedRequestForBids(null);
+    } catch (err) {
+      console.error('Failed to place bid:', err);
+      toast.error('Failed to place bid');
+    } finally {
+      setIsSubmittingBid(false);
+    }
   };
 
   const handleAssignTutor = async (requestId: string, tutorId: string) => {
+    if (!auth.currentUser) {
+      toast.error('Please login to accept this request');
+      navigate('/login');
+      return;
+    }
     try {
+      // 1. Mark the request as accepted
       await updateDoc(doc(db, 'tuition_requests', requestId), {
         orbit_status: 'Assigned',
-        assignedTutorId: tutorId
+        status: 'accepted',
+        assignedTutorId: tutorId,
+        tutorId: auth.currentUser.uid,
+        updatedAt: serverTimestamp()
       });
-      toast.success('Tutor assigned to orbit! 🎉');
-    } catch { toast.error('Failed to assign tutor'); }
+
+      // 2. Find the student's ID from the request data
+      const requestSnap = await getDoc(doc(db, 'tuition_requests', requestId));
+      const requestData = requestSnap.data();
+      const studentId = requestData?.studentId;
+
+      if (!studentId) {
+        toast.success('Request accepted! 🎉');
+        return;
+      }
+
+      // 3. Check-or-create a chat between the tutor and student
+      const chatId = [auth.currentUser.uid, studentId].sort().join('_');
+      const chatRef = doc(db, 'chats', chatId);
+      const chatSnap = await getDoc(chatRef);
+
+      if (!chatSnap.exists()) {
+        await setDoc(chatRef, {
+          participants: [auth.currentUser.uid, studentId],
+          studentId: studentId,
+          tutorId: auth.currentUser.uid,
+          status: 'active',
+          lastMessage: `Tutor accepted your tuition request: ${requestData?.topic || 'Session'}`,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          lastMessageTimestamp: serverTimestamp()
+        });
+
+        // Send an initial message
+        await addDoc(collection(db, 'chats', chatId, 'messages'), {
+          text: `Hi! I've accepted your tuition request for "${requestData?.topic || 'your subject'}". Let's discuss the details!`,
+          senderId: auth.currentUser.uid,
+          createdAt: serverTimestamp(),
+          displayName: auth.currentUser.displayName || 'Tutor'
+        });
+      }
+
+      toast.success('Request accepted! Opening chat... 🎉');
+
+      // 4. Navigate to the chat
+      navigate(`/chat/${chatId}`, {
+        state: {
+          otherUser: {
+            id: studentId,
+            name: requestData?.studentName || 'Student',
+            avatar: '',
+            online: true
+          }
+        }
+      });
+    } catch (err) {
+      console.error('Failed to accept request:', err);
+      toast.error('Failed to accept request');
+    }
   };
 
   const handleBecomeTutor = async () => {
@@ -250,18 +420,17 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
     try {
       let certUrl = '';
       if (certFile) {
-        const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-        const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-        const formData = new FormData();
-        formData.append('file', certFile);
-        formData.append('upload_preset', uploadPreset);
-
-        const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
-          method: 'POST',
-          body: formData
-        });
-        const data = await res.json();
-        certUrl = data.secure_url;
+        try {
+          const uniqueId = `${Date.now()}_${certFile.name.replace(/\s+/g, '_')}`;
+          const storageRef = ref(storage, `verifications/${auth.currentUser.uid}/${uniqueId}`);
+          
+          await uploadBytes(storageRef, certFile);
+          certUrl = await getDownloadURL(storageRef);
+        } catch (err) {
+          console.error('[Storage] Upload failed:', err);
+          toast.error("Failed to upload certificate");
+          return;
+        }
       }
 
       const { setDoc, doc } = await import('firebase/firestore');
@@ -289,6 +458,51 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
     } catch (err) {
       console.error(err);
       toast.error('Failed to create profile');
+    }
+  };
+
+  // ── Book Tutor / Start Chat ─────────────────────────────────────────
+  const handleBookTutor = async (tutorId: string, tutorName: string, tutorAvatar: string) => {
+    if (!auth.currentUser) {
+      toast.error('Please login to book a tutor');
+      navigate('/login');
+      return;
+    }
+    const currentUid = auth.currentUser.uid;
+    try {
+      // Deterministic chatId so both users always land on the same doc
+      const chatId = [currentUid, tutorId].sort().join('_');
+      const chatRef = doc(db, 'chats', chatId);
+      const chatSnap = await getDoc(chatRef);
+
+      if (!chatSnap.exists()) {
+        // Create new chat + booking connection
+        await setDoc(chatRef, {
+          participants: [currentUid, tutorId],
+          studentId: currentUid,
+          tutorId: tutorId,
+          status: 'active',
+          lastMessage: '',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          lastMessageTimestamp: serverTimestamp()
+        });
+      }
+
+      // Navigate to the chat
+      navigate(`/chat/${chatId}`, {
+        state: {
+          otherUser: {
+            id: tutorId,
+            name: tutorName,
+            avatar: tutorAvatar,
+            online: true
+          }
+        }
+      });
+    } catch (err) {
+      console.error('Failed to initialize chat:', err);
+      toast.error('Failed to start chat with tutor');
     }
   };
 
@@ -462,11 +676,17 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
           })}
         </div>
 
-        {/* Tutors Grid */}
-        <div>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-[#2C3E50] text-2xl">Available Tutors ({tutors.length})</h2>
-            <div className="flex gap-2">
+        {/* Tutors Grid & Tuition Requests Wrap in Tabs */}
+        <Tabs defaultValue="tutors" className="w-full">
+          <TabsList className="mb-6">
+            <TabsTrigger value="tutors">Tutors</TabsTrigger>
+            <TabsTrigger value="requests">Request Tuition</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="tutors">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-[#2C3E50] text-2xl">Available Tutors ({tutors.length})</h2>
+              <div className="flex gap-2">
               <Button
                 onClick={() => {
                   if (!isLoggedIn) {
@@ -544,11 +764,109 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
               </Button>
             </div>
           </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredTutors.length > 0 ? (
+              filteredTutors.map((tutor) => (
+                <Card key={tutor.id} className="overflow-hidden hover:shadow-lg transition-all duration-300">
+                  <div className="p-6">
+                    {/* Tutor Header */}
+                    <div className="flex items-start gap-4 mb-4">
+                      <div className="relative">
+                        <ImageWithFallback
+                          src={tutor.avatar}
+                          alt={tutor.name}
+                          className="w-16 h-16 rounded-full object-cover border-2 border-[#C4A672]/20"
+                        />
+                        {tutor.verified && (
+                          <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center border-2 border-white">
+                            <span className="text-white text-[10px]">✓</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-[#2C3E50] font-semibold">{tutor.name}</h3>
+                        <p className="text-sm text-gray-600">{tutor.subject}</p>
+                        <Badge
+                          variant={tutor.availability === 'Available' ? 'default' : 'secondary'}
+                          className="mt-1 text-[10px] h-5"
+                        >
+                          {tutor.availability}
+                        </Badge>
+                      </div>
+                    </div>
 
-          {/* Tuition Requests Section */}
-          {tuitionRequests.length > 0 && (
-            <div className="mb-12">
-              <h3 className="text-[#2C3E50] text-xl mb-4">Student Requests</h3>
+                    {/* Specialization */}
+                    <p className="text-sm text-gray-600 mb-4 line-clamp-2 min-h-[40px]">{tutor.specialization}</p>
+
+                    {/* Stats */}
+                    <div className="grid grid-cols-3 gap-2 mb-4 text-center py-3 bg-gray-50 rounded-lg">
+                      <div>
+                        <div className="flex items-center justify-center gap-1 text-yellow-500 mb-0.5">
+                          <Star className="w-3.5 h-3.5 fill-yellow-500" />
+                          <span className="text-sm font-bold text-[#2C3E50]">{tutor.rating || '5.0'}</span>
+                        </div>
+                        <p className="text-[10px] text-gray-500">{tutor.reviews || 0} reviews</p>
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-center gap-1 mb-0.5 text-[#C4A672]">
+                          <Users className="w-3.5 h-3.5" />
+                          <span className="text-sm font-bold text-[#2C3E50]">{tutor.students || 0}</span>
+                        </div>
+                        <p className="text-[10px] text-gray-500">students</p>
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-center gap-1 mb-0.5 text-[#C4A672]">
+                          <Clock className="w-3.5 h-3.5" />
+                          <span className="text-sm font-bold text-[#2C3E50]">{tutor.experience || '1y'}</span>
+                        </div>
+                        <p className="text-[10px] text-gray-500">exp</p>
+                      </div>
+                    </div>
+
+                    {/* Pricing & Action */}
+                    <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                      <div>
+                        <p className="text-[10px] text-gray-500">Hourly Rate</p>
+                        <p className="text-[#C4A672] font-bold">Rs. {tutor.hourlyRate?.toLocaleString()}/hr</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs border-[#C4A672] text-[#C4A672] hover:bg-[#C4A672]/10"
+                          onClick={(e: React.MouseEvent) => {
+                            e.stopPropagation();
+                            setSelectedTutor(tutor);
+                          }}
+                        >
+                          Profile
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="h-8 text-xs bg-[#C4A672] hover:bg-[#8B7355] text-white"
+                          onClick={(e: React.MouseEvent) => {
+                            e.stopPropagation();
+                            handleBookTutor(tutor.userId, tutor.name, tutor.avatar);
+                          }}>
+                          Book
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              ))
+            ) : (
+              <div className="col-span-full py-12 text-center bg-white rounded-2xl border border-dashed border-gray-200">
+                <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <h3 className="text-lg font-medium text-gray-900">No tutors match your search</h3>
+                <p className="text-gray-500 max-w-xs mx-auto">Try adjusting your filters or search keywords to find more educators.</p>
+              </div>
+            )}
+          </div>
+          </TabsContent>
+
+          <TabsContent value="requests">
+            {tuitionRequests.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {tuitionRequests.map(req => (
                   <Card key={req.id} className="p-5 border border-blue-100 bg-blue-50/30 flex flex-col justify-between hover:shadow-md transition-shadow">
@@ -564,7 +882,7 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                             {req.difficulty || 'Beginner'}
                           </Badge>
                           <Badge variant="secondary" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
-                            Status: {(req as any).orbit_status || 'Open'}
+                            Status: {req.orbit_status || 'Open'}
                           </Badge>
                         </div>
                         <div className="flex items-center gap-2">
@@ -586,173 +904,98 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                       </p>
 
                       <div className="bg-white/60 p-2 rounded-lg text-xs space-y-1 mb-3">
-                        {(req as any).budget_range && (
-                          <p><span className="text-gray-500">Budget:</span> <span className="font-semibold text-[#C4A672]">Rs. {(req as any).budget_range.min} - {(req as any).budget_range.max}</span></p>
+                        {req.budget_range && (
+                          <p><span className="text-gray-500">Budget:</span> <span className="font-semibold text-[#C4A672]">Rs. {req.budget_range.min} - {req.budget_range.max}</span></p>
                         )}
-                        {(req as any).location?.zip && (
-                          <p><span className="text-gray-500">Location (ZIP):</span> <span>{(req as any).location.zip}</span></p>
+                        {req.location?.zip && (
+                          <p><span className="text-gray-500">Location (ZIP):</span> <span>{req.location.zip}</span></p>
                         )}
                       </div>
+
+                      {/* Current Bids Section — Real-time subcollection */}
+                      <BidsDisplay
+                        requestId={req.id}
+                        legacyBids={req.bids}
+                        isOwner={auth.currentUser?.uid === req.studentId}
+                        onAssignTutor={(tutorId) => handleAssignTutor(req.id, tutorId)}
+                      />
                     </div>
 
                     <div className="border-t pt-3 mt-auto">
                       {auth.currentUser?.uid === req.studentId ? (
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button size="sm" className="w-full bg-[#C4A672] hover:bg-[#8B7355] text-white text-xs py-1 h-8">
-                              View Radar 🛰️ Bids
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Bids for "{req.topic}"</DialogTitle>
-                            </DialogHeader>
-                            <BidsList requestId={req.id} onAssign={(tId) => handleAssignTutor(req.id, tId)} isOwner={true} status={(req as any).orbit_status || 'Open'} navigate={navigate} />
-                          </DialogContent>
-                        </Dialog>
-                      ) : tutorStatus === 'Verified' && (req as any).orbit_status !== 'Assigned' && (
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button size="sm" className="w-full bg-[#2C3E50] hover:bg-[#1a252f] text-white text-xs py-1 h-8">
-                              Express Interest 🚀
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Place a Bid</DialogTitle>
-                              <DialogDescription>Offer your Expertise to this client.</DialogDescription>
-                            </DialogHeader>
-                            <div className="grid gap-3 py-3">
-                              <Input type="number" placeholder="Offer Amount (Rs.)" value={bidForm.amount} onChange={e => setBidForm({ ...bidForm, amount: e.target.value })} />
-                              <Textarea placeholder="Message (Optional)" value={bidForm.message} onChange={e => setBidForm({ ...bidForm, message: e.target.value })} />
-                              <Button onClick={() => handlePlaceBid(req.id)} className="bg-[#C4A672] text-white">Broadcast Bid</Button>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
+                        <div className="space-y-2">
+                           <Button size="sm" className="w-full bg-[#C4A672] hover:bg-[#8B7355] text-white text-xs py-1 h-8">
+                             Review Bids
+                           </Button>
+                        </div>
+                      ) : tutorStatus === 'Verified' && req.orbit_status !== 'Assigned' && (
+                        <div className="space-y-2">
+                          <div className="flex gap-2">
+                             <Input 
+                               type="number" 
+                               placeholder="Amount (Rs.)" 
+                               className="h-8 text-xs flex-1"
+                               value={selectedRequestForBids === req.id ? bidForm.amount : ''}
+                               onChange={(e) => {
+                                 setSelectedRequestForBids(req.id);
+                                 setBidForm({ ...bidForm, amount: e.target.value });
+                               }}
+                             />
+                             <Input 
+                               type="text" 
+                               placeholder="Short message (optional)" 
+                               className="h-8 text-xs flex-[2]"
+                               value={selectedRequestForBids === req.id ? bidForm.message : ''}
+                               onChange={(e) => {
+                                 setSelectedRequestForBids(req.id);
+                                 setBidForm({ ...bidForm, message: e.target.value });
+                               }}
+                             />
+                          </div>
+                          <div className="flex gap-2">
+                           <Button 
+                             size="sm" 
+                             onClick={() => handlePlaceBid(req.id)} 
+                             disabled={isSubmittingBid}
+                             className="bg-[#2C3E50] hover:bg-[#1a252f] text-white text-xs py-1 h-8 px-4 flex-1"
+                           >
+                             {isSubmittingBid && selectedRequestForBids === req.id ? 'Loading...' : 'Place Bid'}
+                           </Button>
+                             <Button 
+                               size="sm" 
+                               variant="outline"
+                               onClick={() => startChatWithUser(navigate, auth.currentUser!.uid, req.studentId, {name: req.studentName, avatar: ''}, { type: 'tuition_request', topic: req.topic, requestId: req.id })} 
+                               className="border-[#C4A672] text-[#C4A672] hover:bg-[#C4A672]/10 text-xs py-1 h-8 px-4"
+                             >
+                               Message
+                             </Button>
+                          </div>
+                         </div>
                       )}
                     </div>
                   </Card>
                 ))}
               </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredTutors.map((tutor) => (
-              <Card key={tutor.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                <div className="p-6">
-                  {/* Tutor Header */}
-                  <div className="flex items-start gap-4 mb-4">
-                    <div className="relative">
-                      <ImageWithFallback
-                        src={tutor.avatar}
-                        alt={tutor.name}
-                        className="w-16 h-16 rounded-full object-cover"
-                      />
-                      {tutor.verified && (
-                        <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center border-2 border-white">
-                          <span className="text-white text-xs">✓</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-[#2C3E50]">{tutor.name}</h3>
-                      <p className="text-sm text-gray-600">{tutor.subject}</p>
-                      <Badge
-                        variant={tutor.availability === 'Available' ? 'default' : 'secondary'}
-                        className="mt-1"
-                      >
-                        {tutor.availability}
-                      </Badge>
-                    </div>
-                  </div>
-
-                  {/* Specialization */}
-                  <p className="text-sm text-gray-600 mb-4">{tutor.specialization}</p>
-
-                  {/* Stats */}
-                  <div className="grid grid-cols-3 gap-2 mb-4 text-center">
-                    <div>
-                      <div className="flex items-center justify-center gap-1 text-yellow-500 mb-1">
-                        <Star className="w-4 h-4 fill-yellow-500" />
-                        <span className="text-sm text-[#2C3E50]">{tutor.rating}</span>
-                      </div>
-                      <p className="text-xs text-gray-500">{tutor.reviews} reviews</p>
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-center gap-1 mb-1">
-                        <Users className="w-4 h-4 text-[#C4A672]" />
-                        <span className="text-sm text-[#2C3E50]">{tutor.students}</span>
-                      </div>
-                      <p className="text-xs text-gray-500">students</p>
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-center gap-1 mb-1">
-                        <Clock className="w-4 h-4 text-[#C4A672]" />
-                        <span className="text-sm text-[#2C3E50]">{tutor.experience}</span>
-                      </div>
-                      <p className="text-xs text-gray-500">experience</p>
-                    </div>
-                  </div>
-
-                  {/* Pricing & Action */}
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                    <div>
-                      <p className="text-xs text-gray-500">Starting at</p>
-                      <p className="text-[#C4A672] text-xl">Rs. {tutor.hourlyRate}/hr</p>
-                    </div>
-                    <div className="flex flex-wrap gap-2 justify-end">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={(e: React.MouseEvent) => {
-                          e.stopPropagation();
-                          setSelectedTutor(tutor);
-                        }}
-                      >
-                        View Profile
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="bg-[#C4A672] hover:bg-[#8B7355] text-white"
-                        onClick={(e: React.MouseEvent) => {
-                          e.stopPropagation();
-                          if (!isLoggedIn || !auth.currentUser) {
-                            toast.error("Please login to book a session");
-                            navigate('/login');
-                            return;
-                          }
-                          const uid = auth.currentUser.uid;
-                          startChatWithUser(navigate, uid, tutor.userId, { name: tutor.name, avatar: tutor.avatar }, { title: `1hr Tuition Session: ${tutor.subject}`, price: tutor.hourlyRate });
-                        }}>
-                        Book
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-[#C4A672] text-[#C4A672] hover:bg-[#C4A672]/10"
-                        onClick={(e: React.MouseEvent) => {
-                          e.stopPropagation();
-                          if (isLoggedIn && auth.currentUser) {
-                            startChatWithUser(navigate, auth.currentUser.uid, tutor.userId, { name: tutor.name, avatar: tutor.avatar });
-                          } else {
-                            toast.error("Please login to message a tutor");
-                            navigate('/login');
-                          }
-                        }}
-                      >
-                        Start Chat & Deal
-                      </Button>
-                    </div>
-                  </div>
+            ) : (
+              <div className="py-20 text-center bg-white rounded-2xl border border-dashed border-gray-200">
+                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <BookOpen className="w-8 h-8 text-gray-300" />
                 </div>
-              </Card>
-            ))}
-          </div>
-        </div>
+                <h3 className="text-xl font-semibold text-[#2C3E50] mb-2">No Tuition Requests Yet</h3>
+                <p className="text-gray-500 mb-8 max-w-sm mx-auto">Be the first to post a request or explore our available tutors to start your learning journey.</p>
+                <Dialog open={isPostingRequest} onOpenChange={setIsPostingRequest}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-[#C4A672] text-white hover:bg-[#8B7355]">
+                       Post a Tuition Request
+                    </Button>
+                  </DialogTrigger>
+                </Dialog>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
 
-        {/* How It Works Section */}
-        < div className="mt-16" >
+        <div className="mt-16">
           <h2 className="text-[#2C3E50] text-2xl text-center mb-8">How It Works</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <Card className="p-6 text-center hover:scale-105 transition-transform duration-300">
@@ -848,7 +1091,7 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                   className="bg-[#C4A672] hover:bg-[#8B7355] text-white"
                   onClick={() => {
                     if (isLoggedIn) {
-                      navigate('/chat', { state: { otherUser: { id: selectedTutor.userId, name: selectedTutor.name, avatar: selectedTutor.avatar, online: true } } });
+                      handleBookTutor(selectedTutor.userId, selectedTutor.name, selectedTutor.avatar);
                     } else {
                       toast.error("Please login to message this tutor");
                     }

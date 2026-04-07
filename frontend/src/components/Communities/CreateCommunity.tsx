@@ -6,8 +6,9 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { toast } from 'sonner';
-import { db } from '../../firebase';
+import { db, storage } from '../../firebase';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, arrayUnion, setDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 interface CreateCommunityProps {
   onBack: () => void;
@@ -124,30 +125,19 @@ export function CreateCommunity({ onBack, onSuccess, userId, userName, initialDa
     try {
       let imageUrl = formData.image; // fallback to base64 if no file (shouldn't happen if we clear it right) or if we keep existing logic (but we initialized image as string | null)
 
-      // Upload Image to Cloudinary if file exists
+      // Upload Image to Firebase Storage if file exists
       if (formData.imageFile) {
-        const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-        const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-
-        if (!cloudName || !uploadPreset) {
-          throw new Error("Cloudinary configuration missing");
+        try {
+          const uniqueId = `${Date.now()}_${formData.imageFile.name.replace(/\s+/g, '_')}`;
+          const storageRef = ref(storage, `community_covers/${uniqueId}`);
+          
+          await uploadBytes(storageRef, formData.imageFile);
+          imageUrl = await getDownloadURL(storageRef);
+        } catch (err) {
+          console.error('[Storage] Upload failed:', err);
+          toast.error("Failed to upload community cover");
+          return;
         }
-
-        const uploadData = new FormData();
-        uploadData.append('file', formData.imageFile);
-        uploadData.append('upload_preset', uploadPreset);
-
-        const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-          method: 'POST',
-          body: uploadData
-        });
-
-        if (!response.ok) {
-          throw new Error('Image upload failed');
-        }
-
-        const data = await response.json();
-        imageUrl = data.secure_url;
       }
 
       if (isEditing && communityId) {

@@ -7,6 +7,8 @@ import {
   orderBy,
   onSnapshot,
   addDoc,
+  updateDoc,
+  doc,
   serverTimestamp,
   getDocs
 } from 'firebase/firestore';
@@ -108,6 +110,11 @@ export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId }: Privat
         senderId: currentUserId,
         createdAt: serverTimestamp(),
         displayName: auth.currentUser?.displayName || "User"
+      });
+      // Keep the chat document in sync for the chat list
+      await updateDoc(doc(db, "chats", chatId), {
+        lastMessage: newMessage,
+        lastMessageTimestamp: serverTimestamp()
       });
       setNewMessage('');
     } catch (error) {

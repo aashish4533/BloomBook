@@ -20,7 +20,7 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
   const [isbnSearch, setIsbnSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [conditionFilter, setConditionFilter] = useState('all');
-  const [rentalPeriod, setRentalPeriod] = useState<'weekly' | 'monthly' | 'yearly'>('monthly');
+  const [rentalPeriod, setRentalPeriod] = useState<'all' | 'weekly' | 'monthly' | 'yearly'>('monthly');
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 20]);
   const [locationFilter, setLocationFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -102,8 +102,10 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
     const matchesCondition = conditionFilter === 'all' || book.condition === conditionFilter;
 
     // Price range filter (based on selected rental period)
-    const bookPrice = book.rentalOptions[rentalPeriod];
-    const matchesPrice = bookPrice >= priceRange[0] && bookPrice <= priceRange[1];
+    const matchesPrice = rentalPeriod === 'all' || (() => {
+      const bookPrice = book.rentalOptions[rentalPeriod];
+      return bookPrice >= priceRange[0] && bookPrice <= priceRange[1];
+    })();
 
     // Location filter
     const matchesLocation = locationFilter === '' ||
@@ -117,7 +119,7 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
     setIsbnSearch('');
     setCategoryFilter('all');
     setConditionFilter('all');
-    setRentalPeriod('monthly');
+    setRentalPeriod('all');
     setPriceRange([0, 20]);
     setLocationFilter('');
   };
@@ -214,6 +216,7 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
                   <SelectValue placeholder="Period" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">All Periods</SelectItem>
                   <SelectItem value="weekly">Weekly</SelectItem>
                   <SelectItem value="monthly">Monthly</SelectItem>
                   <SelectItem value="yearly">Yearly</SelectItem>
@@ -281,26 +284,28 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
             <div className="mt-4 pt-4 border-t border-gray-200">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Price Range Slider */}
-                <div>
-                  <label className="text-sm text-gray-700 mb-3 block">
-                    {rentalPeriod.charAt(0).toUpperCase() + rentalPeriod.slice(1)} Price Range:
-                    <span className="text-[#C4A672] ml-2">
-                      ${priceRange[0]} - ${priceRange[1]}
-                    </span>
-                  </label>
-                  <Slider
-                    value={priceRange}
-                    onValueChange={(value) => setPriceRange(value as [number, number])}
-                    min={0}
-                    max={20}
-                    step={0.5}
-                    className="mt-2"
-                  />
-                  <div className="flex justify-between text-xs text-gray-500 mt-1">
-                    <span>Rs. 0</span>
-                    <span>Rs. 20</span>
+                {rentalPeriod !== 'all' && (
+                  <div>
+                    <label className="text-sm text-gray-700 mb-3 block">
+                      {rentalPeriod.charAt(0).toUpperCase() + rentalPeriod.slice(1)} Price Range:
+                      <span className="text-[#C4A672] ml-2">
+                        ${priceRange[0]} - ${priceRange[1]}
+                      </span>
+                    </label>
+                    <Slider
+                      value={priceRange}
+                      onValueChange={(value) => setPriceRange(value as [number, number])}
+                      min={0}
+                      max={20}
+                      step={0.5}
+                      className="mt-2"
+                    />
+                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                      <span>Rs. 0</span>
+                      <span>Rs. 20</span>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Location Proximity */}
                 <div>
@@ -340,8 +345,12 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
                   {locationFilter && (
                     <Badge variant="secondary">Location: {locationFilter}</Badge>
                   )}
-                  <Badge variant="secondary">Period: {rentalPeriod}</Badge>
-                  <Badge variant="secondary">Price: ${priceRange[0]}-${priceRange[1]}</Badge>
+                  {rentalPeriod !== 'all' && (
+                    <>
+                      <Badge variant="secondary">Period: {rentalPeriod}</Badge>
+                      <Badge variant="secondary">Price: ${priceRange[0]}-${priceRange[1]}</Badge>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -354,7 +363,7 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
             Available for Rent ({filteredBooks.length})
           </h2>
           <div className="text-sm text-gray-600">
-            Showing {rentalPeriod} rates
+            {rentalPeriod === 'all' ? 'Showing all rates' : `Showing ${rentalPeriod} rates`}
           </div>
         </div>
 

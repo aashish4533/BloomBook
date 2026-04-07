@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Check, AlertCircle, X, ShieldCheck, Banknote } from 'lucide-react';
+import { useState } from 'react';
+import { Check, AlertCircle, X, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { auth, db } from '../../firebase';
 import { doc, getDoc, collection, setDoc, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -21,35 +21,12 @@ interface PaymentGatewayProps {
 
 export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel, cartItems }: PaymentGatewayProps) {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [sellerDetails, setSellerDetails] = useState<any>(null);
-  const [loadingDetails, setLoadingDetails] = useState(true);
   const navigate = useNavigate();
 
   const targetUserId = cartItems && cartItems.length > 0 ? cartItems[0].sellerId : 'unknown_seller';
   const totalAmount = amount;
 
-  useEffect(() => {
-    const fetchSellerDetails = async () => {
-      try {
-        if (targetUserId === 'unknown_seller') {
-            setLoadingDetails(false);
-            return;
-        }
-        const payoutRef = doc(db, 'users', targetUserId, 'payoutDetails', 'primary');
-        const payoutSnap = await getDoc(payoutRef);
-        if (payoutSnap.exists()) {
-          setSellerDetails(payoutSnap.data());
-        }
-      } catch (err) {
-        console.error("Error fetching seller details:", err);
-      } finally {
-        setLoadingDetails(false);
-      }
-    };
-    fetchSellerDetails();
-  }, [targetUserId]);
-
-  const handleStartDeal = async () => {
+  const handleConfirmOrder = async () => {
     setIsProcessing(true);
 
     try {
@@ -70,7 +47,7 @@ export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel, c
       const response: any = await initiateP2PDeal(payload);
       const { transactionId } = response.data;
       
-      toast.success('P2P Deal Locked! Redirecting to chat...');
+      toast.success('Order Confirmed! Redirecting to chat...');
 
       const chatId = [user.uid, targetUserId].sort().join('_');
       const chatRef = doc(db, 'chats', chatId);
@@ -97,7 +74,7 @@ export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel, c
         state: {
           otherUser: {
              id: targetUserId,
-             name: sellerDetails?.accountTitle || 'Seller',
+             name: 'Seller',
              avatar: 'S',
              online: true
           }
@@ -116,9 +93,9 @@ export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel, c
     <div className="fixed inset-0 bg-black/50 flex flex-col items-center justify-center z-50 p-4 overflow-y-auto">
       <Card className="w-full max-w-2xl my-8">
         {/* Header */}
-        <div className="bg-gradient-to-r from-[#C4A672] to-[#8B7355] text-white p-6 rounded-t-lg">
+        <div className="bg-gradient-to-r from-[#2C3E50] to-[#34495E] text-white p-6 rounded-t-lg">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold">P2P Deal Initialization</h2>
+            <h2 className="text-2xl font-bold">Order Confirmation</h2>
             <button
               onClick={onCancel}
               className="text-white/80 hover:text-white"
@@ -128,7 +105,7 @@ export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel, c
           </div>
           <div className="flex items-center gap-2 text-white/90 text-sm">
             <ShieldCheck className="w-4 h-4" />
-            <span>Manual Escrow Protection System</span>
+            <span>Secure Order Processing</span>
           </div>
         </div>
 
@@ -146,42 +123,10 @@ export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel, c
             </div>
           </div>
 
-          <Alert className="mb-6 bg-blue-50 border-blue-200">
-            You are about to start a direct Peer-to-Peer deal. BookBloom holds the transaction record, but you will manually transfer funds directly to the seller's account shown below.
+          <Alert className="mb-6 bg-[#C4A672]/10 border-[#C4A672]/20">
+            Confirming your order will notify the seller and initiate a direct communication channel. All payments and handovers are to be coordinated directly between you and the seller.
           </Alert>
-
-          {/* Seller Details */}
-          <div className="mb-6">
-             <h3 className="text-[#2C3E50] font-medium mb-3 flex items-center gap-2">
-                 <Banknote className="w-5 h-5 text-[#C4A672]" /> 
-                 Seller Receiving Account
-             </h3>
-             {loadingDetails ? (
-                 <div className="p-4 bg-gray-50 rounded animate-pulse text-gray-500 text-sm">Loading security details...</div>
-             ) : sellerDetails ? (
-                 <div className="p-4 bg-[#C4A672]/5 border border-[#C4A672]/30 rounded-lg">
-                    <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                            <span className="text-gray-500">Bank / Service:</span>
-                            <span className="font-medium text-[#2C3E50]">{sellerDetails.bankName || 'Unknown Bank'}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="text-gray-500">Account Title:</span>
-                            <span className="font-medium text-[#2C3E50]">{sellerDetails.accountTitle || 'Unknown Title'}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="text-gray-500">Account Number:</span>
-                            <span className="font-mono text-[#2C3E50] bg-white px-2 py-1 border rounded">{sellerDetails.accountNumber || 'N/A'}</span>
-                        </div>
-                    </div>
-                 </div>
-             ) : (
-                 <div className="p-4 bg-red-50 text-red-600 border border-red-200 rounded-lg text-sm flex items-start gap-2">
-                     <AlertCircle className="w-5 h-5 shrink-0" />
-                     <span>This seller has not configured a payout account. Please ask them to update their settings first or you will not be able to proceed safely.</span>
-                 </div>
-             )}
-          </div>
+        </div>
 
           {/* Action Buttons */}
           <div className="flex gap-3 mt-8">
@@ -195,24 +140,23 @@ export function PaymentGateway({ amount, type, itemTitle, onSuccess, onCancel, c
               Cancel
             </Button>
             <Button
-              onClick={handleStartDeal}
+              onClick={handleConfirmOrder}
               className="flex-1 bg-[#C4A672] hover:bg-[#8B7355] text-white"
-              disabled={isProcessing || !sellerDetails || loadingDetails}
+              disabled={isProcessing}
             >
               {isProcessing ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                  Locking Deal...
+                  Processing...
                 </>
               ) : (
                 <>
                   <Check className="w-4 h-4 mr-2" />
-                  Acknowledge & Start Deal
+                  Confirm Order
                 </>
               )}
             </Button>
           </div>
-        </div>
       </Card>
     </div>
   );

@@ -3,7 +3,7 @@ import { Worker, Viewer } from '@react-pdf-viewer/core';
 import { defaultLayoutPlugin } from '@react-pdf-viewer/default-layout';
 import '@react-pdf-viewer/core/lib/styles/index.css';
 import '@react-pdf-viewer/default-layout/lib/styles/index.css';
-import { Loader2, FileWarning, ZoomIn, ZoomOut, Maximize, Minimize, EyeOff } from 'lucide-react';
+import { Loader2, FileWarning, ZoomIn, ZoomOut, Maximize, Minimize, EyeOff, Download, ExternalLink } from 'lucide-react';
 import { Button } from './ui/button';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
@@ -25,6 +25,7 @@ export const FilePreview: React.FC<FilePreviewProps> = ({ fileUrl, fileType, isT
     const [error, setError] = useState<string | null>(null);
     const [scale, setScale] = useState(1);
     const [fitToScreen, setFitToScreen] = useState(true);
+    const [pdfFallback, setPdfFallback] = useState(false);
 
     // Blur state for "Exchange" logic
     const [isBlurred, setIsBlurred] = useState(false); // Default to false for now, can be toggled via prop if needed later
@@ -157,13 +158,67 @@ export const FilePreview: React.FC<FilePreviewProps> = ({ fileUrl, fileType, isT
         return (
             <div className="flex flex-col items-center justify-center h-full min-h-[400px] bg-gray-50 rounded-md text-gray-500 p-8 text-center">
                 <FileWarning className="w-12 h-12 mb-4 text-red-400" />
-                <p>{error}</p>
+                <p className="mb-4">{error}</p>
+                <a
+                    href={fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-[#C4A672] hover:bg-[#8B7355] text-white rounded-md transition-colors"
+                >
+                    <Download className="w-4 h-4" />
+                    Download File
+                </a>
             </div>
         );
     }
 
     // PDF 
     if (type === 'pdf') {
+        // Fallback: use iframe/object when react-pdf-viewer fails (e.g. CORS)
+        if (pdfFallback) {
+            return (
+                <div className="h-full w-full min-h-[600px] flex flex-col">
+                    <div className="flex items-center justify-between p-2 bg-gray-100 border-b">
+                        <span className="text-xs text-gray-500 italic">Using browser PDF viewer (fallback)</span>
+                        <a
+                            href={fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-[#C4A672] hover:underline"
+                        >
+                            <ExternalLink className="w-3 h-3" />
+                            Open in new tab
+                        </a>
+                    </div>
+                    <div className="flex-1 relative border rounded-md overflow-hidden bg-gray-100">
+                        <object
+                            data={fileUrl}
+                            type="application/pdf"
+                            className="w-full h-full min-h-[600px]"
+                        >
+                            <iframe
+                                src={fileUrl}
+                                className="w-full h-full min-h-[600px] border-none"
+                                title="PDF Viewer Fallback"
+                            />
+                        </object>
+                        {/* Final fallback: download link */}
+                        <div className="absolute bottom-4 left-0 right-0 flex justify-center">
+                            <a
+                                href={fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 px-4 py-2 bg-white/90 hover:bg-white border border-gray-300 rounded-lg shadow-sm text-sm text-gray-700 transition-colors"
+                            >
+                                <Download className="w-4 h-4" />
+                                Can't see the PDF? Download directly
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
         return (
             <div className="h-full w-full min-h-[600px] flex flex-col">
                 <div className="flex justify-end p-2 bg-gray-100 border-b">
@@ -183,6 +238,16 @@ export const FilePreview: React.FC<FilePreviewProps> = ({ fileUrl, fileType, isT
                             fileUrl={fileUrl}
                             plugins={[defaultLayoutPluginInstance]}
                             initialPage={0}
+                            renderError={() => {
+                                // Trigger fallback on next render cycle
+                                setTimeout(() => setPdfFallback(true), 0);
+                                return (
+                                    <div className="flex flex-col items-center justify-center h-full p-8 text-gray-500">
+                                        <Loader2 className="w-8 h-8 animate-spin mb-2" />
+                                        <p className="text-sm">Switching to fallback viewer…</p>
+                                    </div>
+                                );
+                            }}
                             renderPage={(props) => {
                                 // Teaser Mode: Only render the first page (index 0)
                                 if (isTeaser && props.pageIndex > 0) {
@@ -242,7 +307,7 @@ export const FilePreview: React.FC<FilePreviewProps> = ({ fileUrl, fileType, isT
                             width: fitToScreen ? 'auto' : `${scale * 100}%`,
                             objectFit: 'contain'
                         }}
-                        onError={() => setError("Failed to load image.")}
+                        onError={() => setError("Failed to load image. The file may be restricted or unavailable.")}
                     />
                 </div>
             </div>
@@ -282,7 +347,16 @@ export const FilePreview: React.FC<FilePreviewProps> = ({ fileUrl, fileType, isT
         <div className="flex flex-col items-center justify-center h-full min-h-[400px] bg-gray-50 rounded-md text-gray-500 p-8 text-center">
             <FileWarning className="w-12 h-12 mb-4" />
             <p className="mb-2 text-lg font-medium">Preview not supported for this file type.</p>
-            <p className="text-sm">Please download the file to view it.</p>
+            <p className="text-sm mb-4">Please download the file to view it.</p>
+            <a
+                href={fileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-[#C4A672] hover:bg-[#8B7355] text-white rounded-md transition-colors"
+            >
+                <Download className="w-4 h-4" />
+                Download File
+            </a>
         </div>
     );
 };

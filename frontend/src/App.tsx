@@ -113,6 +113,76 @@ function PrivateChatWrapper() {
   );
 }
 
+function PrivateChatByIdWrapper() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { chatId } = useParams<{ chatId: string }>();
+  const [user] = useAuthState(auth);
+  const stateOtherUser = location.state?.otherUser;
+
+  const [otherUser, setOtherUser] = useState<{ id: string; name: string; avatar: string; online: boolean } | null>(
+    stateOtherUser || null
+  );
+  const [loading, setLoading] = useState(!stateOtherUser);
+
+  useEffect(() => {
+    // If we already have otherUser from state, skip the fetch
+    if (stateOtherUser || !chatId || !user?.uid) return;
+
+    const fetchChatInfo = async () => {
+      try {
+        const chatDoc = await getDoc(doc(db, 'chats', chatId));
+        if (!chatDoc.exists()) {
+          navigate('/dashboard/chats', { replace: true });
+          return;
+        }
+        const data = chatDoc.data();
+        const otherUid = (data.participants || []).find((p: string) => p !== user.uid);
+
+        let name = 'User';
+        let avatar = '';
+        if (otherUid) {
+          try {
+            const userDoc = await getDoc(doc(db, 'users', otherUid));
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              name = userData.displayName || userData.name || 'User';
+              avatar = userData.photoURL || userData.avatar || '';
+            }
+          } catch (err) {
+            console.error('Failed to fetch user info:', err);
+          }
+        }
+
+        setOtherUser({ id: otherUid || '', name, avatar, online: true });
+      } catch (err) {
+        console.error('Failed to load chat:', err);
+        navigate('/dashboard/chats', { replace: true });
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchChatInfo();
+  }, [chatId, user?.uid, stateOtherUser, navigate]);
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading chat...</div>;
+  }
+
+  if (!otherUser || !chatId) {
+    return <Navigate to="/dashboard/chats" replace />;
+  }
+
+  return (
+    <PrivateChat
+      chatId={chatId}
+      otherUser={otherUser}
+      onBack={() => navigate(-1)}
+      currentUserId={user?.uid || ''}
+    />
+  );
+}
+
 function AboutPageWrapper() {
   const navigate = useNavigate();
   return <AboutPage onBack={() => navigate('/')} />;
@@ -238,6 +308,7 @@ function AppContent() {
             <Route path="/communities/:id/chat" element={<GroupChatWrapper />} />
 
             <Route path="/chat" element={<PrivateChatWrapper />} />
+            <Route path="/chat/:chatId" element={<PrivateChatByIdWrapper />} />
 
             <Route path="/announcements" element={<AnnouncementsPage />} />
             <Route path="/search" element={<AdvancedSearchWrapper />} />

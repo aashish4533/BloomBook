@@ -6,8 +6,9 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Card } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { db, auth } from '../firebase';
+import { db, auth, storage } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { toast } from 'sonner';
 
 interface GiveBooksOnRentProps {
@@ -140,22 +141,21 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
 
       // Process each book
       for (const book of allBooks) {
-        // Upload images
+        // Upload images to Firebase Storage
         const imageUrls: string[] = [];
         if (book.imageFiles && book.imageFiles.length > 0) {
           for (const file of book.imageFiles) {
-            const uploadFormData = new FormData();
-            uploadFormData.append('file', file);
-            uploadFormData.append('upload_preset', uploadPreset);
-
-            const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-              method: 'POST',
-              body: uploadFormData
-            });
-
-            if (!response.ok) throw new Error('Image upload failed');
-            const data = await response.json();
-            imageUrls.push(data.secure_url);
+            try {
+              const uniqueId = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+              const storageRef = ref(storage, `book_images/${user.uid}/${uniqueId}`);
+              
+              await uploadBytes(storageRef, file);
+              const url = await getDownloadURL(storageRef);
+              imageUrls.push(url);
+            } catch (err) {
+              console.error('[Storage] Upload failed:', err);
+              toast.error(`Failed to upload ${file.name}`);
+            }
           }
         }
 

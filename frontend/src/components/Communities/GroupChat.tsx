@@ -4,8 +4,9 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { ChatMessage } from '../Chat/ChatMessage';
 import { toast } from 'sonner';
-import { db } from '../../firebase';
+import { db, storage } from '../../firebase';
 import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useNeuralPrivacy } from '../../hooks/useNeuralPrivacy';
 import { Skeleton } from '../ui/skeleton';
@@ -134,6 +135,7 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
   }, [messages]);
 
   const onlineCount = members.filter(m => m.online).length;
+  const isMember = members.some(m => m.id === currentUserId);
 
   // ── Gravitational Shielding — Send encrypted message ───────────────────────
   const handleSend = async () => {
@@ -143,18 +145,17 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
     try {
       const imageUrls: string[] = [];
       for (const img of selectedImages) {
-        const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-        const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-        if (!cloudName || !uploadPreset) throw new Error('Cloudinary config missing');
-
-        const form = new FormData();
-        form.append('file', img.file);
-        form.append('upload_preset', uploadPreset);
-
-        const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, { method: 'POST', body: form });
-        if (!res.ok) throw new Error('Image upload failed');
-        const data = await res.json();
-        imageUrls.push(data.secure_url);
+        try {
+          const uniqueId = `${Date.now()}_${img.file.name.replace(/\s+/g, '_')}`;
+          const storageRef = ref(storage, `chat_attachments/${communityId}/${uniqueId}`);
+          
+          await uploadBytes(storageRef, img.file);
+          const url = await getDownloadURL(storageRef);
+          imageUrls.push(url);
+        } catch (err) {
+          console.error('[Storage] Upload failed:', err);
+          toast.error(`Failed to upload ${img.file.name}`);
+        }
       }
 
       const encryptions: Record<string, { ciphertext: string; iv: string }> = {};
@@ -378,33 +379,49 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
 
           {/* Input Area */}
           <div className="border-t border-gray-200 p-4 bg-white">
-            <div className="max-w-3xl mx-auto flex items-end gap-3">
-              <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" />
-              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="flex-shrink-0">
-                <ImageIcon className="w-5 h-5" />
-              </Button>
-              <div className="flex-1 relative">
-                <Input
-                  value={newMessage}
-                  onChange={e => setNewMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Send a message..."
-                  disabled={!initialized}
-                  className="pr-12 min-h-[44px]"
-                />
-                <button className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                  <Smile className="w-5 h-5" />
-                </button>
+            {!isMember ? (
+              <div className="max-w-3xl mx-auto py-2 px-4 bg-gray-50 rounded-xl border border-dashed border-gray-300 flex items-center justify-between">
+                <div className="flex items-center gap-3 text-gray-500">
+                  <span className="p-2 bg-white rounded-lg"><Lock className="w-5 h-5" /></span>
+                  <p className="text-sm">You must join this community to participate in the conversation.</p>
+                </div>
+                <Button 
+                  size="sm" 
+                  className="bg-[#C4A672] hover:bg-[#8B7355] text-white"
+                  onClick={() => toast.info("Please join this community from the main page to chat.")}
+                >
+                  Join Community
+                </Button>
               </div>
-              <Button
-                onClick={handleSend}
-                disabled={(!newMessage.trim() && selectedImages.length === 0) || !initialized}
-                className="bg-[#C4A672] hover:bg-[#8B7355] text-white flex-shrink-0"
-                size="lg"
-              >
-                <Send className="w-5 h-5" />
-              </Button>
-            </div>
+            ) : (
+              <div className="max-w-3xl mx-auto flex items-end gap-3">
+                <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" />
+                <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="flex-shrink-0">
+                  <ImageIcon className="w-5 h-5" />
+                </Button>
+                <div className="flex-1 relative">
+                  <Input
+                    value={newMessage}
+                    onChange={e => setNewMessage(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Send a message..."
+                    disabled={!initialized}
+                    className="pr-12 min-h-[44px]"
+                  />
+                  <button className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    <Smile className="w-5 h-5" />
+                  </button>
+                </div>
+                <Button
+                  onClick={handleSend}
+                  disabled={(!newMessage.trim() && selectedImages.length === 0) || !initialized}
+                  className="bg-[#C4A672] hover:bg-[#8B7355] text-white flex-shrink-0"
+                  size="lg"
+                >
+                  <Send className="w-5 h-5" />
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 

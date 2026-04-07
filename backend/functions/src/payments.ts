@@ -30,20 +30,33 @@ export const initiateP2PDeal = onCall(
         );
       }
 
-      // Create a transaction doc in locked_for_payment
+      // Create a transaction doc - simplified and marked as completed immediately
       const transactionRef = await db.collection("transactions").add({
         buyerId: request.auth.uid,
         sellerId: targetUserId,
         userEmail: request.auth.token.email || "Unknown",
         type: transactionType || 'buy',
-        itemTitle: itemTitle || 'Payment',
+        itemTitle: itemTitle || 'Order',
         baseAmount: amount, // Total charged
-        platformFee: 0, // 0%
+        platformFee: 0, 
         sellerPayout: amount,
-        paymentMethod: 'p2p_escrow',
-        status: "locked_for_payment",
+        paymentMethod: 'system_confirmation',
+        status: "completed", // Bypassing locked_for_payment
         cartItems: cartItems || [],
         createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      // 2. Immediately create the purchase/rental record
+      const collectionName = transactionType === 'rent' ? 'rentals' : 'purchases';
+      await db.collection(collectionName).add({
+         userId: request.auth.uid,
+         bookTitle: itemTitle,
+         pricePaid: amount,
+         sellerId: targetUserId,
+         status: transactionType === 'rent' ? 'active' : 'completed',
+         transactionRef: transactionRef.id,
+         ...(transactionType === 'rent' ? { createdAt: FieldValue.serverTimestamp() } : { timestamp: FieldValue.serverTimestamp() }),
       });
 
       return {
@@ -57,229 +70,29 @@ export const initiateP2PDeal = onCall(
   }
 );
 
-/**
- * submitProofOfPayment:
- * Accepts transactionId and proofImageUrl.
- * Updates the transaction document to status: 'payment_claimed' and sets the proofUrl.
- * Triggers a notification to the Seller.
- */
+/* 
+  LEGACY P2P VERIFICATION FLOWS
+  The functions below are disabled in the current financial pivot.
+  They are preserved here as comments for potential future escrow reinstatement.
+
 export const submitProofOfPayment = onCall(
   { cors: true },
   async (request) => {
-    if (!request.auth) throw new HttpsError('unauthenticated', 'User must be logged in.');
-    const { transactionId, proofImageUrl } = request.data;
-
-    const db = getFirestore();
-    const txRef = db.collection("transactions").doc(transactionId);
-
-    await db.runTransaction(async (t) => {
-      const doc = await t.get(txRef);
-      if (!doc.exists) throw new HttpsError('not-found', 'Transaction not found.');
-      const data = doc.data()!;
-      if (data.buyerId !== request.auth!.uid) throw new HttpsError('permission-denied', 'Only the buyer can submit proof.');
-      if (data.status !== 'locked_for_payment') throw new HttpsError('failed-precondition', 'Transaction is not awaiting payment.');
-
-      t.update(txRef, {
-        status: 'payment_claimed',
-        proofUrl: proofImageUrl,
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-
-      // Notification
-      const notificationRef = db.collection("notifications").doc();
-      t.set(notificationRef, {
-        userId: data.sellerId,
-        title: "Payment Proof Uploaded",
-        message: `Buyer has uploaded payment proof for "${data.itemTitle}". Please verify receipt in your bank app.`,
-        type: "payment_proof",
-        transactionId: transactionId,
-        read: false,
-        createdAt: FieldValue.serverTimestamp(),
-      });
-    });
-
-    return { success: true };
+    ...
   }
 );
 
-/**
- * verifyPaymentReceived:
- * Can ONLY be called by the sellerId of the transaction. Updates the transaction document to status: 'completed'.
- */
 export const verifyPaymentReceived = onCall(
   { cors: true },
   async (request) => {
-    if (!request.auth) throw new HttpsError('unauthenticated', 'User must be logged in.');
-    const { transactionId } = request.data;
-
-    const db = getFirestore();
-    const txRef = db.collection("transactions").doc(transactionId);
-
-    await db.runTransaction(async (t) => {
-      const doc = await t.get(txRef);
-      if (!doc.exists) throw new HttpsError('not-found', 'Transaction not found.');
-      const data = doc.data()!;
-
-      if (data.sellerId !== request.auth!.uid) throw new HttpsError('permission-denied', 'Only the seller can verify payment receipt.');
-      if (data.status !== 'payment_claimed') throw new HttpsError('failed-precondition', 'Transaction must have proof claimed first.');
-
-      t.update(txRef, {
-        status: 'completed',
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-
-      // Complete the purchase/rental creation inside the db
-      const collectionName = data.type === 'rent' ? 'rentals' : 'purchases';
-      const orderRef = db.collection(collectionName).doc();
-      t.set(orderRef, {
-         userId: data.buyerId,
-         bookTitle: data.itemTitle,
-         pricePaid: data.baseAmount,
-         sellerPayout: data.sellerPayout,
-         status: data.type === 'rent' ? 'active' : 'completed',
-         transactionRef: transactionId,
-         ...(data.type === 'rent' ? { createdAt: FieldValue.serverTimestamp() } : { timestamp: FieldValue.serverTimestamp() }),
-      });
-
-      const buyerNotificationRef = db.collection("notifications").doc();
-      t.set(buyerNotificationRef, {
-        userId: data.buyerId,
-        title: "Payment Verified",
-        message: `Seller verified your payment for "${data.itemTitle}". Deal is now complete.`,
-        type: "payment_complete",
-        transactionId: transactionId,
-        read: false,
-        createdAt: FieldValue.serverTimestamp(),
-      });
-    });
-
-    return { success: true };
+    ...
   }
 );
 
-/**
- * selectMeetupMethod:
- * Saves the buyer's choice of transaction methodology.
- */
-export const selectMeetupMethod = onCall(
-  { cors: true },
-  async (request) => {
-    if (!request.auth) throw new HttpsError('unauthenticated', 'User must be logged in.');
-    const { transactionId, method } = request.data; // 'online' or 'meetup'
-
-    const db = getFirestore();
-    const txRef = db.collection("transactions").doc(transactionId);
-    
-    await db.runTransaction(async (t) => {
-      const doc = await t.get(txRef);
-      if (!doc.exists) throw new HttpsError('not-found', 'Transaction not found.');
-      const data = doc.data()!;
-      
-      if (data.buyerId !== request.auth!.uid && data.sellerId !== request.auth!.uid) {
-         throw new HttpsError('permission-denied', 'Only participants can update the method.');
-      }
-      
-      if (data.status !== 'locked_for_payment') {
-         throw new HttpsError('failed-precondition', 'Cannot change method after payment has been processed.');
-      }
-
-      t.update(txRef, {
-        meetupMethod: method,
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-    });
-
-    return { success: true };
-  }
-);
-
-/**
- * confirmPhysicalHandover:
- * Allows both buyer and seller to independently verify a physical cash transfer.
- * If both confirm, it finalizes the transaction.
- */
 export const confirmPhysicalHandover = onCall(
   { cors: true },
   async (request) => {
-    if (!request.auth) throw new HttpsError('unauthenticated', 'User must be logged in.');
-    const { transactionId, role } = request.data;
-
-    if (role !== 'buyer' && role !== 'seller') {
-      throw new HttpsError('invalid-argument', 'Role must be buyer or seller.');
-    }
-
-    const db = getFirestore();
-    const txRef = db.collection("transactions").doc(transactionId);
-
-    let isFullyConfirmed = false;
-    let finalData: any = {};
-
-    await db.runTransaction(async (t) => {
-      const doc = await t.get(txRef);
-      if (!doc.exists) throw new HttpsError('not-found', 'Transaction not found.');
-      const data = doc.data()!;
-
-      if (role === 'buyer' && data.buyerId !== request.auth!.uid) throw new HttpsError('permission-denied', 'Only the true buyer can confirm.');
-      if (role === 'seller' && data.sellerId !== request.auth!.uid) throw new HttpsError('permission-denied', 'Only the true seller can confirm.');
-
-      const updatePayload: any = { updatedAt: FieldValue.serverTimestamp() };
-      
-      if (role === 'buyer') {
-        updatePayload.buyerConfirmedHandover = true;
-        updatePayload.status = 'payment_claimed'; // Setting to claimed so UI proceeds or signals progress
-      } else if (role === 'seller') {
-        updatePayload.sellerConfirmedHandover = true;
-      }
-
-      const buyerConfirmed = role === 'buyer' ? true : data.buyerConfirmedHandover === true;
-      const sellerConfirmed = role === 'seller' ? true : data.sellerConfirmedHandover === true;
-
-      if (buyerConfirmed && sellerConfirmed) {
-        updatePayload.status = 'completed';
-        isFullyConfirmed = true;
-      }
-
-      t.update(txRef, updatePayload);
-      finalData = { ...data, ...updatePayload };
-
-      if (isFullyConfirmed) {
-        // Complete the purchase/rental creation inside the db
-        const collectionName = data.type === 'rent' ? 'rentals' : 'purchases';
-        const orderRef = db.collection(collectionName).doc();
-        t.set(orderRef, {
-           userId: data.buyerId,
-           bookTitle: data.itemTitle,
-           pricePaid: data.baseAmount,
-           sellerPayout: data.sellerPayout,
-           status: data.type === 'rent' ? 'active' : 'completed',
-           transactionRef: transactionId,
-           ...(data.type === 'rent' ? { createdAt: FieldValue.serverTimestamp() } : { timestamp: FieldValue.serverTimestamp() }),
-        });
-
-        const buyerNotificationRef = db.collection("notifications").doc();
-        t.set(buyerNotificationRef, {
-          userId: data.buyerId,
-          title: "Physical Deal Complete",
-          message: `Both parties verified the physical handover for "${data.itemTitle}". Deal is now complete.`,
-          type: "payment_complete",
-          transactionId: transactionId,
-          read: false,
-          createdAt: FieldValue.serverTimestamp(),
-        });
-        
-        const sellerNotificationRef = db.collection("notifications").doc();
-        t.set(sellerNotificationRef, {
-          userId: data.sellerId,
-          title: "Physical Deal Complete",
-          message: `Both parties verified the physical handover for "${data.itemTitle}". Deal is now complete.`,
-          type: "payment_complete",
-          transactionId: transactionId,
-          read: false,
-          createdAt: FieldValue.serverTimestamp(),
-        });
-      }
-    });
-
-    return { success: true, isFullyConfirmed, status: finalData.status };
+    ...
   }
 );
+*/

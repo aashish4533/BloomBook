@@ -22,6 +22,12 @@ export function ActivityHistory({ onNavigateToBook }: ActivityHistoryProps) {
   const [allActivities, setAllActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const formatActivityDate = (timestamp: any) => {
+    if (!timestamp) return 'Just now';
+    if (timestamp.toDate) return timestamp.toDate().toLocaleString();
+    return new Date(timestamp).toLocaleString();
+  };
+
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
@@ -69,16 +75,21 @@ export function ActivityHistory({ onNavigateToBook }: ActivityHistoryProps) {
         const communityData = communitySnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setCommunityActivity(communityData);
 
-        // Combine all
+        // Combine and sort safely
         const all = [
-          ...viewsData.map(v => ({ ...v, category: 'view' })),
-          ...searchesData.map(s => ({ ...s, category: 'search' })),
-          ...transactionsData.map(t => ({ ...t, category: 'transaction' })),
-          ...communityData.map(c => ({ ...c, category: 'community' }))
-        ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+          ...viewsData.map(v => ({ ...v, category: 'view', type: 'view' })),
+          ...searchesData.map(s => ({ ...s, category: 'search', type: 'search' })),
+          ...transactionsData.map(t => ({ ...t, category: 'transaction', type: t.type || 'purchase' })),
+          ...communityData.map(c => ({ ...c, category: 'community', type: c.type || 'post' }))
+        ].sort((a, b) => {
+          const dateA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp);
+          const dateB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp);
+          return dateB.getTime() - dateA.getTime();
+        });
+
         setAllActivities(all);
       } catch (err) {
-        console.error('Failed to fetch activity');
+        console.error('Failed to fetch activity:', err);
       } finally {
         setLoading(false);
       }
@@ -204,64 +215,86 @@ export function ActivityHistory({ onNavigateToBook }: ActivityHistoryProps) {
         </TabsList>
 
         <TabsContent value="all" className="mt-6">
-          <Card className="divide-y">
-            {allActivities.slice(0, 10).map((activity: any) => {
-              const Icon = getActivityIcon(activity.type);
-              return (
-                <div key={activity.id} className="p-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex gap-4">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${getActivityColor(activity.type)}`}>
-                      <Icon className="w-5 h-5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      {activity.category === 'view' && (
-                        <div className="flex gap-3">
-                          <ImageWithFallback
-                            src={activity.image}
-                            alt={activity.title}
-                            className="w-12 h-16 object-cover rounded"
-                          />
-                          <div className="flex-1">
-                            <p className="text-[#2C3E50]">{activity.title}</p>
-                            <p className="text-sm text-gray-600">by {activity.author}</p>
-                            <p className="text-xs text-gray-500 mt-1">{activity.timestamp}</p>
-                          </div>
-                        </div>
-                      )}
-                      {activity.category === 'search' && (
-                        <div>
-                          <p className="text-[#2C3E50]">Searched: "{activity.query}"</p>
-                          <p className="text-sm text-gray-600">{activity.results} results found</p>
-                          <p className="text-xs text-gray-500 mt-1">{activity.timestamp}</p>
-                        </div>
-                      )}
-                      {activity.category === 'transaction' && (
-                        <div className="flex gap-3">
-                          {activity.image && (
+          {allActivities.length > 0 ? (
+            <Card className="divide-y border border-gray-100 rounded-xl overflow-hidden">
+              {allActivities.slice(0, 20).map((activity: any) => {
+                const Icon = getActivityIcon(activity.type);
+                return (
+                  <div key={activity.id} className="p-4 hover:bg-gray-50 transition-colors">
+                    <div className="flex gap-4">
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${getActivityColor(activity.type)}`}>
+                        <Icon className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        {activity.category === 'view' && (
+                          <div className="flex gap-3">
                             <ImageWithFallback
                               src={activity.image}
                               alt={activity.title}
-                              className="w-12 h-16 object-cover rounded"
+                              className="w-12 h-16 object-cover rounded shadow-sm"
                             />
-                          )}
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <p className="text-[#2C3E50]">{activity.title}</p>
-                              <Badge variant={activity.status === 'completed' ? 'default' : 'secondary'}>
-                                {activity.status}
-                              </Badge>
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between">
+                                <p className="font-medium text-[#2C3E50]">{activity.title}</p>
+                                <span className="text-[10px] text-gray-400">{formatActivityDate(activity.timestamp)}</span>
+                              </div>
+                              <p className="text-sm text-gray-600">Viewed book by {activity.author}</p>
                             </div>
-                            <p className="text-sm text-gray-600">${activity.amount.toFixed(2)}</p>
-                            <p className="text-xs text-gray-500 mt-1">{activity.timestamp}</p>
                           </div>
-                        </div>
-                      )}
+                        )}
+                        {activity.category === 'search' && (
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium text-[#2C3E50]">Searched: "{activity.query}"</p>
+                              <p className="text-sm text-gray-600">{activity.results} results found</p>
+                            </div>
+                            <span className="text-[10px] text-gray-400">{formatActivityDate(activity.timestamp)}</span>
+                          </div>
+                        )}
+                        {activity.category === 'transaction' && (
+                          <div className="flex gap-3">
+                            {activity.image && (
+                              <ImageWithFallback
+                                src={activity.image}
+                                alt={activity.title}
+                                className="w-12 h-16 object-cover rounded shadow-sm"
+                              />
+                            )}
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium text-[#2C3E50]">{activity.title}</p>
+                                  <Badge variant={activity.status === 'completed' ? 'default' : 'secondary'} className="text-[10px] h-4">
+                                    {activity.status}
+                                  </Badge>
+                                </div>
+                                <span className="text-[10px] text-gray-400">{formatActivityDate(activity.timestamp)}</span>
+                              </div>
+                              <p className="text-sm text-gray-600">Transaction: ${activity.amount?.toFixed(2)}</p>
+                            </div>
+                          </div>
+                        )}
+                        {activity.category === 'community' && (
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium text-[#2C3E50]">{activity.type === 'join' ? 'Joined Group' : 'New Post'}</p>
+                              <p className="text-sm text-gray-600">{activity.content || activity.groupName}</p>
+                            </div>
+                            <span className="text-[10px] text-gray-400">{formatActivityDate(activity.timestamp)}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </Card>
+                );
+              })}
+            </Card>
+          ) : (
+            <div className="bg-white rounded-xl border border-dashed border-gray-200 p-12 text-center">
+              <Clock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500">No activity yet. Start exploring the marketplace!</p>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="views" className="mt-6">

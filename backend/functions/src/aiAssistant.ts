@@ -34,13 +34,13 @@ export const generateAssistantResponse = onCall(
         const booksSnapshot = await db.collection("books")
           .where("isSold", "==", false)
           .orderBy("createdAt", "desc")
-          .limit(5)
+          .limit(10)
           .get();
 
         inventoryData = booksSnapshot.docs.map((doc) => {
           const b = doc.data();
           const availability = b.status || "Available";
-          return `- Title: "${b.title}", Author: ${b.author || 'Unknown'}, Availability: ${availability} for ${b.type || 'Sale/Rent'}`;
+          return `- ID: ${doc.id}, Title: "${b.title}", Author: ${b.author || 'Unknown'}, Price: Rs.${b.price || 'Contact Seller'}, Availability: ${availability} for ${b.type || 'Sale/Rent'}`;
         }).join("\n");
       } catch (error) {
         logger.warn("Neural Scan warning: Firestore books query failed (possible index building). Continuing with blank inventory.", error);
@@ -63,10 +63,10 @@ export const generateAssistantResponse = onCall(
         TONE CONSTRAINT & TERMINOLOGY: 
         Tone must be professional and academic. Always refer to tutoring sessions as "Learning Orbits".
         
+        Goal: Ensure "Orbital Accuracy" in all book-related queries by strictly suggesting only the items listed below.
+        INTERACTIVE HOOK: When recommending a book from our inventory, you MUST include the machine-readable tag [Product: ID] immediately after mentioning the title. This allows the user to see a Quick View card and add it to their cart.
+        
         AVAILABLE INVENTORY DATA (LIVE MARKETPLACE):
-        You have direct access to the following top trending and newly listed books from our active marketplace. 
-        When a user asks for book recommendations, you MUST provide real recommendations based on the actual items available in the BookBloom marketplace instead of generic suggestions.
-        Goal: Ensure "Orbital Accuracy" in all book-related queries by strictly suggesting only the items listed below:
         ${inventoryData || "No books currently available."}
       `;
 

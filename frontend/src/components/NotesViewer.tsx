@@ -190,7 +190,7 @@ export function NotesViewer({
       // ── Images ─────────────────────────────────────────────────────
       case 'image':
         return (
-          <div className="flex items-center justify-center h-full p-4 overflow-auto">
+          <div className="flex items-center justify-center h-[80vh] p-4 overflow-auto">
             <img
               src={url}
               alt={title}
@@ -206,7 +206,7 @@ export function NotesViewer({
       // ── PDFs (native browser viewer) ───────────────────────────────
       case 'pdf':
         return (
-          <div className="w-full h-full relative">
+          <div className="w-full h-[80vh] relative">
             {iframeLoading && (
               <div className="absolute inset-0 flex items-center justify-center bg-gray-800 z-10">
                 <div className="flex flex-col items-center gap-3 text-white">
@@ -216,8 +216,8 @@ export function NotesViewer({
               </div>
             )}
             <iframe
-              src={url}
-              className="w-full h-full min-h-[80vh] border-none"
+              src={`${url}#toolbar=0`}
+              className="w-full h-full min-h-[600px] border-none"
               title="PDF Viewer"
               onLoad={() => setIframeLoading(false)}
             />
@@ -227,7 +227,7 @@ export function NotesViewer({
       // ── Office documents (Google Docs Viewer) ──────────────────────
       case 'office':
         return (
-          <div className="w-full h-full relative">
+          <div className="w-full h-[80vh] relative">
             {iframeLoading && (
               <div className="absolute inset-0 flex items-center justify-center bg-gray-800 z-10">
                 <div className="flex flex-col items-center gap-3 text-white">
@@ -238,7 +238,7 @@ export function NotesViewer({
             )}
             <iframe
               src={`https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`}
-              className="w-full h-full min-h-[80vh] border-none"
+              className="w-full h-full min-h-[600px] border-none"
               title="Document Viewer"
               onLoad={() => setIframeLoading(false)}
             />

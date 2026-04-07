@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { X, Image as ImageIcon, Upload } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
+import { storage } from '../../firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { toast } from 'sonner';
 
 interface CreatePostProps {
@@ -63,31 +65,20 @@ export function CreatePost({ onClose, onSubmit }: CreatePostProps) {
     try {
       const uploadedImageUrls: string[] = [];
 
-      // Upload images if any
+      // Upload images if any (to Firebase Storage)
       if (imageFiles.length > 0) {
-        const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-        const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-
-        if (!cloudName || !uploadPreset) {
-          toast.error("Configuration error: Cloudinary credentials missing");
-          setIsSubmitting(false);
-          return;
-        }
-
         for (const file of imageFiles) {
-          const formData = new FormData();
-          formData.append('file', file);
-          formData.append('upload_preset', uploadPreset);
-
-          const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-            method: 'POST',
-            body: formData
-          });
-
-          if (!response.ok) throw new Error('Image upload failed');
-
-          const data = await response.json();
-          uploadedImageUrls.push(data.secure_url);
+          try {
+            const uniqueId = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+            const storageRef = ref(storage, `post_images/${uniqueId}`);
+            
+            await uploadBytes(storageRef, file);
+            const url = await getDownloadURL(storageRef);
+            uploadedImageUrls.push(url);
+          } catch (err) {
+            console.error('[Storage] Upload failed:', err);
+            toast.error(`Failed to upload ${file.name}`);
+          }
         }
       }
 
