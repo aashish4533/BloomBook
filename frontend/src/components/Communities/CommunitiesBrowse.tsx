@@ -6,7 +6,7 @@ import { Badge } from '../ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { toast } from 'sonner';
 import { db, auth } from '../../firebase';
-import { collection, getDocs, query, where, doc, updateDoc, arrayUnion, arrayRemove, onSnapshot, orderBy, limit, increment, getDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, updateDoc, arrayUnion, arrayRemove, onSnapshot, orderBy, limit, increment, getDoc, deleteDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 interface Post {
   id: string;
@@ -100,8 +100,13 @@ export function CommunitiesBrowse({ onNavigateToDetail, onNavigateToCreate, isLo
 
     try {
       if (privacy === 'private') {
-        await updateDoc(commRef, {
-          pending: arrayUnion(user.uid)
+        const pendingRef = doc(db, 'communities', communityId, 'pending', user.uid);
+        await setDoc(pendingRef, {
+          id: user.uid,
+          name: user.displayName || 'User',
+          avatar: user.photoURL || 'U',
+          joinedAt: serverTimestamp(),
+          role: 'member'
         });
         toast.success('Join request sent! Waiting for admin approval.');
       } else {
@@ -109,6 +114,16 @@ export function CommunitiesBrowse({ onNavigateToDetail, onNavigateToCreate, isLo
           members: arrayUnion(user.uid),
           memberCount: increment(1)
         });
+
+        // Add to subcollection for direct chat/post logic validation
+        await setDoc(doc(db, 'communities', communityId, 'members', user.uid), {
+          id: user.uid,
+          name: user.displayName || 'User',
+          role: 'member',
+          joinedAt: serverTimestamp(),
+          avatar: user.photoURL || 'U'
+        });
+
         toast.success('Successfully joined the community!');
       }
     } catch (err) {

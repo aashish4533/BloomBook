@@ -207,6 +207,8 @@
 
   body {
     line-height: inherit;
+    max-width: 100vw;
+    overflow-x: hidden;
   }
 
   hr {

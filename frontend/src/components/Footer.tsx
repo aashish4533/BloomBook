@@ -6,7 +6,7 @@ export function Footer() {
   return (
     <footer className="bg-[#2C3E50] text-white py-8 px-8">
       <div className="max-w-7xl mx-auto">
-        <nav className="flex items-center justify-center gap-8 mb-4">
+        <nav className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4 mb-4">
           <Link to="/marketplace" className="hover:opacity-80 transition-opacity">Buy</Link>
           <Link to="/rent" className="hover:opacity-80 transition-opacity">Rent</Link>
           <Link to="/sell" className="hover:opacity-80 transition-opacity">Resell</Link>

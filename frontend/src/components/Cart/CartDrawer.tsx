@@ -6,34 +6,38 @@ import { ScrollArea } from '../ui/scroll-area';
 import { Separator } from '../ui/separator';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import { PaymentGateway } from '../Payment/PaymentGateway';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db, auth } from '../../firebase';
 
 export function CartDrawer() {
     const { items, removeFromCart, totalAmount, clearCart } = useCart();
     const navigate = useNavigate();
-    const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
 
-    const handleCheckoutSuccess = (transactionId: string) => {
-        setIsCheckoutOpen(false);
-        setIsOpen(false);
-        clearCart();
-        // Redirect to order tracking or history?
-        navigate('/dashboard/purchases');
-    };
+    const handleBypassCheckout = async () => {
+        const currentUser = auth.currentUser;
+        if (!currentUser || items.length === 0) return;
 
-    if (isCheckoutOpen) {
-        return (
-            <PaymentGateway
-                amount={totalAmount}
-                type="buy" // Unified logic handles type separate from gateway now ideally, but for now passing buy. Revisit PaymentGateway refactor next.
-                itemTitle={`Cart Checkout (${items.length} items)`}
-                onSuccess={handleCheckoutSuccess}
-                onCancel={() => setIsCheckoutOpen(false)}
-                cartItems={items} // Need to update PaymentGateway to accept this
-            />
-        );
-    }
+        try {
+            // Push order directly to database
+            await addDoc(collection(db, 'orders'), {
+                userId: currentUser.uid,
+                items: items,
+                totalAmount: totalAmount,
+                status: 'completed',
+                createdAt: serverTimestamp()
+            });
+
+            // Clear the cart context/state here
+            clearCart();
+
+            // Close drawer and show success
+            setIsOpen(false);
+            navigate('/dashboard/purchases'); // Redirect to purchases history
+        } catch (error) {
+            console.error("Failed to place order:", error);
+        }
+    };
 
     return (
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -128,7 +132,7 @@ export function CartDrawer() {
                             </Button>
                             <Button
                                 className="bg-[#C4A672] hover:bg-[#8B7355] text-white"
-                                onClick={() => setIsCheckoutOpen(true)}
+                                onClick={handleBypassCheckout}
                             >
                                 Checkout
                             </Button>

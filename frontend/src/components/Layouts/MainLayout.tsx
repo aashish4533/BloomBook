@@ -27,9 +27,9 @@ export function MainLayout({ isLoggedIn, onLogout }: MainLayoutProps) {
             />
 
             {/* Main Content Area - with left padding for sidebar */}
-            <div className={`flex-1 flex flex-col transition-all duration-300 ${isCollapsed ? 'md:ml-16' : 'md:ml-64'}`}>
+            <div className={`flex-1 flex flex-col transition-all duration-300 ${isCollapsed ? 'md:ml-16' : 'md:ml-64'} min-w-0 overflow-x-hidden`}>
                 <Navbar isLoggedIn={isLoggedIn} onLogout={onLogout} />
-                <main className="flex-1 relative z-0">
+                <main className="flex-1 relative z-0 flex flex-wrap">
                     <Outlet />
                 </main>
                 <Footer />

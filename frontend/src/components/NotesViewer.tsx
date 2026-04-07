@@ -110,10 +110,20 @@ export function NotesViewer({
     return () => unsubscribe();
   }, [id]);
 
+  const previewType = url ? getPreviewType(url) : 'unsupported';
+
+  // Fallback timer for iframe loading
+  useEffect(() => {
+    if (iframeLoading && previewType === 'office') {
+      const timer = setTimeout(() => {
+        // We don't necessarily set loading to false, just let the user see the fallback
+      }, 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [iframeLoading, previewType]);
+
   // Debug: verify file URL data is arriving
 
-
-  const previewType = url ? getPreviewType(url) : 'unsupported';
 
   // ── Handlers ──────────────────────────────────────────────────────────
 
@@ -229,12 +239,32 @@ export function NotesViewer({
       // ── Office documents (Google Docs Viewer) ──────────────────────
       case 'office':
         return (
-          <div className="w-full h-[80vh] relative">
+          <div className="w-full h-[80vh] relative group">
             {iframeLoading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-gray-800 z-10">
-                <div className="flex flex-col items-center gap-3 text-white">
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-800 z-10 transition-opacity duration-300">
+                <div className="flex flex-col items-center gap-4 text-white max-w-sm text-center px-6">
                   <Loader2 className="w-10 h-10 animate-spin text-[#C4A672]" />
-                  <span className="text-sm text-gray-400">Loading document preview…</span>
+                  <div className="space-y-2">
+                    <span className="text-sm font-medium text-gray-300">Synchronizing with Bloom Preview Orbits...</span>
+                    <p className="text-xs text-gray-500">If the preview fails to materialize, use the stabilization bridge below.</p>
+                  </div>
+                  
+                  {/* Immediate Fallback Action */}
+                  <div className="mt-4 flex flex-col gap-2 w-full">
+                    <Button 
+                      variant="outline" 
+                      onClick={handlePreview}
+                      className="border-[#C4A672] text-[#C4A672] hover:bg-[#C4A672]/10"
+                    >
+                      View in New Tab
+                    </Button>
+                    <Button 
+                      onClick={handleDownload}
+                      className="bg-[#C4A672] text-white hover:bg-[#8B7355]"
+                    >
+                      Download Material
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}
@@ -243,6 +273,10 @@ export function NotesViewer({
               className="w-full h-full min-h-[600px] border-none"
               title="Document Viewer"
               onLoad={() => setIframeLoading(false)}
+              onError={() => {
+                setIframeLoading(false);
+                toast.error("Preview stabilization failed.");
+              }}
             />
           </div>
         );

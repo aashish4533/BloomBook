@@ -34,9 +34,21 @@ export const handleGroupChatMessage = onCall(
         }
 
         try {
-            // 1. Validate User Membership strictly
+            // 1. Validate User Membership strictly with Array Fallback
             const memberDoc = await db.collection("communities").doc(communityId).collection("members").doc(uid).get();
-            if (!memberDoc.exists) {
+            let isMember = memberDoc.exists;
+
+            if (!isMember) {
+                 // Fallback: Check if user exists in the 'members' array of the main document
+                 const commSnap = await db.collection("communities").doc(communityId).get();
+                 if (commSnap.exists()) {
+                     const commData = commSnap.data();
+                     const membersArray = commData?.members || [];
+                     isMember = membersArray.includes(uid);
+                 }
+            }
+
+            if (!isMember) {
                 throw new HttpsError("permission-denied", "You are not a member of this community orbit.");
             }
 
@@ -113,6 +125,10 @@ export const handleGroupChatMessage = onCall(
 
             throw new HttpsError("invalid-argument", "Unsupported proxy action operation.");
         } catch (error: any) {
+            // Re-throw HttpsErrors directly to preserve status code and message
+            if (error instanceof HttpsError) {
+                throw error;
+            }
             logger.error("handleGroupChatMessage collapse:", error);
             throw new HttpsError("internal", error.message || "Operation failed inside atmospheric distortion.");
         }

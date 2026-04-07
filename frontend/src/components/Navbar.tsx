@@ -83,7 +83,7 @@ export function Navbar({
               {/* Hamburger Button (Visible on mobile/tablet, hides on desktop screens using 'lg:hidden') */}
               <button
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="p-2 rounded-md hover:bg-[#8B7355] lg:hidden focus:outline-none transition-colors"
+                className="p-2 rounded-md hover:bg-[#8B7355] focus:outline-none transition-colors"
                 aria-label="Toggle Menu"
               >
                 {isMenuOpen ? <X className="w-6 h-6 text-[#2C3E50]" /> : <Menu className="w-6 h-6 text-[#2C3E50]" />}
@@ -252,7 +252,7 @@ export function Navbar({
 
         {/* Mobile Collapsible Menu */}
         {isMenuOpen && (
-          <div className="fixed top-0 left-0 h-[100dvh] w-64 sm:w-80 !bg-white dark:!bg-gray-900 !z-[9999] shadow-[20px_0_50px_rgba(0,0,0,0.5)] flex flex-col p-4 overflow-y-auto !opacity-100">
+          <div className="absolute top-16 left-0 w-full h-screen bg-white dark:bg-gray-900 z-[9999] shadow-2xl flex flex-col p-4 overflow-y-auto">
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.path);

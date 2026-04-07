@@ -81,8 +81,15 @@ export function AIAssistantPage() {
   const [messages, setMessages] = useState<Message[]>(() => {
     const saved = sessionStorage.getItem('bookbloom_ai_messages');
     try {
-      return saved ? JSON.parse(saved) : [];
-    } catch {
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      // Validate structure to prevent UI crashes
+      if (Array.isArray(parsed)) {
+        return parsed.filter(m => m.role && m.parts && Array.isArray(m.parts));
+      }
+      return [];
+    } catch (err) {
+      console.error("Failed to parse AI session storage:", err);
       return [];
     }
   });
@@ -135,10 +142,20 @@ export function AIAssistantPage() {
       }
     } catch (error: any) {
       console.error("Neural Link Error:", error);
-      // 3. Show an error bubble in the UI so the user isn't left guessing
+      
+      let errorMessage = "⚠️ Atmospheric interference. I could not reach the Bloom Matrix. Please check your backend connection or API keys and try again.";
+      
+      if (error.code === 'deadline-exceeded') {
+        errorMessage = "🕒 Neural connection timed out. The Bloom Matrix is taking too long to respond. Please try a shorter query.";
+      } else if (error.code === 'unauthenticated') {
+        errorMessage = "🔐 Unauthorized access. Please ensure you are logged into the BookBloom grid.";
+      } else if (error.message?.includes('matrix')) {
+        errorMessage = "📉 AI Matrix unstable. Please try again in 5 seconds.";
+      }
+
       setMessages(prev => [...prev, { 
         role: 'model', 
-        parts: [{ text: "⚠️ Atmospheric interference. I could not reach the Bloom Matrix. Please check your backend connection or API keys and try again." }] 
+        parts: [{ text: errorMessage }] 
       }]);
     } finally {
       setIsLoading(false);

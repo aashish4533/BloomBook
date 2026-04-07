@@ -135,13 +135,7 @@ export function MainSidebar({
 
   return (
     <>
-      {/* Mobile Overlay */}
-      {isMobile && isMobileOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
-          onClick={onMobileClose}
-        />
-      )}
+
 
       {/* Sidebar */}
       <aside
@@ -320,130 +314,7 @@ export function MainSidebar({
         </div>
       </aside>
 
-      {/* Mobile Sidebar (Drawer) */}
-      <aside
-        className={cn(
-          "fixed top-0 left-0 h-screen z-50 flex flex-col",
-          "bg-gradient-to-b from-[#FAF8F3] via-[#FAF8F3] to-[#F5F0E8]",
-          "border-r border-[#C4A672]/20",
-          "shadow-xl",
-          "transition-transform duration-300 ease-in-out",
-          "md:hidden w-72",
-          isMobileOpen ? "translate-x-0" : "-translate-x-full"
-        )}
-      >
-        {/* Close button */}
-        <button
-          onClick={onMobileClose}
-          className="absolute top-4 right-4 w-8 h-8 rounded-full bg-[#2C3E50]/10 text-[#2C3E50] flex items-center justify-center hover:bg-[#2C3E50]/20 transition-colors"
-        >
-          <X className="w-5 h-5" />
-        </button>
 
-        {/* Header */}
-        <div className="p-4 flex items-center">
-          <Link
-            to="/"
-            onClick={handleNavClick}
-            className="flex items-center gap-3 group"
-          >
-            <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-[#2C3E50] to-[#1a252f] shadow-lg">
-              <BookOpen className="w-5 h-5 text-white" />
-              <Sparkles className="absolute -top-1 -right-1 w-4 h-4 text-[#C4A672] animate-pulse" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-lg font-bold text-[#2C3E50] tracking-tight">
-                BookBloom
-              </span>
-              <span className="text-xs text-[#8B7355] font-medium">
-                Discover • Share • Learn
-              </span>
-            </div>
-          </Link>
-        </div>
-
-        {/* Separator */}
-        <div className="mx-3 h-[1px] bg-gradient-to-r from-transparent via-[#C4A672]/30 to-transparent" />
-
-        {/* Navigation Content */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4">
-          {navigationSections.map((section, sectionIndex) => (
-            <div key={section.label} className="mb-6">
-              <div className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-[#8B7355]/70">
-                {section.label}
-              </div>
-              <ul className="space-y-1">
-                {section.items.map((item) => {
-                  const isActive = isActivePath(item.path);
-                  const Icon = item.icon;
-
-                  return (
-                    <li key={item.path}>
-                      <Link
-                        to={item.path}
-                        onClick={handleNavClick}
-                        className={cn(
-                          "relative flex items-center gap-3 px-3 py-2.5 rounded-lg",
-                          "transition-all duration-200",
-                          "group",
-                          isActive
-                            ? "bg-gradient-to-r from-[#C4A672]/25 to-[#C4A672]/10 text-[#2C3E50] font-medium shadow-sm"
-                            : "text-[#5a5a5a] hover:bg-[#C4A672]/10 hover:text-[#2C3E50]"
-                        )}
-                      >
-                        {isActive && (
-                          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full bg-gradient-to-b from-[#C4A672] to-[#8B7355] shadow-[0_0_8px_rgba(196,166,114,0.6)]" />
-                        )}
-                        <Icon
-                          className={cn(
-                            "w-5 h-5 transition-colors duration-200",
-                            isActive
-                              ? "text-[#C4A672]"
-                              : "text-[#8B7355] group-hover:text-[#C4A672]"
-                          )}
-                        />
-                        <span className="truncate">{item.title}</span>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-              {sectionIndex < navigationSections.length - 1 && (
-                <div className="mt-4 mx-3 h-[1px] bg-gradient-to-r from-transparent via-[#C4A672]/20 to-transparent" />
-              )}
-            </div>
-          ))}
-        </nav>
-
-        {/* User Profile Footer */}
-        <div className="p-3 border-t border-[#C4A672]/20">
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-[#2C3E50]/5 to-[#C4A672]/5 border border-[#C4A672]/10">
-            <Avatar className="w-10 h-10 border-2 border-[#C4A672]/30 shadow-md">
-              <AvatarImage src={user?.photoURL || undefined} alt={userName} />
-              <AvatarFallback className="bg-gradient-to-br from-[#C4A672] to-[#8B7355] text-white font-semibold text-sm">
-                {userInitials}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-[#2C3E50] truncate">
-                {userName}
-              </p>
-              <p className="text-xs text-[#8B7355] truncate">{userEmail}</p>
-            </div>
-            {onLogout && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onLogout}
-                className="h-8 w-8 rounded-lg text-[#8B7355] hover:text-red-600 hover:bg-red-50 transition-all duration-200"
-                title="Sign out"
-              >
-                <LogOut className="w-4 h-4" />
-              </Button>
-            )}
-          </div>
-        </div>
-      </aside>
     </>
   );
 }
