@@ -18,7 +18,7 @@ interface Transaction {
   status: 'completed' | 'pending' | 'refunded';
 }
 
-export function TransactionHistory() {
+export default function TransactionHistory() {
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | 'buy' | 'sell' | 'rent'>('all');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -216,7 +216,7 @@ export function TransactionHistory() {
                 </td>
                 <td className="px-6 py-4 text-gray-600">{txn.bookTitle}</td>
                 <td className="px-6 py-4 text-gray-600">{txn.user}</td>
-                <td className="px-6 py-4 text-[#C4A672]">${txn.amount.toFixed(2)}</td>
+                <td className="px-6 py-4 text-[#C4A672]">Rs. {txn.amount.toFixed(2)}</td>
                 <td className="px-6 py-4 text-gray-600">
                   {new Date(txn.date).toLocaleDateString()}
                 </td>

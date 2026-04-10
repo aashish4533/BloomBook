@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
-import { collection, query, where, getDocs, addDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { useAuthState } from 'react-firebase-hooks/auth';
 
@@ -24,7 +24,6 @@ export function useWishlist() {
     const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Fetch wishlist on mount or user change
     useEffect(() => {
         if (!user) {
             setWishlist([]);
@@ -32,21 +31,32 @@ export function useWishlist() {
             return;
         }
 
-        const fetchWishlist = async () => {
-            setLoading(true);
-            try {
-                const q = query(collection(db, 'wishlists'), where('userId', '==', user.uid));
-                const snapshot = await getDocs(q);
-                const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WishlistItem));
-                setWishlist(data);
-            } catch (error) {
-                console.error("Error fetching wishlist:", error);
-            } finally {
+        setLoading(true);
+        const q = query(collection(db, 'wishlists'), where('userId', '==', user.uid));
+
+        const unsub = onSnapshot(
+            q,
+            (snapshot) => {
+                const rows = snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as WishlistItem));
+                rows.sort((a, b) => {
+                    const ta =
+                        a.createdAt?.toMillis?.() ??
+                        (typeof a.createdAt?.seconds === 'number' ? a.createdAt.seconds * 1000 : 0);
+                    const tb =
+                        b.createdAt?.toMillis?.() ??
+                        (typeof b.createdAt?.seconds === 'number' ? b.createdAt.seconds * 1000 : 0);
+                    return tb - ta;
+                });
+                setWishlist(rows);
+                setLoading(false);
+            },
+            (error) => {
+                console.error('Error listening to wishlist:', error);
                 setLoading(false);
             }
-        };
+        );
 
-        fetchWishlist();
+        return () => unsub();
     }, [user]);
 
     const isInWishlist = (bookId: string) => {

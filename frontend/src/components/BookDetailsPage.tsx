@@ -87,7 +87,15 @@ export function BookDetailsPage() {
     };
 
     const handleBuyNow = () => {
-
+        const uid = auth.currentUser?.uid;
+        if (book.listingStatus === 'reserved' && book.reservedBy && book.reservedBy !== uid) {
+            toast.error('This book is reserved by another buyer');
+            return;
+        }
+        if (book.listingStatus === 'reserved' && book.reservedBy === uid) {
+            toast.message('You already have an active reservation for this book. Check Purchases in settings.');
+            return;
+        }
         setShowPurchase(true);
     };
 
@@ -232,7 +240,11 @@ export function BookDetailsPage() {
                                     </div>
                                     <div className="flex items-start gap-2 mt-2 text-sm text-gray-600">
                                         <MapPin className="w-4 h-4 text-gray-400 mt-0.5" />
-                                        <span>San Francisco, CA (15 miles away)</span>
+                                        <span>
+                                            {book.location?.city && book.location?.state
+                                                ? `${book.location.city}, ${book.location.state}`
+                                                : book.location?.city || 'Location shared after chat'}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -240,17 +252,21 @@ export function BookDetailsPage() {
 
                         {/* Location & Delivery */}
                         <div>
-                            <h3 className="text-[#2C3E50] font-semibold mb-3">Location & Delivery</h3>
+                            <h3 className="text-[#2C3E50] font-semibold mb-3">Location &amp; pickup</h3>
                             <div className="bg-gray-50 rounded-lg p-4 space-y-3">
                                 <div className="flex items-center gap-2 text-sm">
                                     <Package className="w-4 h-4 text-[#C4A672]" />
-                                    <span className="text-gray-700">Available for local pickup and shipping</span>
+                                    <span className="text-gray-700">Local pickup only — arrange time and place in chat</span>
                                 </div>
                                 <div className="bg-gray-200 rounded-lg h-48 flex items-center justify-center">
                                     <div className="text-center text-gray-500">
                                         <MapPin className="w-8 h-8 mx-auto mb-2 text-gray-400" />
                                         <p className="text-sm">Map View</p>
-                                        <p className="text-xs mt-1">San Francisco, CA</p>
+                                        <p className="text-xs mt-1">
+                                            {book.location?.city && book.location?.state
+                                                ? `${book.location.city}, ${book.location.state}`
+                                                : 'Exact address in chat'}
+                                        </p>
                                     </div>
                                 </div>
                                 <Button
@@ -283,11 +299,22 @@ export function BookDetailsPage() {
                                 {book.availableFor?.includes('sale') && (
                                     <Button
                                         onClick={handleBuyNow}
-                                        disabled={book.isSold}
+                                        disabled={
+                                            !!book.isSold ||
+                                            (book.listingStatus === 'reserved' &&
+                                                book.reservedBy &&
+                                                book.reservedBy !== auth.currentUser?.uid)
+                                        }
                                         className="w-full h-12 bg-[#C4A672] hover:bg-[#8B7355] text-white disabled:opacity-50"
                                     >
                                         <ShoppingCart className="w-5 h-5 mr-2" />
-                                        {book.isSold ? 'Sold' : `Buy Now (Rs. ${book.price?.toLocaleString()})`}
+                                        {book.isSold
+                                            ? 'Sold'
+                                            : book.listingStatus === 'reserved' && book.reservedBy === auth.currentUser?.uid
+                                              ? 'Reserved (see Purchases)'
+                                              : book.listingStatus === 'reserved'
+                                                ? 'Reserved'
+                                                : `Buy Now (Rs. ${book.price?.toLocaleString()})`}
                                     </Button>
                                 )}
 
@@ -338,7 +365,7 @@ export function BookDetailsPage() {
                         <div className="flex items-center justify-center gap-4 pt-4 text-xs text-gray-500">
                             <div className="flex items-center gap-1">
                                 <Package className="w-4 h-4" />
-                                <span>Secure Shipping</span>
+                                <span>Local pickup</span>
                             </div>
                             <div className="flex items-center gap-1">
                                 <Star className="w-4 h-4" />
@@ -362,6 +389,7 @@ export function BookDetailsPage() {
                         onClose={() => setShowRentModal(false)}
                         preSelectedBook={{
                             id: book.id,
+                            userId: book.userId,
                             isbn: book.isbn,
                             title: book.title,
                             author: book.author,
@@ -369,17 +397,24 @@ export function BookDetailsPage() {
                             category: book.category,
                             images: book.images,
                             description: book.description,
+                            originalPrice: (book as Book & { originalPrice?: number }).originalPrice,
+                            securityDeposit: (book as Book & { securityDeposit?: number }).securityDeposit,
                             seller: {
+                                id: book.userId,
                                 name: book.seller?.name || 'Unknown',
                                 rating: book.seller?.rating || 0,
-                                location: 'Unknown'
+                                location: book.location
+                                    ? [book.location.city, book.location.state].filter(Boolean).join(', ')
+                                    : 'Unknown',
                             },
                             rentalOptions: {
                                 weekly: book.rentPrice ? book.rentPrice : 0,
                                 monthly: book.rentPrice ? book.rentPrice * 4 : 0,
-                                yearly: book.rentPrice ? book.rentPrice * 48 : 0
+                                yearly: book.rentPrice ? book.rentPrice * 48 : 0,
                             },
-                            deliveryMethods: ['pickup']
+                            deliveryMethods:
+                                (book as Book & { deliveryMethods?: ('pickup' | 'shipping')[] }).deliveryMethods ||
+                                ['pickup'],
                         }}
                     />
                 )}
@@ -398,6 +433,7 @@ export function BookDetailsPage() {
 }
 
 function NegotiateDialog({ book, onClose }: { book: Book; onClose: () => void }) {
+    const navigate = useNavigate();
     const [offerPrice, setOfferPrice] = useState('');
     const [message, setMessage] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -413,20 +449,67 @@ function NegotiateDialog({ book, onClose }: { book: Book; onClose: () => void })
                 return;
             }
 
-            await addDoc(collection(db, 'negotiations'), {
+            const sellerId = book.userId || book.seller?.id;
+            if (!sellerId) {
+                toast.error('Seller not found for this listing');
+                return;
+            }
+
+            const offerNum = parseFloat(offerPrice);
+            if (Number.isNaN(offerNum) || offerNum <= 0) {
+                toast.error('Enter a valid offer amount');
+                return;
+            }
+
+            const negRef = await addDoc(collection(db, 'negotiations'), {
                 buyerId: user.uid,
                 buyerName: user.displayName || 'Anonymous',
-                sellerId: book.userId || book.seller?.id, // Added sellerId
+                sellerId,
                 bookId: book.id,
                 bookTitle: book.title,
                 sellerName: book.seller.name,
-                offerPrice: parseFloat(offerPrice),
-                message: message,
+                originalPrice: book.price,
+                offerPrice: offerNum,
+                sellerCounter: null,
+                agreedPrice: null,
+                buyerDealOk: true,
+                sellerDealOk: false,
+                message: message || '',
                 status: 'pending',
-                createdAt: serverTimestamp()
+                createdAt: serverTimestamp(),
             });
 
-            toast.success('Offer sent to seller!');
+            await addDoc(collection(db, 'notifications'), {
+                userId: sellerId,
+                type: 'system',
+                title: 'New price offer',
+                message: `${user.displayName || 'A buyer'} offered Rs. ${offerNum.toLocaleString()} for "${book.title}". Open Negotiations to respond.`,
+                read: false,
+                timestamp: serverTimestamp(),
+                negotiationId: negRef.id,
+                bookId: book.id,
+            });
+
+            const chatIntro =
+                `${user.displayName || 'Buyer'}: I'm offering Rs. ${offerNum.toLocaleString()} for "${book.title}" (listed at Rs. ${book.price.toLocaleString()}). ${message || ''}`.trim();
+            await startChatWithUser(
+                navigate,
+                user.uid,
+                sellerId,
+                {
+                    name: book.seller.name,
+                    avatar: book.seller.avatar || 'S',
+                },
+                {
+                    id: book.id,
+                    title: book.title,
+                    price: book.price,
+                    image: book.images?.[0],
+                    initialChatMessage: chatIntro,
+                }
+            );
+
+            toast.success('Offer sent — opening chat with the seller');
             onClose();
         } catch (error) {
             console.error('Error sending offer:', error);

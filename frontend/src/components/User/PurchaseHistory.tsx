@@ -12,7 +12,10 @@ interface Purchase {
   author: string;
   price: number;
   timestamp?: any;
-  status: 'completed' | 'shipped' | 'delivered';
+  createdAt?: any;
+  status: 'completed' | 'shipped' | 'delivered' | 'reserved';
+  pickupDeadline?: string;
+  deliveryMethod?: string;
 }
 
 
@@ -25,6 +28,8 @@ export function PurchaseHistory() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'reserved':
+        return 'bg-amber-100 text-amber-900';
       case 'completed':
         return 'bg-blue-100 text-blue-800';
       case 'shipped':
@@ -34,6 +39,17 @@ export function PurchaseHistory() {
       default:
         return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const formatRs = (p: number) =>
+    `Rs. ${Number(p).toLocaleString('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+
+  const displayDate = (purchase: Purchase) => {
+    const t = purchase.timestamp ?? purchase.createdAt;
+    if (!t) return 'N/A';
+    if (typeof t === 'string') return new Date(t).toLocaleDateString();
+    if (typeof t.toDate === 'function') return t.toDate().toLocaleDateString();
+    return 'N/A';
   };
 
   if (loadingUser || loadingPurchases) return <div>Loading...</div>;
@@ -63,18 +79,23 @@ export function PurchaseHistory() {
                   <h5 className="text-[#2C3E50]">{purchase.bookTitle}</h5>
                   <p className="text-sm text-gray-600">by {purchase.author}</p>
                 </div>
-                <Badge className={getStatusColor(purchase.status)}>
-                  {purchase.status}
+                <Badge className={getStatusColor(purchase.status || 'completed')}>
+                  {purchase.status === 'reserved' ? 'Reserved (pickup)' : purchase.status}
                 </Badge>
               </div>
-              <div className="flex items-center gap-4 text-sm text-gray-500">
-                <span>Order #{purchase.id}</span>
+              <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
+                <span>Ref #{purchase.id.slice(0, 10)}…</span>
                 <span>•</span>
-                <span>{purchase.timestamp ? (typeof purchase.timestamp === 'string' ? new Date(purchase.timestamp) : purchase.timestamp.toDate()).toLocaleDateString() : 'N/A'}</span>
+                <span>{displayDate(purchase)}</span>
                 <span>•</span>
-                <span className="text-[#C4A672]">${purchase.price ? purchase.price.toFixed(2) : '0.00'}</span>
+                <span className="text-[#C4A672]">{formatRs(purchase.price ?? 0)}</span>
               </div>
-
+              {purchase.status === 'reserved' && purchase.pickupDeadline && (
+                <p className="text-sm text-amber-900 mt-2">
+                  Complete local pickup by{' '}
+                  <strong>{new Date(purchase.pickupDeadline).toLocaleString()}</strong> or the reservation may be released.
+                </p>
+              )}
             </div>
           ))}
           {purchases.length === 0 && (

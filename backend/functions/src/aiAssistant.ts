@@ -9,7 +9,7 @@ import { getFirestore } from "firebase-admin/firestore";
  * Processes user queries through the Gemini Engine while enforcing platform rules.
  */
 export const generateAssistantResponse = onCall(
-  { secrets: ["GEMINI_API_KEY"] },
+  { cors: true, secrets: ["GEMINI_API_KEY"] },
   async (request) => {
     // 1. Validation Logic
     if (!request.auth) {
@@ -71,7 +71,7 @@ export const generateAssistantResponse = onCall(
       `;
 
       const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash",
+        model: "gemini-2.0-flash",
         systemInstruction: systemInstructions,
       });
 
@@ -86,8 +86,12 @@ export const generateAssistantResponse = onCall(
       const response = await result.response;
 
       return { text: response.text() };
-    } catch (error) {
-      logger.error("Bloom Intelligence Matrix error:", error);
+    } catch (error: unknown) {
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+      const err = error as { message?: string };
+      logger.error("Bloom Intelligence Matrix error:", err?.message ?? error);
       throw new HttpsError("internal", "Neural synchronization failed. Please try again.");
     }
   }

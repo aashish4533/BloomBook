@@ -9,6 +9,140 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { BookOpen, Search, Upload, X, Camera } from 'lucide-react';
 import { BarcodeScanner } from '../BarcodeScanner';
 
+/** Strip separators; keep digits and X (ISBN-10 check digit). */
+function normalizeIsbnInput(raw: string): string {
+  return raw.replace(/[^0-9X]/gi, '').toUpperCase();
+}
+
+function mapRawCategory(raw: string, allowed: string[]): string {
+  const r = raw.trim();
+  if (!r) return 'Other';
+  const lower = r.toLowerCase();
+  const exact = allowed.find((c) => c.toLowerCase() === lower);
+  if (exact) return exact;
+  if (lower.includes('fantasy')) return 'Fantasy';
+  if (lower.includes('science fiction') || lower.includes('sci-fi')) return 'Science Fiction';
+  if (lower.includes('mystery') || lower.includes('crime')) return 'Mystery';
+  if (lower.includes('romance')) return 'Romance';
+  if (lower.includes('biograph')) return 'Biography';
+  if (lower.includes('histor')) return 'History';
+  if (lower.includes('business') || lower.includes('econom')) return 'Business';
+  if (lower.includes('self-help') || lower.includes('self help')) return 'Self-Help';
+  if (lower.includes('philosoph')) return 'Philosophy';
+  if (lower.includes('fiction') && !lower.includes('non-fiction') && !lower.includes('nonfiction')) return 'Fiction';
+  if (lower.includes('non-fiction') || lower.includes('nonfiction')) return 'Non-Fiction';
+  if (lower.includes('science') || lower.includes('physics') || lower.includes('biology')) return 'Science';
+  return 'Other';
+}
+
+function mapLangCode(code?: string): string {
+  if (!code) return 'English';
+  const c = code.toLowerCase().slice(0, 2);
+  const m: Record<string, string> = {
+    en: 'English',
+    ur: 'اردو',
+    fr: 'French',
+    es: 'Spanish',
+    de: 'German',
+    ar: 'Arabic',
+    hi: 'Hindi',
+  };
+  return m[c] || code.toUpperCase();
+}
+
+type LookupPayload = { fields: Partial<BookFormData>; source: 'openlibrary' | 'google' };
+
+async function fetchFromOpenLibrary(cleanIsbn: string, categories: string[]): Promise<LookupPayload | null> {
+  const url = `https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(cleanIsbn)}&format=json&jscmd=data`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const data = await res.json();
+  const entry = data[`ISBN:${cleanIsbn}`];
+  if (!entry || !entry.title) return null;
+
+  const authors = Array.isArray(entry.authors)
+    ? entry.authors.map((a: { name?: string }) => a?.name).filter(Boolean).join(', ')
+    : '';
+  let publishedYear = '';
+  if (entry.publish_date) {
+    const m = String(entry.publish_date).match(/(19|20)\d{2}/);
+    publishedYear = m ? m[0] : '';
+  }
+  const pages = entry.number_of_pages != null ? String(entry.number_of_pages) : '';
+  let category = 'Other';
+  if (Array.isArray(entry.subjects) && entry.subjects.length) {
+    const sub = entry.subjects[0];
+    const label = typeof sub === 'string' ? sub : sub?.name;
+    if (label) category = mapRawCategory(String(label), categories);
+  }
+  let language = 'English';
+  if (Array.isArray(entry.languages) && entry.languages.length) {
+    const href = entry.languages[0]?.key || '';
+    const code = href.split('/').pop() || '';
+    if (code) language = mapLangCode(code.length >= 2 ? code.slice(0, 2) : code);
+  }
+
+  return {
+    source: 'openlibrary',
+    fields: {
+      bookName: entry.title,
+      author: authors,
+      publishedYear,
+      pages,
+      category,
+      language,
+    },
+  };
+}
+
+async function fetchFromGoogleBooks(
+  cleanIsbn: string,
+  categories: string[]
+): Promise<{ result: LookupPayload | null; rateLimited: boolean }> {
+  const apiKey = (import.meta.env.VITE_GOOGLE_BOOKS_API_KEY as string | undefined)?.trim();
+  const base = `https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(cleanIsbn)}`;
+  const url = apiKey ? `${base}&key=${encodeURIComponent(apiKey)}` : base;
+  const response = await fetch(url);
+  if (response.status === 429) {
+    return { result: null, rateLimited: true };
+  }
+  if (!response.ok) {
+    return { result: null, rateLimited: false };
+  }
+  const data = await response.json();
+  if (!data.totalItems || !data.items?.[0]) {
+    return { result: null, rateLimited: false };
+  }
+  const bookInfo = data.items[0].volumeInfo;
+  const authors = Array.isArray(bookInfo.authors) ? bookInfo.authors.join(', ') : '';
+  let publishedYear = '';
+  if (bookInfo.publishedDate) {
+    const m = String(bookInfo.publishedDate).match(/(19|20)\d{2}/);
+    publishedYear = m ? m[0] : bookInfo.publishedDate.split('-')[0] || '';
+  }
+  const pages = bookInfo.pageCount != null ? String(bookInfo.pageCount) : '';
+  const category = bookInfo.categories?.[0]
+    ? mapRawCategory(bookInfo.categories[0], categories)
+    : 'Other';
+  const language = mapLangCode(bookInfo.language);
+
+  return {
+    rateLimited: false,
+    result: {
+      source: 'google',
+      fields: {
+        bookName: bookInfo.title || '',
+        author: authors,
+        publishedYear,
+        pages,
+        language,
+        category,
+        description: bookInfo.description || '',
+      },
+    },
+  };
+}
+
 interface BookDetailsStepProps {
   initialData: BookFormData;
   onNext: (data: BookFormData) => void;
@@ -42,8 +176,7 @@ export function BookDetailsStep({ initialData, onNext, onCancel, isExchange = fa
   const conditions = ['New', 'Like New', 'Good', 'Fair', 'Poor'];
 
   const validateISBN = (isbn: string) => {
-    // Normalize: strip hyphens and spaces
-    const clean = isbn.replace(/[-\s]/g, '');
+    const clean = normalizeIsbnInput(isbn);
     
     // Validate ISBN-10 (Legacy) or SBN with a leading 0
     if (clean.length === 10) {
@@ -73,8 +206,7 @@ export function BookDetailsStep({ initialData, onNext, onCancel, isExchange = fa
   };
 
   const handleISBNLookup = async (isbnOverride?: string) => {
-    // Use override if provided (e.g. from scanner), otherwise use state
-    const isbnToLookup = isbnOverride || formData.isbn;
+    const isbnToLookup = (isbnOverride || formData.isbn).trim();
 
     if (!isbnToLookup) {
       setErrors({ ...errors, isbn: 'Please enter an ISBN number first' });
@@ -82,44 +214,60 @@ export function BookDetailsStep({ initialData, onNext, onCancel, isExchange = fa
     }
 
     if (!validateISBN(isbnToLookup)) {
-      setErrors({ ...errors, isbn: 'Invalid ISBN format' });
+      setErrors({ ...errors, isbn: 'Invalid ISBN-10 or ISBN-13 (check digits). You can use dashes or spaces.' });
       return;
     }
 
     setIsbnLookup(true);
-    const cleanISBN = isbnToLookup.replace(/[-\s]/g, '');
+    const cleanISBN = normalizeIsbnInput(isbnToLookup);
 
     try {
-      const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanISBN}`);
-      const data = await response.json();
-
-      if (data.totalItems > 0) {
-        const bookInfo = data.items[0].volumeInfo;
-        setFormData(prev => ({
+      const ol = await fetchFromOpenLibrary(cleanISBN, categories);
+      if (ol) {
+        setFormData((prev) => ({
           ...prev,
-          isbn: isbnToLookup, // Ensure ISBN is set (important if coming from override)
-          bookName: bookInfo.title || '',
-          author: bookInfo.authors?.[0] || '',
-          publishedYear: bookInfo.publishedDate?.split('-')[0] || '',
-          pages: bookInfo.pageCount?.toString() || '',
-          language: bookInfo.language?.toUpperCase() || 'English',
-          description: bookInfo.description || prev.description
+          isbn: isbnToLookup,
+          ...ol.fields,
         }));
-        // Clear errors if successful
-        setErrors(prev => ({ ...prev, isbn: '' }));
-      } else {
-        setErrors(prev => ({ ...prev, isbn: 'No book found with this ISBN' }));
+        setErrors((prev) => ({ ...prev, isbn: '' }));
+        return;
       }
-    } catch (err) {
-      setErrors(prev => ({ ...prev, isbn: 'Failed to lookup ISBN. Please enter details manually.' }));
+
+      const { result: googleHit, rateLimited } = await fetchFromGoogleBooks(cleanISBN, categories);
+      if (googleHit) {
+        setFormData((prev) => ({
+          ...prev,
+          isbn: isbnToLookup,
+          ...googleHit.fields,
+          description: googleHit.fields.description
+            ? googleHit.fields.description
+            : prev.description,
+        }));
+        setErrors((prev) => ({ ...prev, isbn: '' }));
+      } else if (rateLimited) {
+        setErrors((prev) => ({
+          ...prev,
+          isbn: 'Google Books is rate-limiting lookups right now. Try again in a minute, or enter details manually. (Tip: set VITE_GOOGLE_BOOKS_API_KEY for a higher quota.)',
+        }));
+      } else {
+        setErrors((prev) => ({
+          ...prev,
+          isbn: 'No book found with this ISBN. Enter details manually.',
+        }));
+      }
+    } catch {
+      setErrors((prev) => ({
+        ...prev,
+        isbn: 'Failed to look up this ISBN. Enter details manually.',
+      }));
     } finally {
       setIsbnLookup(false);
     }
   };
 
   const handleScanComplete = (rawIsbn: string) => {
-    const cleanIsbn = rawIsbn.replace(/[-\s]/g, '');
-    setFormData(prev => ({ ...prev, isbn: cleanIsbn }));
+    const cleanIsbn = normalizeIsbnInput(rawIsbn);
+    setFormData((prev) => ({ ...prev, isbn: cleanIsbn }));
     setShowScanner(false);
     handleISBNLookup(cleanIsbn);
   };
@@ -134,6 +282,7 @@ export function BookDetailsStep({ initialData, onNext, onCancel, isExchange = fa
         images: [...prev.images, ...newImages],
         imageFiles: [...(prev.imageFiles || []), ...files]
       }));
+      setErrors((prev) => ({ ...prev, images: '' }));
     }
   };
 
@@ -203,6 +352,11 @@ export function BookDetailsStep({ initialData, onNext, onCancel, isExchange = fa
       newErrors.pages = 'Pages must be greater than 0';
     }
 
+    const hasPhotos = (formData.imageFiles?.length ?? 0) > 0;
+    if (!hasPhotos) {
+      newErrors.images = 'Upload at least one photo of the book (cover, condition, etc.).';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -213,7 +367,7 @@ export function BookDetailsStep({ initialData, onNext, onCancel, isExchange = fa
       // Ensure the ISBN passed to the parent is fully normalized
       const normalizedData = {
         ...formData,
-        isbn: formData.isbn.replace(/[-\s]/g, '').toUpperCase()
+        isbn: normalizeIsbnInput(formData.isbn),
       };
       onNext(normalizedData);
     }
@@ -241,7 +395,7 @@ export function BookDetailsStep({ initialData, onNext, onCancel, isExchange = fa
                 <Input
                   id="isbn"
                   type="text"
-                  placeholder="978-3-16-148410-0 or 0-306-40615-2"
+                  placeholder="9780702047473 or 978-0-7020-4747-3"
                   value={formData.isbn}
                   onChange={(e) => {
                     setFormData({ ...formData, isbn: e.target.value });
@@ -274,7 +428,7 @@ export function BookDetailsStep({ initialData, onNext, onCancel, isExchange = fa
               </Button>
             </div>
             <p className="text-xs text-gray-500">
-              The ISBN can be found on the back cover or copyright page of the book
+              ISBN-10 or ISBN-13 with or without dashes/spaces. Auto-fill tries Open Library first, then Google Books.
             </p>
           </div>
 
@@ -488,7 +642,7 @@ export function BookDetailsStep({ initialData, onNext, onCancel, isExchange = fa
 
           {/* Image Upload */}
           <div className="space-y-2 md:col-span-2">
-            <Label>Book Images</Label>
+            <Label>Book Images *</Label>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {formData.images.map((img, idx) => (
                 <div key={idx} className="relative aspect-[3/4] rounded-lg overflow-hidden border border-gray-200 group">
@@ -515,8 +669,11 @@ export function BookDetailsStep({ initialData, onNext, onCancel, isExchange = fa
                 />
               </label>
             </div>
+            {errors.images && (
+              <p className="text-sm text-red-500">{errors.images}</p>
+            )}
             <p className="text-xs text-gray-500">
-              Upload clear photos of the front cover, back cover, and any damage.
+              Required: at least one clear photo (front cover, spine, or condition). Add more if you like.
             </p>
           </div>
         </div>

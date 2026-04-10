@@ -270,7 +270,7 @@ export function ActivityHistory({ onNavigateToBook }: ActivityHistoryProps) {
                                 </div>
                                 <span className="text-[10px] text-gray-400">{formatActivityDate(activity.timestamp)}</span>
                               </div>
-                              <p className="text-sm text-gray-600">Transaction: ${activity.amount?.toFixed(2)}</p>
+                              <p className="text-sm text-gray-600">Transaction: Rs. {activity.amount?.toFixed(2)}</p>
                             </div>
                           </div>
                         )}
@@ -313,7 +313,7 @@ export function ActivityHistory({ onNavigateToBook }: ActivityHistoryProps) {
                 <h4 className="text-[#2C3E50] mb-1">{item.title}</h4>
                 <p className="text-sm text-gray-600 mb-2">by {item.author}</p>
                 <div className="flex items-center justify-between">
-                  <span className="text-[#C4A672]">${item.price}</span>
+                  <span className="text-[#C4A672]">Rs. {Number(item.price).toLocaleString()}</span>
                   <span className="text-xs text-gray-500">{item.timestamp}</span>
                 </div>
               </Card>
@@ -369,7 +369,7 @@ export function ActivityHistory({ onNavigateToBook }: ActivityHistoryProps) {
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-gray-600">ID: {transaction.transactionId}</span>
-                      <span className="text-[#C4A672]">${transaction.amount.toFixed(2)}</span>
+                      <span className="text-[#C4A672]">Rs. {transaction.amount.toFixed(2)}</span>
                     </div>
                     <p className="text-xs text-gray-500 mt-2">{transaction.timestamp}</p>
                   </div>

@@ -34,6 +34,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const unsubscribe = auth.onAuthStateChanged(async (user) => {
             if (user) {
                 try {
+                    await user.getIdToken();
                     const docRef = doc(db, 'carts', user.uid);
                     const docSnap = await getDoc(docRef);
                     if (docSnap.exists()) {

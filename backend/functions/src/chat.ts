@@ -34,18 +34,23 @@ export const handleGroupChatMessage = onCall(
         }
 
         try {
-            // 1. Validate User Membership strictly with Array Fallback
+            // 1. Membership: members/{uid} subdoc OR parent members[] (string or {id}) OR community admin
             const memberDoc = await db.collection("communities").doc(communityId).collection("members").doc(uid).get();
             let isMember = memberDoc.exists;
 
             if (!isMember) {
-                 // Fallback: Check if user exists in the 'members' array of the main document
-                 const commSnap = await db.collection("communities").doc(communityId).get();
-                 if (commSnap.exists()) {
-                     const commData = commSnap.data();
-                     const membersArray = commData?.members || [];
-                     isMember = membersArray.includes(uid);
-                 }
+                const commSnap = await db.collection("communities").doc(communityId).get();
+                if (commSnap.exists) {
+                    const commData = commSnap.data();
+                    if (commData?.adminId === uid) {
+                        isMember = true;
+                    } else {
+                        const membersArray = commData?.members || [];
+                        isMember = membersArray.some((m: unknown) =>
+                            typeof m === "string" ? m === uid : (m as { id?: string })?.id === uid
+                        );
+                    }
+                }
             }
 
             if (!isMember) {

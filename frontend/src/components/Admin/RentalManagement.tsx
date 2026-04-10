@@ -65,6 +65,8 @@ export function RentalManagement() {
     switch (status) {
       case 'active':
         return 'bg-green-100 text-green-800';
+      case 'reserved_rent':
+        return 'bg-amber-100 text-amber-900';
       case 'pending':
         return 'bg-yellow-100 text-yellow-800';
       case 'overdue':
@@ -216,7 +218,7 @@ export function RentalManagement() {
                     </Badge>
                   </td>
                   <td className="px-6 py-4 text-[#C4A672]">
-                    ${rental.rentalPrice.toFixed(2)}/mo
+                    Rs. {rental.rentalPrice.toFixed(2)}/mo
                   </td>
                   <td className="px-6 py-4">
                     {rental.status === 'pending' ? (

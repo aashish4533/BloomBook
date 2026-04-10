@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { RentalBook } from '../RentBookFlow';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
@@ -8,11 +8,26 @@ import { Search, SlidersHorizontal, X, MapPin, Calendar, Image as ImageIcon } fr
 import { Badge } from '../ui/badge';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { RentalBookDetails } from './RentalBookDetails';
 
 interface RentalBrowseProps {
   onSelectBook: (book: RentalBook) => void;
   onClose: () => void;
+}
+
+/** Local row with location string for filtering (city, state, zip, address). */
+type BrowseBookRow = RentalBook & { searchLocation: string };
+
+function normalizeIsbn(s: string) {
+  return s.replace(/[\s-]/g, '').toLowerCase();
+}
+
+function conditionSelectLabel(value: string) {
+  const v = value.toLowerCase();
+  if (v === 'new') return 'Like New';
+  if (v === 'excellent') return 'Excellent';
+  if (v === 'good') return 'Good';
+  if (v === 'fair') return 'Fair';
+  return value;
 }
 
 export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
@@ -25,9 +40,8 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
   const [locationFilter, setLocationFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [showPhotoPreviews, setShowPhotoPreviews] = useState(true);
-  const [books, setBooks] = useState<RentalBook[]>([]);
+  const [books, setBooks] = useState<BrowseBookRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedBook, setSelectedBook] = useState<RentalBook | null>(null);
 
   useEffect(() => {
     const fetchBooks = async () => {
@@ -38,22 +52,30 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
           where('status', '==', 'active')
         );
         const querySnapshot = await getDocs(q);
-        const fetchedBooks: RentalBook[] = querySnapshot.docs.map(doc => {
+        const fetchedBooks: BrowseBookRow[] = querySnapshot.docs.map(doc => {
           const data = doc.data();
           const pricePerWeek = Number(data.pricePerWeek) || 0;
+          const city = data.location?.city || '';
+          const state = data.location?.state || '';
+          const zip = data.location?.zipCode || '';
+          const addr = data.location?.address || '';
+          const searchLocation = [city, state, zip, addr].filter(Boolean).join(' ').toLowerCase();
           return {
             id: doc.id,
             isbn: data.isbn || '',
             title: data.title || 'Untitled',
             author: data.author || 'Unknown Author',
-            condition: data.condition || 'Good',
+            condition: data.condition || 'good',
             category: data.category || 'General',
             images: data.images || [],
             description: data.description || 'No description available.',
+            userId: data.userId,
+            searchLocation,
             seller: {
+              id: data.userId,
               name: data.seller?.name || 'Unknown Seller',
               rating: data.seller?.rating || 4.5,
-              location: data.location?.city || 'Unknown Location'
+              location: city || 'Unknown Location'
             },
             rentalOptions: {
               weekly: pricePerWeek,
@@ -73,7 +95,13 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
           };
         });
 
+        let rentMax = 20;
+        for (const b of fetchedBooks) {
+          rentMax = Math.max(rentMax, b.rentalOptions.weekly, b.rentalOptions.monthly, b.rentalOptions.yearly);
+        }
+        const sliderMax = Math.min(50000, Math.max(20, Math.ceil(rentMax * 1.1)));
         setBooks(fetchedBooks);
+        setPriceRange([0, sliderMax]);
       } catch (error) {
         console.error("Error fetching rental books:", error);
       } finally {
@@ -83,33 +111,63 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
     fetchBooks();
   }, []);
 
+  const priceSliderMax = useMemo(() => {
+    let max = 20;
+    for (const b of books) {
+      max = Math.max(max, b.rentalOptions.weekly, b.rentalOptions.monthly, b.rentalOptions.yearly);
+    }
+    return Math.min(50000, Math.max(20, Math.ceil(max * 1.1)));
+  }, [books]);
+
+  const priceStep = priceSliderMax > 200 ? 1 : 0.5;
+
+  const uniqueCategories = useMemo(() => {
+    const s = new Set<string>();
+    books.forEach((b) => {
+      if (b.category) s.add(b.category);
+    });
+    return Array.from(s).sort((a, b) => a.localeCompare(b));
+  }, [books]);
+
+  const uniqueConditions = useMemo(() => {
+    const s = new Set<string>();
+    books.forEach((b) => {
+      if (b.condition) s.add(String(b.condition));
+    });
+    return Array.from(s).sort((a, b) => a.localeCompare(b));
+  }, [books]);
+
   // Filter books based on all criteria
   const filteredBooks = books.filter(book => {
-    // Text search (title, author, ISBN)
-    const searchLower = searchQuery.toLowerCase();
-    const matchesSearch = searchQuery === '' ||
-      book.title.toLowerCase().includes(searchLower) ||
-      book.author.toLowerCase().includes(searchLower) ||
-      book.isbn.toLowerCase().includes(searchLower);
+    const q = searchQuery.trim().toLowerCase();
+    const matchesSearch = q === '' ||
+      book.title.toLowerCase().includes(q) ||
+      book.author.toLowerCase().includes(q) ||
+      book.isbn.toLowerCase().includes(q);
 
-    // ISBN specific search
-    const matchesISBN = isbnSearch === '' || book.isbn.includes(isbnSearch);
+    const isbnQ = normalizeIsbn(isbnSearch.trim());
+    const matchesISBN = isbnQ === '' || normalizeIsbn(book.isbn).includes(isbnQ);
 
-    // Category filter
     const matchesCategory = categoryFilter === 'all' || book.category === categoryFilter;
 
-    // Condition filter
-    const matchesCondition = conditionFilter === 'all' || book.condition === conditionFilter;
+    const matchesCondition =
+      conditionFilter === 'all' ||
+      book.condition.toLowerCase() === conditionFilter.toLowerCase();
 
-    // Price range filter (based on selected rental period)
-    const matchesPrice = rentalPeriod === 'all' || (() => {
-      const bookPrice = book.rentalOptions[rentalPeriod];
-      return bookPrice >= priceRange[0] && bookPrice <= priceRange[1];
-    })();
+    const [lo, hi] = priceRange;
+    const inPriceRange = (p: number) => p >= lo && p <= hi;
+    const matchesPrice =
+      rentalPeriod === 'all'
+        ? inPriceRange(book.rentalOptions.weekly) ||
+          inPriceRange(book.rentalOptions.monthly) ||
+          inPriceRange(book.rentalOptions.yearly)
+        : inPriceRange(book.rentalOptions[rentalPeriod]);
 
-    // Location filter
-    const matchesLocation = locationFilter === '' ||
-      book.seller.location.toLowerCase().includes(locationFilter.toLowerCase());
+    const locQ = locationFilter.trim().toLowerCase();
+    const matchesLocation =
+      locQ === '' ||
+      book.searchLocation.includes(locQ) ||
+      book.seller.location.toLowerCase().includes(locQ);
 
     return matchesSearch && matchesISBN && matchesCategory && matchesCondition && matchesPrice && matchesLocation;
   });
@@ -120,7 +178,7 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
     setCategoryFilter('all');
     setConditionFilter('all');
     setRentalPeriod('all');
-    setPriceRange([0, 20]);
+    setPriceRange([0, priceSliderMax]);
     setLocationFilter('');
   };
 
@@ -180,11 +238,11 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  <SelectItem value="Fiction">Fiction</SelectItem>
-                  <SelectItem value="Classic Literature">Classic Literature</SelectItem>
-                  <SelectItem value="Romance">Romance</SelectItem>
-                  <SelectItem value="Mystery">Mystery</SelectItem>
-                  <SelectItem value="Science Fiction">Science Fiction</SelectItem>
+                  {uniqueCategories.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -201,9 +259,11 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Conditions</SelectItem>
-                  <SelectItem value="New">New</SelectItem>
-                  <SelectItem value="Good">Good</SelectItem>
-                  <SelectItem value="Fair">Fair</SelectItem>
+                  {uniqueConditions.map((cond) => (
+                    <SelectItem key={cond} value={cond}>
+                      {conditionSelectLabel(cond)}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -284,28 +344,29 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
             <div className="mt-4 pt-4 border-t border-gray-200">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Price Range Slider */}
-                {rentalPeriod !== 'all' && (
-                  <div>
-                    <label className="text-sm text-gray-700 mb-3 block">
-                      {rentalPeriod.charAt(0).toUpperCase() + rentalPeriod.slice(1)} Price Range:
-                      <span className="text-[#C4A672] ml-2">
-                        ${priceRange[0]} - ${priceRange[1]}
-                      </span>
-                    </label>
-                    <Slider
-                      value={priceRange}
-                      onValueChange={(value) => setPriceRange(value as [number, number])}
-                      min={0}
-                      max={20}
-                      step={0.5}
-                      className="mt-2"
-                    />
-                    <div className="flex justify-between text-xs text-gray-500 mt-1">
-                      <span>Rs. 0</span>
-                      <span>Rs. 20</span>
-                    </div>
+                <div>
+                  <label className="text-sm text-gray-700 mb-3 block">
+                    {rentalPeriod === 'all'
+                      ? 'Price range (weekly, monthly, or yearly rate)'
+                      : `${rentalPeriod.charAt(0).toUpperCase() + rentalPeriod.slice(1)} price`}
+                    :
+                    <span className="text-[#C4A672] ml-2">
+                      Rs. {priceRange[0]} - Rs. {priceRange[1]}
+                    </span>
+                  </label>
+                  <Slider
+                    value={priceRange}
+                    onValueChange={(value) => setPriceRange(value as [number, number])}
+                    min={0}
+                    max={priceSliderMax}
+                    step={priceStep}
+                    className="mt-2"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>Rs. 0</span>
+                    <span>Rs. {priceSliderMax}</span>
                   </div>
-                )}
+                </div>
 
                 {/* Location Proximity */}
                 <div>
@@ -346,10 +407,10 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
                     <Badge variant="secondary">Location: {locationFilter}</Badge>
                   )}
                   {rentalPeriod !== 'all' && (
-                    <>
-                      <Badge variant="secondary">Period: {rentalPeriod}</Badge>
-                      <Badge variant="secondary">Price: ${priceRange[0]}-${priceRange[1]}</Badge>
-                    </>
+                    <Badge variant="secondary">Period: {rentalPeriod}</Badge>
+                  )}
+                  {(priceRange[0] > 0 || priceRange[1] < priceSliderMax) && (
+                    <Badge variant="secondary">Price: Rs. {priceRange[0]}-{priceRange[1]}</Badge>
                   )}
                 </div>
               </div>
@@ -375,7 +436,13 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
                 {/* Book Image with Photo Count */}
                 {showPhotoPreviews && (
                   <div className="h-48 bg-gray-200 overflow-hidden relative">
-                    <img src={book.images[0]} alt={book.title} className="w-full h-full object-cover" crossOrigin="anonymous" referrerPolicy="no-referrer" />
+                    <img
+                      src={book.images[0] || 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&q=80&w=600'}
+                      alt={book.title}
+                      className="w-full h-full object-cover"
+                      crossOrigin="anonymous"
+                      referrerPolicy="no-referrer"
+                    />
                     {book.images.length > 1 && (
                       <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
                         <ImageIcon className="w-3 h-3" />
@@ -393,11 +460,14 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
                       <p className="text-sm text-gray-600">by {book.author}</p>
                     </div>
                     <Badge className={
-                      book.condition === 'New' ? 'bg-green-100 text-green-800' :
-                        book.condition === 'Good' ? 'bg-blue-100 text-blue-800' :
-                          'bg-yellow-100 text-yellow-800'
+                      (() => {
+                        const c = book.condition.toLowerCase();
+                        if (c === 'new' || c === 'excellent') return 'bg-green-100 text-green-800';
+                        if (c === 'good') return 'bg-blue-100 text-blue-800';
+                        return 'bg-yellow-100 text-yellow-800';
+                      })()
                     }>
-                      {book.condition}
+                      {conditionSelectLabel(book.condition)}
                     </Badge>
                   </div>
 
@@ -422,19 +492,19 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
                       <div className="flex items-center justify-between">
                         <span className="text-gray-600">Weekly:</span>
                         <span className={rentalPeriod === 'weekly' ? 'text-[#C4A672] font-medium' : 'text-gray-800'}>
-                          ${book.rentalOptions.weekly}/wk
+                          Rs. {book.rentalOptions.weekly}/wk
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-gray-600">Monthly:</span>
                         <span className={rentalPeriod === 'monthly' ? 'text-[#C4A672] font-medium' : 'text-gray-800'}>
-                          ${book.rentalOptions.monthly}/mo
+                          Rs. {book.rentalOptions.monthly}/mo
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-gray-600">Yearly:</span>
                         <span className={rentalPeriod === 'yearly' ? 'text-[#C4A672] font-medium' : 'text-gray-800'}>
-                          ${book.rentalOptions.yearly}/yr
+                          Rs. {book.rentalOptions.yearly}/yr
                         </span>
                       </div>
                     </div>

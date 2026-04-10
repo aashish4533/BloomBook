@@ -4,10 +4,11 @@ import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
 import { Eye, EyeOff, Mail, Lock, Home } from 'lucide-react';
-import { auth, googleProvider, facebookProvider } from '../firebase';
+import { auth, googleProvider, facebookProvider, db } from '../firebase';
 import { signInWithPopup } from 'firebase/auth';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSignInWithEmailAndPassword } from 'react-firebase-hooks/auth';
+import { doc, getDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
 
 interface LoginFormProps {
@@ -27,17 +28,30 @@ export function LoginForm({ onLogin }: LoginFormProps) {
     error,
   ] = useSignInWithEmailAndPassword(auth);
 
+  const resolvePostLoginRoute = async (uid: string) => {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', uid));
+      if (userDoc.exists() && userDoc.data().role === 'admin') {
+        navigate('/admin/dashboard');
+        return;
+      }
+    } catch (err) {
+      console.error('Failed to resolve user role after login:', err);
+    }
+
+    navigate('/');
+  };
+
   useEffect(() => {
     if (error) {
       // Show error toast
       toast.error(error.message);
     }
     if (user) {
-
       if (onLogin) onLogin();
-      navigate('/');
+      resolvePostLoginRoute(user.user.uid);
     }
-  }, [user, error, onLogin, navigate]);
+  }, [user, error, onLogin]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,10 +64,10 @@ export function LoginForm({ onLogin }: LoginFormProps) {
 
   const handleGoogleLogin = async () => {
     try {
-      await signInWithPopup(auth, googleProvider);
+      const credential = await signInWithPopup(auth, googleProvider);
 
       if (onLogin) onLogin();
-      navigate('/');
+      await resolvePostLoginRoute(credential.user.uid);
     } catch (err: any) {
       toast.error(err.message || 'Google login failed.');
     }
@@ -61,10 +75,10 @@ export function LoginForm({ onLogin }: LoginFormProps) {
 
   const handleFacebookLogin = async () => {
     try {
-      await signInWithPopup(auth, facebookProvider);
+      const credential = await signInWithPopup(auth, facebookProvider);
 
       if (onLogin) onLogin();
-      navigate('/');
+      await resolvePostLoginRoute(credential.user.uid);
     } catch (err: any) {
       toast.error(err.message || 'Facebook login failed.');
     }

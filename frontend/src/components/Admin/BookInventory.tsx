@@ -145,7 +145,7 @@ export function BookInventory() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Price:</span>
-                  <span className="text-[#C4A672] text-lg">${book.price.toFixed(2)}</span>
+                  <span className="text-[#C4A672] text-lg">Rs. {book.price.toFixed(2)}</span>
                 </div>
               </div>
 

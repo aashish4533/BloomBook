@@ -5,7 +5,9 @@ import { RentalConfirmation } from './Rental/RentalConfirmation';
 import { RentalSuccess } from './Rental/RentalSuccess';
 import { GiveBooksOnRent } from './GiveBooksOnRent';
 import { db, auth } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { computeSecurityDepositHalf } from '../utils/rentalActivation';
+import { notifyChatRecipient } from '../utils/chatNotifications';
 import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { BookOpen, HandCoins, ArrowLeft } from 'lucide-react';
@@ -32,6 +34,9 @@ export interface RentalBook {
     yearly: number;
   };
   deliveryMethods: ('pickup' | 'shipping')[];
+  /** Listing reference price (e.g. original / retail) — security deposit is 50% of this. */
+  originalPrice?: number;
+  securityDeposit?: number;
 }
 
 interface RentBookFlowProps {
@@ -45,6 +50,8 @@ export function RentBookFlow({ onClose, preSelectedBook }: RentBookFlowProps) {
   );
   const [selectedBook, setSelectedBook] = useState<RentalBook | null>(preSelectedBook || null);
   const [rentalPeriod, setRentalPeriod] = useState<'weekly' | 'monthly' | 'yearly'>('monthly');
+  const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'shipping'>('pickup');
+  const [pickupDate, setPickupDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   const handleSelectBook = (book: RentalBook) => {
     setSelectedBook(book);
@@ -56,41 +63,113 @@ export function RentBookFlow({ onClose, preSelectedBook }: RentBookFlowProps) {
     setCurrentStep('confirm');
   };
 
+  const [lastRentalId, setLastRentalId] = useState<string | null>(null);
+
   const handleCompleteRental = async () => {
     if (!selectedBook || !auth.currentUser) return;
 
+    const lenderId = selectedBook.userId || selectedBook.seller?.id;
+    if (!lenderId) {
+      toast.error('This listing is missing owner information.');
+      return;
+    }
+    if (auth.currentUser.uid === lenderId) {
+      toast.error('You cannot rent your own book.');
+      return;
+    }
+
     try {
-      const startDate = new Date();
-      const dueDate = new Date();
-      if (rentalPeriod === 'weekly') dueDate.setDate(startDate.getDate() + 7);
-      if (rentalPeriod === 'monthly') dueDate.setDate(startDate.getDate() + 30);
-      if (rentalPeriod === 'yearly') dueDate.setDate(startDate.getDate() + 365);
+      const rentAmount = selectedBook.rentalOptions[rentalPeriod];
+      const referenceBookPrice =
+        (selectedBook.originalPrice && selectedBook.originalPrice > 0)
+          ? selectedBook.originalPrice
+          : (Number(selectedBook.securityDeposit) > 0
+              ? Number(selectedBook.securityDeposit) * 2
+              : Math.max(rentAmount * 4, 1));
+      const securityDepositAmount = computeSecurityDepositHalf(referenceBookPrice);
+      const shippingFee = deliveryMethod === 'shipping' ? 5.99 : 0;
+      const totalAtCheckout = rentAmount + securityDepositAmount + shippingFee;
 
       const rentalRef = await addDoc(collection(db, 'rentals'), {
         renterId: auth.currentUser.uid,
+        renterName: auth.currentUser.displayName || auth.currentUser.email || 'Renter',
+        renterEmail: auth.currentUser.email || '',
+        lenderId,
+        lenderName: selectedBook.seller.name,
         bookId: selectedBook.id,
         bookTitle: selectedBook.title,
         author: selectedBook.author,
-        startDate: startDate.toISOString(),
-        dueDate: dueDate.toISOString(),
-        status: 'active',
-        price: selectedBook.rentalOptions[rentalPeriod],
-        rentalPeriod: rentalPeriod,
-        createdAt: serverTimestamp()
+        status: 'reserved_rent',
+        rentalPeriod,
+        rentAmount,
+        securityDepositAmount,
+        referenceBookPrice,
+        shippingFee,
+        deliveryMethod,
+        pickupDate,
+        price: rentAmount,
+        borrowerReceivedBook: false,
+        lenderReceivedPayments: false,
+        startDate: null,
+        dueDate: null,
+        createdAt: serverTimestamp(),
       });
 
-      // Also save to transactions collection for Admin Dashboard
+      const chatId = [auth.currentUser.uid, lenderId].sort().join('_');
+      const chatRef = doc(db, 'chats', chatId);
+      await setDoc(
+        chatRef,
+        {
+          participants: [auth.currentUser.uid, lenderId],
+          rentalId: rentalRef.id,
+          topic: `Rental: ${selectedBook.title}`,
+          status: 'active',
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      const intro = `Rental reserved for "${selectedBook.title}". Pickup date: ${pickupDate}. Rent Rs. ${rentAmount.toFixed(2)}, security deposit Rs. ${securityDepositAmount.toFixed(2)} (50% of book reference price). Please coordinate handover here and confirm on the rental handover page.`;
+      await addDoc(collection(db, 'chats', chatId, 'messages'), {
+        text: intro,
+        senderId: auth.currentUser.uid,
+        createdAt: serverTimestamp(),
+        displayName: auth.currentUser.displayName || 'Renter',
+      });
+      await updateDoc(chatRef, {
+        lastMessage: intro,
+        lastMessageTimestamp: serverTimestamp(),
+      });
+      notifyChatRecipient({
+        recipientUserId: lenderId,
+        senderLabel: auth.currentUser.displayName || 'Borrower',
+        preview: intro.slice(0, 120),
+        chatId,
+      });
+
       await addDoc(collection(db, 'transactions'), {
         type: 'rent',
         bookTitle: selectedBook.title,
         user: auth.currentUser.displayName || auth.currentUser.email || 'Unknown User',
-        amount: selectedBook.rentalOptions[rentalPeriod],
+        amount: totalAtCheckout,
         date: new Date().toISOString(),
-        status: 'completed',
+        status: 'pending_handover',
         relatedId: rentalRef.id,
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
       });
 
+      await addDoc(collection(db, 'notifications'), {
+        userId: lenderId,
+        type: 'rental_reserved',
+        title: 'Rental reserved',
+        message: `${auth.currentUser.displayName || 'A borrower'} reserved "${selectedBook.title}" for pickup on ${pickupDate}. Open Rentals to confirm payment receipt and handover.`,
+        read: false,
+        timestamp: serverTimestamp(),
+        rentalId: rentalRef.id,
+        bookId: selectedBook.id,
+      });
+
+      setLastRentalId(rentalRef.id);
       setCurrentStep('success');
     } catch (error) {
       console.error('Error saving rental:', error);
@@ -162,7 +241,9 @@ export function RentBookFlow({ onClose, preSelectedBook }: RentBookFlowProps) {
       {currentStep === 'details' && selectedBook && (
         <RentalBookDetails
           book={selectedBook}
-          onBack={() => setCurrentStep('browse')}
+          deliveryMethod={deliveryMethod}
+          onDeliveryMethodChange={setDeliveryMethod}
+          onBack={() => setCurrentStep(preSelectedBook ? 'selection' : 'browse')}
           onRent={handleConfirmRental}
         />
       )}
@@ -171,13 +252,16 @@ export function RentBookFlow({ onClose, preSelectedBook }: RentBookFlowProps) {
         <RentalConfirmation
           book={selectedBook}
           rentalPeriod={rentalPeriod}
+          deliveryMethod={deliveryMethod}
+          pickupDate={pickupDate}
+          onPickupDateChange={setPickupDate}
           onBack={() => setCurrentStep('details')}
           onConfirm={handleCompleteRental}
         />
       )}
 
-      {currentStep === 'success' && selectedBook && (
-        <RentalSuccess book={selectedBook} onClose={onClose} />
+      {currentStep === 'success' && selectedBook && lastRentalId && (
+        <RentalSuccess book={selectedBook} rentalId={lastRentalId} onClose={onClose} />
       )}
     </div>
   );

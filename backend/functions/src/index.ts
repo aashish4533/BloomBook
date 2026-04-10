@@ -4,7 +4,7 @@ import * as logger from "firebase-functions/logger";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 
-setGlobalOptions({ maxInstances: 10 });
+setGlobalOptions({ maxInstances: 10, region: "us-central1" });
 
 /**
  * Returns 5 curated antigravity-themed book recommendations.

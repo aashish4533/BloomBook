@@ -108,7 +108,7 @@ export function BookDetailModal({ book, onClose }: BookDetailModalProps) {
               <p className="text-lg text-gray-600">{book.author}</p>
             </div>
             <div className="text-right">
-              <div className="text-3xl font-bold text-[#C4A672]">${book.price}</div>
+              <div className="text-3xl font-bold text-[#C4A672]">Rs. {Number(book.price).toLocaleString()}</div>
               <span className={`inline-block mt-2 px-3 py-1 rounded-full text-sm font-medium ${getConditionColor(book.condition)}`}>
                 {book.condition}
               </span>
@@ -275,12 +275,12 @@ function NegotiateDialog({ book, onClose }: { book: Book; onClose: () => void })
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg p-6 max-w-md w-full">
         <h3 className="text-[#2C3E50] mb-4">Negotiate Price</h3>
-        <p className="text-gray-600 text-sm mb-4">Current asking price: ${book.price.toFixed(2)}</p>
+        <p className="text-gray-600 text-sm mb-4">Current asking price: Rs. {book.price.toFixed(2)}</p>
         <div className="space-y-4">
           <div>
             <label className="text-sm text-gray-700 block mb-2">Your Offer</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">Rs.</span>
               <input
                 type="number"
                 step="0.01"

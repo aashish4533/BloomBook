@@ -50,3 +50,21 @@ export const openFilePreview = (url: string): void => {
     }
     window.open(url, '_blank', 'noopener,noreferrer');
 };
+
+/**
+ * True when the URL cannot be loaded by third-party viewers (e.g. Google Docs) or is unsafe to embed
+ * in an iframe next to chrome-error navigations (typical on localhost / private IPs with self-signed HTTPS).
+ */
+export function cannotUseEmbeddedExternalViewer(fileUrl: string): boolean {
+    try {
+        const u = new URL(fileUrl, typeof window !== 'undefined' ? window.location.href : 'https://localhost');
+        const h = u.hostname.toLowerCase();
+        if (h === 'localhost' || h === '127.0.0.1' || h === '[::1]') return true;
+        if (/^192\.168\.\d+\.\d+$/.test(h)) return true;
+        if (/^10\.\d+\.\d+\.\d+$/.test(h)) return true;
+        if (/^172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+$/.test(h)) return true;
+        return false;
+    } catch {
+        return true;
+    }
+}

@@ -1,5 +1,5 @@
 import { Book } from './BookMarketplace';
-import { Star, User, Tag, Calendar, ShoppingCart } from 'lucide-react';
+import { Star, ShoppingCart, Heart } from 'lucide-react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { Badge } from './ui/badge';
 import { useCart } from '../context/CartContext';
@@ -9,7 +9,6 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { handleAuthCheck } from '../utils/auth';
 import { useWishlist } from '../hooks/useWishlist';
-import { useUserRole } from '../context/UserRoleContext';
 
 interface BookCardProps {
   book: Book;
@@ -22,7 +21,6 @@ export function BookCard({ book, onClick }: BookCardProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { isInWishlist, toggleWishlist } = useWishlist();
-  const { isAdmin } = useUserRole();
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -42,6 +40,7 @@ export function BookCard({ book, onClick }: BookCardProps) {
 
   const handleToggleWishlist = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!handleAuthCheck(user, navigate, location.pathname)) return;
     toggleWishlist(book);
   };
 
@@ -75,15 +74,16 @@ export function BookCard({ book, onClick }: BookCardProps) {
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
         />
 
-        {/* Wishlist Button - Available for all logged-in users */}
-        {user && (
-          <button
-            onClick={handleToggleWishlist}
-            className="absolute top-2 left-2 p-1.5 rounded-full bg-white/80 hover:bg-white text-gray-500 hover:text-red-500 shadow-sm transition-colors z-10"
-          >
-            <Star className={`w-4 h-4 ${isInWishlist(book.id) ? 'fill-red-500 text-red-500' : ''}`} />
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={handleToggleWishlist}
+          aria-label={isInWishlist(book.id) ? 'Remove from wishlist' : 'Save to wishlist'}
+          className="absolute top-2 left-2 p-1.5 rounded-full bg-white/90 hover:bg-white text-gray-500 hover:text-red-500 shadow-sm transition-colors z-10"
+        >
+          <Heart
+            className={`w-4 h-4 ${isInWishlist(book.id) ? 'fill-red-500 text-red-500' : ''}`}
+          />
+        </button>
 
         <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
           {book.availableFor?.includes('sale') && <Badge className="bg-blue-100 text-blue-800 shadow-sm">Sale</Badge>}

@@ -25,6 +25,7 @@ import { UserDashboard } from './components/UserDashboard';
 import { BookMarketplace } from './components/BookMarketplace';
 import { BookDetailsPage } from './components/BookDetailsPage';
 import { RentBookFlow } from './components/RentBookFlow';
+import { RentalHandoverPage } from './components/Rental/RentalHandoverPage';
 import { SellBookFlow } from './components/SellBookFlow';
 import { ExchangeBookFlow } from './components/ExchangeBookFlow';
 import { CommunitiesBrowse } from './components/Communities/CommunitiesBrowse';
@@ -53,9 +54,7 @@ import { Wishlist } from './components/User/Wishlist';
 import { UserCommunities } from './components/User/UserCommunities';
 import { UserChats } from './components/User/UserChats';
 import { UserExchanges } from './components/User/UserExchanges';
-import { ExchangesPage } from './components/pages/ExchangesPage';
 import { NegotiationInbox } from './components/User/NegotiationInbox';
-import { PayoutSettings } from './components/User/PayoutSettings';
 
 // AI Integration
 import { AIChatbox } from './components/Chat/AIChatbox';
@@ -66,7 +65,7 @@ import { AIAssistantPage } from './components/AIAssistantPage';
 import { UserManagement } from './components/Admin/UserManagement';
 import { BookInventory } from './components/Admin/BookInventory';
 import { RentalManagement } from './components/Admin/RentalManagement';
-import { TransactionHistory } from './components/Admin/TransactionHistory';
+import TransactionHistory from './components/Admin/TransactionHistory';
 import { CommunityManagement } from './components/Admin/CommunityManagement';
 import { NotesManagement } from './components/Admin/NotesManagement';
 import { SystemSettings } from './components/Admin/SystemSettings';
@@ -300,6 +299,7 @@ function AppContent() {
             <Route path="/book/:id" element={<BookDetailsPage />} />
             <Route path="/sell" element={<SellBookFlowWrapper />} />
             <Route path="/rent" element={<RentBookFlowWrapper />} />
+            <Route path="/rental/:rentalId/handover" element={<RentalHandoverPage />} />
             <Route path="/exchange" element={<ExchangeBookFlowWrapper />} />
 
             <Route path="/communities" element={<CommunitiesBrowseWrapper />} />
@@ -329,26 +329,26 @@ function AppContent() {
               <Route path="chats" element={<UserChats />} />
               <Route path="exchanges" element={<UserExchanges />} />
               <Route path="negotiations" element={<NegotiationInbox />} />
-              <Route path="payout" element={<PayoutSettings />} />
             </Route>
 
             <Route path="/tutor-verification" element={<TutorVerificationForm />} />
           </Route>
 
-          {/* Admin Routes */}
-          <Route element={<AdminRoute />}>
-            <Route path="/admin" element={<AdminDashboard onLogout={handleLogout} />}>
-              <Route path="users" element={<UserManagement />} />
-              <Route path="inventory" element={<BookInventory />} />
-              <Route path="rentals" element={<RentalManagement />} />
-              <Route path="transactions" element={<TransactionHistory />} />
-              <Route path="communities" element={<CommunityManagement />} />
-              <Route path="notes" element={<NotesManagement />} />
-              <Route path="tuition" element={<TuitionManagement />} />
-              <Route path="announcements" element={<AdminAnnouncementsWrapper />} />
-              <Route path="settings" element={<SystemSettings />} />
-              <Route index element={<Navigate to="users" replace />} />
-            </Route>
+        </Route>
+
+        {/* Admin Routes */}
+        <Route element={<AdminRoute />}>
+          <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="/admin/dashboard" element={<AdminDashboard onLogout={handleLogout} />}>
+            <Route index element={<UserManagement />} />
+            <Route path="books" element={<BookInventory />} />
+            <Route path="rentals" element={<RentalManagement />} />
+            <Route path="transactions" element={<TransactionHistory />} />
+            <Route path="communities" element={<CommunityManagement />} />
+            <Route path="notes" element={<NotesManagement />} />
+            <Route path="tuition" element={<TuitionManagement />} />
+            <Route path="announcements" element={<AdminAnnouncementsWrapper />} />
+            <Route path="settings" element={<SystemSettings />} />
           </Route>
         </Route>
 

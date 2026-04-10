@@ -4,7 +4,7 @@ import { LocationData } from '../SellBookFlow';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Label } from '../ui/label';
-import { MapPin, Package, Truck, MapPinned } from 'lucide-react';
+import { MapPin, Package, MapPinned } from 'lucide-react';
 
 // 1. Import Leaflet and React-Leaflet components
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
@@ -31,12 +31,128 @@ interface LocationStepProps {
 }
 
 // 3. Helper component to recenter map when coordinates change
-function MapUpdater({ center }: { center: [number, number] }) {
+function MapUpdater({ center, zoom }: { center: [number, number]; zoom: number }) {
   const map = useMap();
   useEffect(() => {
-    map.setView(center, 13);
-  }, [center, map]);
+    map.setView(center, zoom);
+  }, [center, zoom, map]);
   return null;
+}
+
+const GEO_OPTIONS: PositionOptions = {
+  enableHighAccuracy: true,
+  maximumAge: 0,
+  // Give GPS radios time on cold start (especially mobile).
+  timeout: 35000,
+};
+
+/** Smaller = better; unknown / zero accuracy treated as weak so GPS can replace it. */
+function effectiveAccuracyMeters(coords: GeolocationCoordinates): number {
+  const a = coords.accuracy;
+  if (!Number.isFinite(a) || a <= 0) return 9999;
+  return a;
+}
+
+/**
+ * Seeds with getCurrentPosition, then watchPosition for several seconds and keeps
+ * the fix with the lowest reported uncertainty (typical on GPS vs first Wi‑Fi fix).
+ * Resolves early if accuracy ≤ 10 m (good satellite lock).
+ */
+function getBestHighAccuracyPosition(): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('Geolocation not supported'));
+      return;
+    }
+
+    let best: GeolocationPosition | null = null;
+    let bestScore = Infinity;
+    let finished = false;
+    let watchId = 0;
+    let timeoutId: ReturnType<typeof window.setTimeout> | undefined;
+
+    const cleanup = () => {
+      if (watchId !== 0) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = 0;
+      }
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+        timeoutId = undefined;
+      }
+    };
+
+    const resolveOne = (pos: GeolocationPosition) => {
+      if (finished) return;
+      finished = true;
+      cleanup();
+      resolve(pos);
+    };
+
+    const rejectOne = (err: GeolocationPositionError | Error) => {
+      if (finished) return;
+      finished = true;
+      cleanup();
+      reject(err);
+    };
+
+    const consider = (pos: GeolocationPosition) => {
+      if (finished) return;
+      const score = effectiveAccuracyMeters(pos.coords);
+      if (!best || score < bestScore) {
+        best = pos;
+        bestScore = score;
+      }
+      if (score <= 10) {
+        resolveOne(pos);
+      }
+    };
+
+    watchId = navigator.geolocation.watchPosition(
+      (pos) => consider(pos),
+      (err) => {
+        if (err.code === 1 && !best) {
+          rejectOne(err);
+        }
+      },
+      GEO_OPTIONS
+    );
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => consider(pos),
+      () => {},
+      GEO_OPTIONS
+    );
+
+    const WATCH_MS = 22000;
+    timeoutId = window.setTimeout(() => {
+      if (finished) return;
+      if (best) {
+        resolveOne(best);
+        return;
+      }
+      cleanup();
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolveOne(pos),
+        (err) => rejectOne(err),
+        GEO_OPTIONS
+      );
+    }, WATCH_MS);
+  });
+}
+
+async function reverseGeocodeOpenStreetMap(latitude: number, longitude: number) {
+  const params = new URLSearchParams({
+    format: 'jsonv2',
+    lat: String(latitude),
+    lon: String(longitude),
+    zoom: '18',
+    addressdetails: '1',
+  });
+  const response = await fetch(
+    `https://nominatim.openstreetmap.org/reverse?${params.toString()}`
+  );
+  return response.json();
 }
 
 export function LocationStep({ initialData, onNext, onBack }: LocationStepProps) {
@@ -44,11 +160,11 @@ export function LocationStep({ initialData, onNext, onBack }: LocationStepProps)
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [locating, setLocating] = useState(false);
 
-  // Default center (San Francisco) if no coordinates provided
   const defaultCenter: [number, number] = [37.7749, -122.4194];
   const mapCenter: [number, number] = formData.coordinates
     ? [formData.coordinates.lat, formData.coordinates.lng]
     : defaultCenter;
+  const mapZoom = formData.coordinates ? 18 : 12;
 
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
@@ -66,68 +182,95 @@ export function LocationStep({ initialData, onNext, onBack }: LocationStepProps)
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleUseCurrentLocation = () => {
+  const handleUseCurrentLocation = async () => {
+    if (!('geolocation' in navigator)) {
+      toast.error('Geolocation is not supported by this browser.');
+      return;
+    }
+
+    if (!window.isSecureContext) {
+      toast.warning('Open this app over HTTPS', {
+        description:
+          'Browsers only expose precise location on a secure origin. Use https:// (the dev server now enables it) or production hosting with SSL.',
+      });
+    }
+
     setLocating(true);
 
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords;
+    let latitude = 0;
+    let longitude = 0;
+    let accuracy = Infinity;
 
-          try {
-            // FETCH IMPLEMENTATION: OpenStreetMap Nominatim API
-            // This fetches address details based on the lat/long
-            const response = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
-            );
-            const data = await response.json();
+    try {
+      const position = await getBestHighAccuracyPosition();
+      latitude = position.coords.latitude;
+      longitude = position.coords.longitude;
+      accuracy = position.coords.accuracy;
 
-            const addressParts = data.address || {};
+      try {
+        const data = await reverseGeocodeOpenStreetMap(latitude, longitude);
 
-            // Construct fields from API response
-            const street = [addressParts.house_number, addressParts.road].filter(Boolean).join(' ');
-            const city = addressParts.city || addressParts.town || addressParts.village || addressParts.hamlet || '';
+        const addressParts = data.address || {};
+        const street = [addressParts.house_number, addressParts.road].filter(Boolean).join(' ').trim();
+        const city =
+          addressParts.city ||
+          addressParts.town ||
+          addressParts.village ||
+          addressParts.hamlet ||
+          addressParts.suburb ||
+          addressParts.neighbourhood ||
+          addressParts.municipality ||
+          addressParts.county ||
+          '';
+        const state =
+          addressParts.state ||
+          addressParts.region ||
+          addressParts.state_district ||
+          '';
 
-            setFormData({
-              ...formData,
-              address: street || 'Detected Location', // Fallback if road isn't found
-              city: city,
-              state: addressParts.state || '',
-              zipCode: addressParts.postcode || '',
-              coordinates: {
-                lat: latitude,
-                lng: longitude
-              }
-            });
+        setFormData((prev) => ({
+          ...prev,
+          method: 'pickup',
+          address: street || data.display_name?.split(',').slice(0, 2).join(', ').trim() || 'Detected location',
+          city,
+          state,
+          zipCode: addressParts.postcode || '',
+          coordinates: { lat: latitude, lng: longitude },
+        }));
 
-            // Clear any previous errors
-            setErrors({});
+        setErrors({});
 
-          } catch (error) {
-            console.error("Reverse geocoding failed", error);
-            // Fallback: If API fails, at least update the map coordinates
-            setFormData(prev => ({
-              ...prev,
-              coordinates: { lat: latitude, lng: longitude }
-            }));
-            alert('Location found, but could not retrieve address details automatically.');
-          } finally {
-            setLocating(false);
-          }
-        },
-        (error) => {
-          console.error('Error getting location:', error.message);
-          let errorMessage = 'Unable to get your location.';
-          if (error.code === error.PERMISSION_DENIED) {
-            errorMessage = 'Location permission denied. Please enable it in your browser settings.';
-          }
-          alert(errorMessage);
-          setLocating(false);
-        },
-        { enableHighAccuracy: true }
-      );
-    } else {
-      alert('Geolocation is not supported by your browser.');
+        if (Number.isFinite(accuracy) && accuracy > 25) {
+          toast.message('Location can be more precise', {
+            description:
+              'Use HTTPS, allow location + Precise/Exact location for this site (browser site settings), wait a few seconds on first lock, or move near a window/outdoors and tap again.',
+          });
+        }
+      } catch (error) {
+        console.error('Reverse geocoding failed', error);
+        setFormData((prev) => ({
+          ...prev,
+          method: 'pickup',
+          coordinates: { lat: latitude, lng: longitude },
+        }));
+        toast.error('Could not resolve address from coordinates. Enter your street details manually.');
+      }
+    } catch (error: unknown) {
+      console.error('Error getting location:', error);
+      let errorMessage = 'Unable to get your location.';
+      if (error && typeof error === 'object' && 'code' in error) {
+        const code = (error as GeolocationPositionError).code;
+        if (code === 1) {
+          errorMessage =
+            'Location permission denied. Allow location and Precise/Exact location for this site in your browser settings.';
+        } else if (code === 2) {
+          errorMessage = 'Position unavailable. Check GPS/network or try again outdoors.';
+        } else if (code === 3) {
+          errorMessage = 'Location request timed out. Try again—first GPS lock can take longer.';
+        }
+      }
+      toast.error(errorMessage);
+    } finally {
       setLocating(false);
     }
   };
@@ -135,7 +278,7 @@ export function LocationStep({ initialData, onNext, onBack }: LocationStepProps)
   const handleSubmitForm = (e: React.FormEvent) => {
     e.preventDefault();
     if (validateForm()) {
-      onNext(formData);
+      onNext({ ...formData, method: 'pickup' });
     } else {
       toast.error('Please fill in all required location fields correctly.');
       console.warn('Validation failed. Missing fields in formData.');
@@ -149,66 +292,16 @@ export function LocationStep({ initialData, onNext, onBack }: LocationStepProps)
           <MapPin className="w-6 h-6 text-[#C4A672]" />
         </div>
         <div>
-          <h3 className="text-[#2C3E50]">Location & Delivery Options</h3>
-          <p className="text-gray-600 text-sm">Help buyers find your book by sharing your location</p>
+          <h3 className="text-[#2C3E50]">Pickup location</h3>
+          <p className="text-gray-600 text-sm">Buyers will meet you locally to collect the book</p>
         </div>
       </div>
 
-      {/* Delivery Method Selection (Unchanged) */}
-      <div className="space-y-3">
-        <Label>Delivery Method *</Label>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <button
-            type="button"
-            onClick={() => setFormData({ ...formData, method: 'pickup' })}
-            className={`p-4 border-2 rounded-lg transition-all ${formData.method === 'pickup'
-              ? 'border-[#C4A672] bg-[#C4A672]/5'
-              : 'border-gray-200 hover:border-gray-300'
-              }`}
-          >
-            <Package className={`w-6 h-6 mx-auto mb-2 ${formData.method === 'pickup' ? 'text-[#C4A672]' : 'text-gray-400'
-              }`} />
-            <div className="text-center">
-              <div className="text-sm">Local Pickup</div>
-              <div className="text-xs text-gray-500 mt-1">Meet in person</div>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setFormData({ ...formData, method: 'shipping' })}
-            className={`p-4 border-2 rounded-lg transition-all ${formData.method === 'shipping'
-              ? 'border-[#C4A672] bg-[#C4A672]/5'
-              : 'border-gray-200 hover:border-gray-300'
-              }`}
-          >
-            <Truck className={`w-6 h-6 mx-auto mb-2 ${formData.method === 'shipping' ? 'text-[#C4A672]' : 'text-gray-400'
-              }`} />
-            <div className="text-center">
-              <div className="text-sm">Shipping Only</div>
-              <div className="text-xs text-gray-500 mt-1">Ship to buyer</div>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setFormData({ ...formData, method: 'both' })}
-            className={`p-4 border-2 rounded-lg transition-all ${formData.method === 'both'
-              ? 'border-[#C4A672] bg-[#C4A672]/5'
-              : 'border-gray-200 hover:border-gray-300'
-              }`}
-          >
-            <div className="flex justify-center gap-1 mb-2">
-              <Package className={`w-5 h-5 ${formData.method === 'both' ? 'text-[#C4A672]' : 'text-gray-400'
-                }`} />
-              <Truck className={`w-5 h-5 ${formData.method === 'both' ? 'text-[#C4A672]' : 'text-gray-400'
-                }`} />
-            </div>
-            <div className="text-center">
-              <div className="text-sm">Both Options</div>
-              <div className="text-xs text-gray-500 mt-1">Most flexible</div>
-            </div>
-          </button>
+      <div className="flex items-start gap-3 rounded-lg border border-[#C4A672]/30 bg-[#C4A672]/5 p-4">
+        <Package className="w-5 h-5 text-[#C4A672] shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-medium text-[#2C3E50]">Local pickup only</p>
+          <p className="text-xs text-gray-600 mt-1">Listings use in-person pickup. Share an accurate meeting address.</p>
         </div>
       </div>
 
@@ -228,10 +321,11 @@ export function LocationStep({ initialData, onNext, onBack }: LocationStepProps)
                 size="sm"
                 onClick={handleUseCurrentLocation}
                 disabled={locating}
+                title="Samples GPS for up to ~22s and uses the most accurate reading (enable Precise location in browser settings)"
                 className="h-8 text-xs bg-[#C4A672]/10 text-[#C4A672] hover:bg-[#C4A672]/20 border-[#C4A672]/30"
               >
                 <MapPinned className="w-3 h-3 mr-1" />
-                {locating ? 'Locating...' : '📍 Use Current Location'}
+                {locating ? 'Locating…' : 'Use current location'}
               </Button>
             </div>
             <Input
@@ -242,6 +336,10 @@ export function LocationStep({ initialData, onNext, onBack }: LocationStepProps)
               placeholder="Enter street address"
             />
             {errors.address && <p className="text-sm text-red-500">{errors.address}</p>}
+            <p className="text-xs text-gray-500 leading-snug">
+              Best accuracy: open the site with <strong className="text-gray-700">https://</strong>, allow location, turn on{' '}
+              <strong className="text-gray-700">Precise location</strong> for this site (address bar lock icon → site settings → Location), then try again near a window or outdoors.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -284,14 +382,14 @@ export function LocationStep({ initialData, onNext, onBack }: LocationStepProps)
       <div className="h-64 rounded-lg overflow-hidden border border-gray-300 z-0 relative">
         <MapContainer
           center={mapCenter}
-          zoom={13}
+          zoom={mapZoom}
           style={{ height: '100%', width: '100%' }}
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          <MapUpdater center={mapCenter} />
+          <MapUpdater center={mapCenter} zoom={mapZoom} />
           {formData.coordinates && (
             <Marker position={[formData.coordinates.lat, formData.coordinates.lng]}>
               <Popup>

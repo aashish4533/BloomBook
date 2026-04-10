@@ -6,16 +6,43 @@ service firebase.storage {
       return request.auth != null;
     }
 
+    // Match Firestore user role (same idea as firestore.rules isAdmin for uploads)
+    function isStorageAdmin() {
+      return isAuthenticated()
+        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
     // Helper: Is the file an image and under 5MB?
     function isImageUnder5MB() {
       return request.resource.size < 5 * 1024 * 1024 
              && request.resource.contentType.matches('image/.*');
     }
 
-    // Book Images
-    match /book_images/{imageId} {
+    // Helper: Allow common note/document uploads up to 25MB.
+    function isAllowedNotesFile() {
+      return request.resource.size < 25 * 1024 * 1024
+             && (
+               request.resource.contentType.matches('application/pdf')
+               || request.resource.contentType.matches('application/msword')
+               || request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+               || request.resource.contentType.matches('application/vnd.ms-powerpoint')
+               || request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.presentationml.presentation')
+               || request.resource.contentType.matches('text/plain')
+               || request.resource.contentType.matches('image/.*')
+             );
+    }
+
+    // Book listing images: book_images/{uid}/{fileName} (GiveBooksOnRent, SellBookFlow, ExchangeBookFlow)
+    match /book_images/{userId}/{fileName} {
       allow read: if true;
-      allow write: if isAuthenticated() && isImageUnder5MB();
+      allow write: if isAuthenticated() && request.auth.uid == userId && isImageUnder5MB();
+    }
+
+    // Admin-added inventory images: book_images/admin/{fileName}
+    match /book_images/admin/{fileName} {
+      allow read: if true;
+      allow write: if isStorageAdmin() && isImageUnder5MB();
     }
 
     // Community Covers
@@ -34,6 +61,14 @@ service firebase.storage {
     match /verifications/{userId}/{docId} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || request.auth.token.admin == true);
       allow write: if isAuthenticated() && request.auth.uid == userId && isImageUnder5MB();
+    }
+
+    // Notes / Helping Material uploads
+    match /helping-material/{userEmail}/{fileName} {
+      allow read: if true;
+      allow write: if isAuthenticated()
+                   && request.auth.token.email == userEmail
+                   && isAllowedNotesFile();
     }
   }
 }

@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { FileText, Upload, Search, ArrowLeft, Download, Eye, Trash2, Pencil, Loader2 } from 'lucide-react';
+import { FileText, Upload, Search, ArrowLeft, Download, Eye, Trash2, Pencil, Loader2, ClipboardList, Calendar, Send } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from './ui/dialog';
 import { Label } from './ui/label';
+import { Textarea } from './ui/textarea';
 import { db, auth, storage } from '../firebase';
 import { collection, addDoc, deleteDoc, updateDoc, doc, serverTimestamp, query, orderBy } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -15,6 +16,28 @@ import { NotesViewer } from './NotesViewer';
 import { useNavigate } from 'react-router-dom';
 import { downloadFile } from '../utils/fileHandler';
 import { FilePreview } from './FilePreview';
+import { openMaterialRequestChat } from '../utils/chatUtils';
+
+const EXPLORE_CATEGORIES = [
+    'Computer Science',
+    'Mathematics',
+    'Blockchain',
+    'Data Structures',
+    'Programming',
+    'Machine Learning',
+] as const;
+
+interface MaterialRequest {
+    id: string;
+    materialType: string;
+    course: string;
+    title: string;
+    details: string;
+    requesterId: string;
+    requesterEmail?: string;
+    requesterName: string;
+    createdAt: any;
+}
 
 interface Note {
     id: string;
@@ -34,7 +57,8 @@ interface Note {
 
 export function NotesHub() {
     const navigate = useNavigate();
-    const [searchQuery, setSearchQuery] = useState('');
+    const [hubSearch, setHubSearch] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
     const [selectedNote, setSelectedNote] = useState<Note | null>(null);
     const [previewNote, setPreviewNote] = useState<Note | null>(null); // New state for preview dialog
     const [isUploading, setIsUploading] = useState(false);
@@ -56,8 +80,21 @@ export function NotesHub() {
     const [deletingNote, setDeletingNote] = useState<Note | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
+    const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
+    const [requestForm, setRequestForm] = useState({
+        materialType: 'notes',
+        course: '',
+        title: '',
+        details: ''
+    });
+    const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
+    const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null);
+
     const [value, loading, error] = useCollection(
         query(collection(db, 'notes'), orderBy('timestamp', 'desc')) // Order by new field
+    );
+    const [requestsSnap, requestsLoading] = useCollection(
+        query(collection(db, 'material_requests'), orderBy('createdAt', 'desc'))
     );
 
     const notes = value?.docs.map(doc => {
@@ -72,7 +109,77 @@ export function NotesHub() {
         } as Note;
     }) || [];
 
+    const materialRequests: MaterialRequest[] = requestsSnap?.docs.map((d) => ({
+        id: d.id,
+        ...d.data()
+    } as MaterialRequest)) || [];
+
     const currentUserEmail = auth.currentUser?.email;
+    const currentUserId = auth.currentUser?.uid;
+
+    const handleSubmitMaterialRequest = async () => {
+        if (!auth.currentUser) {
+            toast.error('Please log in to post a request');
+            navigate('/login');
+            return;
+        }
+        if (!requestForm.course.trim() || !requestForm.title.trim()) {
+            toast.error('Course and what you need are required');
+            return;
+        }
+        setIsSubmittingRequest(true);
+        try {
+            await addDoc(collection(db, 'material_requests'), {
+                materialType: requestForm.materialType,
+                course: requestForm.course.trim(),
+                title: requestForm.title.trim(),
+                details: requestForm.details.trim(),
+                requesterId: auth.currentUser.uid,
+                requesterEmail: auth.currentUser.email || null,
+                requesterName: auth.currentUser.displayName || 'Anonymous',
+                createdAt: serverTimestamp()
+            });
+            toast.success('Your request was posted');
+            setRequestForm({ materialType: 'notes', course: '', title: '', details: '' });
+            setIsRequestDialogOpen(false);
+        } catch (e: any) {
+            console.error(e);
+            toast.error(e?.message || 'Failed to post request');
+        } finally {
+            setIsSubmittingRequest(false);
+        }
+    };
+
+    const handleSendMaterial = async (req: MaterialRequest) => {
+        if (!auth.currentUser) {
+            toast.error('Please log in to send material');
+            navigate('/login');
+            return;
+        }
+        if (auth.currentUser.uid === req.requesterId) {
+            return;
+        }
+        try {
+            await openMaterialRequestChat(navigate, auth.currentUser.uid, req);
+        } catch (e) {
+            console.error(e);
+            toast.error('Could not open chat');
+        }
+    };
+
+    const handleDeleteMaterialRequest = async (id: string) => {
+        if (!window.confirm('Remove this request?')) return;
+        setDeletingRequestId(id);
+        try {
+            await deleteDoc(doc(db, 'material_requests', id));
+            toast.success('Request removed');
+        } catch (e: any) {
+            console.error(e);
+            toast.error(e?.message || 'Failed to remove request');
+        } finally {
+            setDeletingRequestId(null);
+        }
+    };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -206,10 +313,31 @@ export function NotesHub() {
 
     // ── Filtering ───────────────────────────────────────────────────────
 
-    const filteredNotes = notes.filter(note =>
-        note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        note.subject.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const q = hubSearch.trim().toLowerCase();
+    const filteredMaterialRequests = materialRequests.filter((r) => {
+        if (!q) return true;
+        return (
+            r.title.toLowerCase().includes(q) ||
+            r.course.toLowerCase().includes(q) ||
+            r.materialType.toLowerCase().includes(q) ||
+            (r.details || '').toLowerCase().includes(q)
+        );
+    });
+
+    const filteredNotes = notes.filter((note) => {
+        const matchesSearch =
+            !q ||
+            note.title.toLowerCase().includes(q) ||
+            note.subject.toLowerCase().includes(q) ||
+            (note.description || '').toLowerCase().includes(q);
+        const cat = (categoryFilter || '').toLowerCase();
+        const matchesCategory =
+            !categoryFilter ||
+            note.subject.toLowerCase().includes(cat) ||
+            note.title.toLowerCase().includes(cat) ||
+            (note.description || '').toLowerCase().includes(cat);
+        return matchesSearch && matchesCategory;
+    });
 
     return (
         <div className="min-h-screen bg-gray-50 pb-20 md:pb-8">
@@ -233,6 +361,86 @@ export function NotesHub() {
                             <p className="text-white/80">Share and discover study materials</p>
                         </div>
 
+                        <div className="flex flex-wrap gap-2 justify-end">
+                        <Dialog open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen}>
+                            <DialogTrigger asChild>
+                                <Button variant="outline" className="border-white/40 bg-white/10 text-white hover:bg-white/20 hover:text-white">
+                                    <ClipboardList className="w-4 h-4 mr-2" />
+                                    Request Material
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-lg">
+                                <DialogHeader>
+                                    <DialogTitle>Request material</DialogTitle>
+                                    <DialogDescription>
+                                        Ask for a specific book, notes, slides, or anything else for a course. Anyone browsing the hub can see your request.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="grid gap-4 py-2">
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="req-type">Type</Label>
+                                        <select
+                                            id="req-type"
+                                            value={requestForm.materialType}
+                                            onChange={(e) => setRequestForm({ ...requestForm, materialType: e.target.value })}
+                                            className="w-full border rounded-md h-10 px-3 bg-white text-sm"
+                                        >
+                                            <option value="book">Book</option>
+                                            <option value="notes">Notes</option>
+                                            <option value="slides">Slides / handouts</option>
+                                            <option value="past_papers">Past papers</option>
+                                            <option value="other">Other material</option>
+                                        </select>
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="req-course">Course / subject</Label>
+                                        <Input
+                                            id="req-course"
+                                            value={requestForm.course}
+                                            onChange={(e) => setRequestForm({ ...requestForm, course: e.target.value })}
+                                            placeholder="e.g. CS1001 — Data Structures"
+                                            disabled={isSubmittingRequest}
+                                        />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="req-title">What do you need?</Label>
+                                        <Input
+                                            id="req-title"
+                                            value={requestForm.title}
+                                            onChange={(e) => setRequestForm({ ...requestForm, title: e.target.value })}
+                                            placeholder="e.g. Instructor slides for week 3–5, or CLRS textbook PDF"
+                                            disabled={isSubmittingRequest}
+                                        />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="req-details">Details (optional)</Label>
+                                        <Textarea
+                                            id="req-details"
+                                            value={requestForm.details}
+                                            onChange={(e) => setRequestForm({ ...requestForm, details: e.target.value })}
+                                            placeholder="Edition, language, deadline, link to syllabus, etc."
+                                            className="min-h-[100px]"
+                                            disabled={isSubmittingRequest}
+                                        />
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        onClick={handleSubmitMaterialRequest}
+                                        className="bg-[#C4A672] hover:bg-[#8B7355] text-white"
+                                        disabled={isSubmittingRequest}
+                                    >
+                                        {isSubmittingRequest ? (
+                                            <>
+                                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                                Posting…
+                                            </>
+                                        ) : (
+                                            'Post request'
+                                        )}
+                                    </Button>
+                                </div>
+                            </DialogContent>
+                        </Dialog>
                         <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
                             <DialogTrigger asChild>
                                 <Button className="bg-[#C4A672] hover:bg-[#8B7355] text-white">
@@ -314,93 +522,189 @@ export function NotesHub() {
                                 </div>
                             </DialogContent>
                         </Dialog>
-                    </div>
-
-                    {/* Search Bar */}
-                    <div className="mt-6 relative max-w-2xl">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                        <Input
-                            type="text"
-                            placeholder="Search notes by title or subject..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-12 h-12 bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:bg-white/20"
-                        />
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div className="max-w-7xl mx-auto px-4 py-8">
-                {loading ? (
-                    <div>Loading notes...</div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {filteredNotes.map((note) => {
-                            // Check ownership by email match
-                            const isOwner = currentUserEmail === note.uploadedBy;
+            <div className="max-w-7xl mx-auto px-4 py-6">
+                <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3 mb-6">
+                    <div className="relative max-w-3xl">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <Input
+                            type="search"
+                            placeholder="Search requests, shared files, or categories…"
+                            value={hubSearch}
+                            onChange={(e) => setHubSearch(e.target.value)}
+                            className="pl-11 h-11 bg-gray-50 border-gray-200"
+                            aria-label="Search hub"
+                        />
+                    </div>
+                </div>
 
-                            return (
-                                <Card key={note.id} className="hover:shadow-lg transition-shadow p-6">
-                                    <div className="flex items-start justify-between mb-4">
-                                        <div className="p-3 bg-red-100 rounded-lg">
-                                            <FileText className="w-6 h-6 text-red-500" />
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <Badge variant="outline">{note.subject}</Badge>
-                                            {/* Owner actions */}
-                                            {isOwner && (
-                                                <>
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    {/* Left: material requests */}
+                    <section className="lg:col-span-3 space-y-4" aria-labelledby="material-requests-heading">
+                        <h2 id="material-requests-heading" className="text-base font-semibold text-[#2C3E50]">
+                            Material requests
+                        </h2>
+                        {requestsLoading ? (
+                            <p className="text-gray-500 text-sm">Loading…</p>
+                        ) : filteredMaterialRequests.length === 0 ? (
+                            <p className="text-gray-500 text-sm">No requests match. Post one with &quot;Request Material&quot;.</p>
+                        ) : (
+                            <div className="space-y-4">
+                                {filteredMaterialRequests.map((req) => {
+                                    const isMine = !!currentUserId && currentUserId === req.requesterId;
+                                    const typeLabel = req.materialType.replace(/_/g, ' ');
+                                    const showSendMaterial = !isMine;
+                                    return (
+                                        <Card key={req.id} className="p-4 border border-gray-200 bg-white shadow-sm">
+                                            <div className="flex flex-wrap items-start gap-2 mb-2">
+                                                <Badge variant="secondary" className="capitalize">{typeLabel}</Badge>
+                                                <Badge variant="outline" className="font-normal">{req.course}</Badge>
+                                                <Badge className="bg-green-100 text-green-800 border-0 ml-auto shrink-0">Request Open</Badge>
+                                            </div>
+                                            <h3 className="font-semibold text-[#2C3E50] text-sm mb-1">{req.title}</h3>
+                                            {req.details ? (
+                                                <p className="text-xs text-gray-600 line-clamp-4 mb-3">{req.details}</p>
+                                            ) : null}
+                                            <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
+                                                <span>{req.requesterName}</span>
+                                                {req.createdAt?.toDate ? (
+                                                    <span className="flex items-center gap-1">
+                                                        <Calendar className="w-3.5 h-3.5" />
+                                                        {new Date(req.createdAt.toDate()).toLocaleDateString()}
+                                                    </span>
+                                                ) : null}
+                                                {isMine && (
                                                     <button
-                                                        onClick={() => openEditDialog(note)}
-                                                        className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400 hover:text-blue-600 transition-colors"
-                                                        title="Edit note"
-                                                    >
-                                                        <Pencil className="w-4 h-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setDeletingNote(note)}
-                                                        className="p-1.5 rounded-md hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
-                                                        title="Delete note"
+                                                        type="button"
+                                                        onClick={() => handleDeleteMaterialRequest(req.id)}
+                                                        disabled={deletingRequestId === req.id}
+                                                        className="ml-auto p-1 rounded text-gray-400 hover:text-red-600"
+                                                        title="Remove request"
                                                     >
                                                         <Trash2 className="w-4 h-4" />
                                                     </button>
-                                                </>
+                                                )}
+                                            </div>
+                                            {showSendMaterial && (
+                                                <Button
+                                                    type="button"
+                                                    className="w-full bg-[#C4A672] hover:bg-[#8B7355] text-white"
+                                                    onClick={() => handleSendMaterial(req)}
+                                                >
+                                                    <Send className="w-4 h-4 mr-2" />
+                                                    Send material
+                                                </Button>
                                             )}
-                                        </div>
-                                    </div>
+                                        </Card>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </section>
 
-                                    <h3 className="text-lg font-semibold text-[#2C3E50] mb-2">{note.title}</h3>
-                                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">{note.description}</p>
+                    {/* Center: shared materials */}
+                    <section className="lg:col-span-6 space-y-4" aria-labelledby="shared-materials-heading">
+                        <h2 id="shared-materials-heading" className="text-base font-semibold text-[#2C3E50]">
+                            Shared materials
+                        </h2>
+                        {loading ? (
+                            <p className="text-gray-500 text-sm">Loading…</p>
+                        ) : filteredNotes.length === 0 ? (
+                            <p className="text-gray-500 text-sm">No shared materials match your search or category.</p>
+                        ) : (
+                            <div className="flex flex-col gap-4">
+                                {filteredNotes.map((note) => {
+                                    const isOwner = currentUserEmail === note.uploadedBy;
+                                    return (
+                                        <Card key={note.id} className="hover:shadow-md transition-shadow p-5 border border-gray-200">
+                                            <div className="flex items-start justify-between mb-3">
+                                                <div className="p-3 bg-red-100 rounded-lg">
+                                                    <FileText className="w-6 h-6 text-red-500" />
+                                                </div>
+                                                <div className="flex items-center gap-2 flex-wrap justify-end">
+                                                    <Badge variant="outline">{note.subject}</Badge>
+                                                    {isOwner && (
+                                                        <>
+                                                            <button
+                                                                onClick={() => openEditDialog(note)}
+                                                                className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400 hover:text-blue-600"
+                                                                title="Edit"
+                                                            >
+                                                                <Pencil className="w-4 h-4" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setDeletingNote(note)}
+                                                                className="p-1.5 rounded-md hover:bg-red-50 text-gray-400 hover:text-red-600"
+                                                                title="Delete"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <h3 className="text-lg font-semibold text-[#2C3E50] mb-2">{note.title}</h3>
+                                            <p className="text-sm text-gray-600 mb-4 line-clamp-3">{note.description}</p>
+                                            <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+                                                <span>By {note.authorName}</span>
+                                                <span>{note.timestamp?.toDate ? new Date(note.timestamp.toDate()).toLocaleDateString() : ''}</span>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800"
+                                                    onClick={() => setPreviewNote(note)}
+                                                >
+                                                    <Eye className="w-4 h-4 mr-2" />
+                                                    Preview
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    className="flex-1 border-[#2C3E50] text-[#2C3E50]"
+                                                    disabled={!note.url}
+                                                    onClick={() => downloadFile(note.url, `${note.title}.${note.fileType || 'pdf'}`)}
+                                                >
+                                                    <Download className="w-4 h-4 mr-2" />
+                                                    Download
+                                                </Button>
+                                            </div>
+                                        </Card>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </section>
 
-                                    <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
-                                        <span>By {note.authorName}</span>
-                                        <span>{note.timestamp?.toDate ? new Date(note.timestamp.toDate()).toLocaleDateString() : ''}</span>
-                                    </div>
-
-                                    <div className="flex gap-2">
-                                        <Button
-                                            className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800"
-                                            onClick={() => setPreviewNote(note)}
-                                        >
-                                            <Eye className="w-4 h-4 mr-2" />
-                                            Preview
-                                        </Button>
-
-                                        <Button
-                                            variant="outline"
-                                            className="flex-1"
-                                            disabled={!note.url}
-                                            onClick={() => downloadFile(note.url, `${note.title}.${note.fileType || 'pdf'}`)}
-                                        >
-                                            <Download className="w-4 h-4 mr-2" />
-                                            Download
-                                        </Button>
-                                    </div>
-                                </Card>
-                            );
-                        })}
-                    </div>
-                )}
+                    {/* Right: categories */}
+                    <aside className="lg:col-span-3 lg:sticky lg:top-4 space-y-3" aria-label="Explore categories">
+                        <h2 className="text-base font-semibold text-[#2C3E50]">
+                            Explore categories <span className="text-xs font-normal text-[#C4A672]">NEW</span>
+                        </h2>
+                        <div className="flex flex-wrap gap-2">
+                            {EXPLORE_CATEGORIES.map((cat) => {
+                                const active = categoryFilter === cat;
+                                return (
+                                    <button
+                                        key={cat}
+                                        type="button"
+                                        onClick={() => setCategoryFilter(active ? null : cat)}
+                                        className={`rounded-full border px-3 py-2 text-sm transition-colors ${
+                                            active
+                                                ? 'border-[#C4A672] bg-[#C4A672]/15 text-[#2C3E50]'
+                                                : 'border-gray-200 bg-white text-gray-700 hover:border-[#C4A672]/50'
+                                        }`}
+                                    >
+                                        {cat}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <p className="text-xs text-gray-500">Tap a category to filter shared materials. Tap again to clear.</p>
+                    </aside>
+                </div>
             </div>
 
             {/* ── NotesViewer overlay ──────────────────────────────────────── */}

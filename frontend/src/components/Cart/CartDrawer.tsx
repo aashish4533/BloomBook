@@ -102,7 +102,7 @@ export function CartDrawer() {
                                                     }`}>
                                                     {item.type === 'buy' ? 'Buy' : 'Rent'}
                                                 </span>
-                                                <span className="font-semibold text-[#C4A672]">${item.price.toFixed(2)}</span>
+                                                <span className="font-semibold text-[#C4A672]">Rs. {item.price.toFixed(2)}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -118,11 +118,11 @@ export function CartDrawer() {
                         <div className="space-y-2 mb-4">
                             <div className="flex justify-between text-sm">
                                 <span className="text-gray-600">Subtotal</span>
-                                <span className="font-medium text-[#2C3E50]">${totalAmount.toFixed(2)}</span>
+                                <span className="font-medium text-[#2C3E50]">Rs. {totalAmount.toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between text-base font-semibold">
                                 <span className="text-[#2C3E50]">Total</span>
-                                <span className="text-[#C4A672]">${totalAmount.toFixed(2)}</span>
+                                <span className="text-[#C4A672]">Rs. {totalAmount.toFixed(2)}</span>
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-3">

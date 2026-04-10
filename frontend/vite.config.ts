@@ -3,6 +3,8 @@
   import react from '@vitejs/plugin-react-swc';
   import path from 'path';
 
+  // HTTP in dev avoids NET::ERR_CERT_AUTHORITY_INVALID from self-signed HTTPS.
+  // http://localhost is still a secure context for geolocation in modern browsers.
   export default defineConfig({
     plugins: [react()],
     resolve: {

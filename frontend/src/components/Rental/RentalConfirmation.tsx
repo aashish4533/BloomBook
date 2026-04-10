@@ -10,29 +10,46 @@ import {
   CreditCard,
   MapPin,
   Package,
-  Truck,
   CheckCircle,
-  AlertCircle
 } from 'lucide-react';
 
 import { useNavigate } from 'react-router-dom';
+import { computeSecurityDepositHalf } from '../../utils/rentalActivation';
 
 interface RentalConfirmationProps {
   book: RentalBook;
   rentalPeriod: 'weekly' | 'monthly' | 'yearly';
+  deliveryMethod: 'pickup' | 'shipping';
+  pickupDate: string;
+  onPickupDateChange: (isoDate: string) => void;
   onBack: () => void;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
 }
 
-export function RentalConfirmation({ book, rentalPeriod, onBack, onConfirm }: RentalConfirmationProps) {
+export function RentalConfirmation({
+  book,
+  rentalPeriod,
+  deliveryMethod,
+  pickupDate,
+  onPickupDateChange,
+  onBack,
+  onConfirm,
+}: RentalConfirmationProps) {
   const navigate = useNavigate();
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [isProcessing, setIsProcessing] = useState(false);
 
   const rentalPrice = book.rentalOptions[rentalPeriod];
-  const shippingFee = 5.99; // Could be dynamic
-  const total = rentalPrice + shippingFee;
+  const referenceBookPrice =
+    book.originalPrice && book.originalPrice > 0
+      ? book.originalPrice
+      : Number(book.securityDeposit) > 0
+        ? Number(book.securityDeposit) * 2
+        : Math.max(rentalPrice * 4, 1);
+  const securityDeposit = computeSecurityDepositHalf(referenceBookPrice);
+  const shippingFee = deliveryMethod === 'shipping' ? 5.99 : 0;
+  const total = rentalPrice + securityDeposit + shippingFee;
 
   const getDuration = () => {
     switch (rentalPeriod) {
@@ -42,9 +59,10 @@ export function RentalConfirmation({ book, rentalPeriod, onBack, onConfirm }: Re
     }
   };
 
-  const getDueDate = () => {
+  const getPlannedReturnLabel = () => {
     const days = rentalPeriod === 'weekly' ? 7 : rentalPeriod === 'monthly' ? 30 : 365;
-    const date = new Date();
+    const start = new Date(pickupDate + 'T12:00:00');
+    const date = new Date(start);
     date.setDate(date.getDate() + days);
     return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   };
@@ -57,31 +75,7 @@ export function RentalConfirmation({ book, rentalPeriod, onBack, onConfirm }: Re
 
     setIsProcessing(true);
     try {
-      // Logic moved to parent component or implemented here?
-      // The parent component RentBookFlow actually passes onConfirm={handleCompleteRental}
-      // which ALREADY has the logic we saw in RentBookFlow.tsx lines 51-91.
-      // Wait, let's re-read RentBookFlow.tsx.
-      // Yes, RentBookFlow passes `handleCompleteRental` as `onConfirm`.
-      // So this component just needs to call that prop!
-      // But wait, the previous code was just simulating a timeout then calling onConfirm.
-      // The USER REQUEST says "Debug the onConfirm handler in RentalConfirmation.tsx. Ensure it is successfully creating a document..."
-      // Actually, looking at RentBookFlow (lines 51-91), it DOES create the document.
-      // So the issue might be that RentalConfirmation wasn't actually calling onConfirm properly or was just doing a timeout.
-      // The previous code was:
-      // setTimeout(() => {
-      //   setIsProcessing(false);
-      //   onConfirm();
-      // }, 2000);
-      //
-      // If RentBookFlow's handleCompleteRental is async, we should await it here if we want to show processing state correctly?
-      // But onConfirm is defined as () => void in props.
-      // Let's assume onConfirm triggers the logic. If the user says it's failing, maybe the props aren't passed right or the validation fails.
-
-      // Let's update this to be robust.
-
-      await onConfirm();
-      // We don't unset isProcessing here because onConfirm likely navigates away or shows success.
-
+      await Promise.resolve(onConfirm());
     } catch (error) {
       console.error("Rental confirmation error:", error);
       setIsProcessing(false);
@@ -135,15 +129,34 @@ export function RentalConfirmation({ book, rentalPeriod, onBack, onConfirm }: Re
                 <div className="flex items-start gap-3">
                   <CheckCircle className="w-5 h-5 text-[#C4A672] mt-0.5" />
                   <div>
-                    <p className="text-[#2C3E50]">Return By</p>
-                    <p className="text-gray-600 text-sm">{getDueDate()}</p>
+                    <p className="text-[#2C3E50]">Planned return (after pickup)</p>
+                    <p className="text-gray-600 text-sm">{getPlannedReturnLabel()}</p>
+                    <p className="text-gray-500 text-xs mt-1">The rental clock starts on your pickup day once both parties confirm handover.</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <Package className="w-5 h-5 text-[#C4A672] mt-0.5" />
                   <div>
                     <p className="text-[#2C3E50]">Delivery Method</p>
-                    <p className="text-gray-600 text-sm">Shipping to your address</p>
+                    <p className="text-gray-600 text-sm">
+                      {deliveryMethod === 'pickup'
+                        ? 'Local pickup — coordinate time and place with the lender in chat'
+                        : 'Shipping to your address'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Calendar className="w-5 h-5 text-[#C4A672] mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-[#2C3E50]">Planned pickup date</p>
+                    <Input
+                      type="date"
+                      className="mt-2 max-w-xs"
+                      value={pickupDate}
+                      min={new Date().toISOString().slice(0, 10)}
+                      onChange={(e) => onPickupDateChange(e.target.value)}
+                    />
+                    <p className="text-gray-500 text-xs mt-1">Rental time begins on this day after confirmations.</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -225,11 +238,15 @@ export function RentalConfirmation({ book, rentalPeriod, onBack, onConfirm }: Re
               <div className="space-y-4 mb-6">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">Rental Fee ({rentalPeriod})</span>
-                  <span className="text-[#2C3E50]">${rentalPrice.toFixed(2)}</span>
+                  <span className="text-[#2C3E50]">Rs. {rentalPrice.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Security deposit (50% of book price)</span>
+                  <span className="text-[#2C3E50]">Rs. {securityDeposit.toFixed(2)}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">Shipping</span>
-                  <span className="text-[#2C3E50]">${shippingFee.toFixed(2)}</span>
+                  <span className="text-[#2C3E50]">Rs. {shippingFee.toFixed(2)}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">Tax</span>
@@ -237,7 +254,7 @@ export function RentalConfirmation({ book, rentalPeriod, onBack, onConfirm }: Re
                 </div>
                 <div className="pt-4 border-t border-gray-200 flex items-center justify-between">
                   <span className="text-[#2C3E50]">Total</span>
-                  <span className="text-[#C4A672] text-2xl">${total.toFixed(2)}</span>
+                  <span className="text-[#C4A672] text-2xl">Rs. {total.toFixed(2)}</span>
                 </div>
               </div>
 
@@ -250,7 +267,7 @@ export function RentalConfirmation({ book, rentalPeriod, onBack, onConfirm }: Re
               </Button>
 
               <Button
-                onClick={() => navigate('/rental-history')}
+                onClick={() => navigate('/dashboard/rentals')}
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white transition-smooth btn-scale"
               >
                 View My Rentals

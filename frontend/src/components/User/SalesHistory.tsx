@@ -38,7 +38,7 @@ export function SalesHistory() {
           </div>
           <div className="text-right">
             <p className="text-gray-600 text-sm">Total Earnings</p>
-            <p className="text-2xl text-[#C4A672]">${totalEarnings.toFixed(2)}</p>
+            <p className="text-2xl text-[#C4A672]">Rs. {totalEarnings.toFixed(2)}</p>
           </div>
         </div>
 
@@ -53,7 +53,7 @@ export function SalesHistory() {
                     <span>•</span>
                     <span>{new Date(sale.date).toLocaleDateString()}</span>
                     <span>•</span>
-                    <span className="text-[#C4A672]">${sale.price.toFixed(2)}</span>
+                    <span className="text-[#C4A672]">Rs. {sale.price.toFixed(2)}</span>
                   </div>
                 </div>
                 <Badge className="bg-green-100 text-green-800">{sale.status}</Badge>

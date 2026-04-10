@@ -137,7 +137,7 @@ export function WishlistPage({ onBack, onNavigateToMarketplace, onNavigateToBook
                       <p className="text-sm text-gray-600 mb-2">by {item.author}</p>
                       <div className="flex items-center justify-between mb-3">
                         <span className="text-[#C4A672] text-xl">
-                          {item.type === 'buy' ? `$${item.price.toFixed(2)}` : `$${item.price.toFixed(2)}/${item.rentDuration || 'term'}`}
+                          {item.type === 'buy' ? `Rs. ${item.price.toFixed(2)}` : `Rs. ${item.price.toFixed(2)}/${item.rentDuration || 'term'}`}
                         </span>
                         <Badge variant="outline">{item.condition}</Badge>
                       </div>
@@ -211,7 +211,7 @@ export function WishlistPage({ onBack, onNavigateToMarketplace, onNavigateToBook
                       <h3 className="text-[#2C3E50] mb-1">{item.title}</h3>
                       <p className="text-sm text-gray-600 mb-2">by {item.author}</p>
                       <div className="flex items-center justify-between mb-3">
-                        <span className="text-[#C4A672] text-xl">${item.price.toFixed(2)}/{item.rentDuration || 'term'}</span>
+                        <span className="text-[#C4A672] text-xl">Rs. {item.price.toFixed(2)}/{item.rentDuration || 'term'}</span>
                       </div>
                       <p className="text-xs text-gray-500 mb-3">
                         Added {item.createdAt?.toDate ? item.createdAt.toDate().toLocaleDateString() : 'Recently'}
@@ -275,7 +275,7 @@ export function WishlistPage({ onBack, onNavigateToMarketplace, onNavigateToBook
                     <p className="text-sm text-gray-600 mb-2">by {book.author}</p>
                     <p className="text-xs text-gray-500 italic mb-2">{book.reason}</p>
                     <div className="flex items-center justify-between">
-                      <span className="text-[#C4A672] text-lg">${book.price}</span>
+                      <span className="text-[#C4A672] text-lg">Rs. {Number(book.price).toLocaleString()}</span>
                       <Button
                         size="sm"
                         variant="ghost"

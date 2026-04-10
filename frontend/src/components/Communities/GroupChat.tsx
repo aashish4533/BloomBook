@@ -43,6 +43,9 @@ interface GroupChatProps {
 export function GroupChat({ communityId, communityName, onBack, currentUserId }: GroupChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  /** Same sources as Cloud Function / CommunityDetails: subcollection OR parent `members` array OR admin */
+  const [parentMembersHasUser, setParentMembersHasUser] = useState(false);
+  const [communityAdminId, setCommunityAdminId] = useState<string | null>(null);
   const [loadingMessages, setLoadingMessages] = useState(true);
   const [newMessage, setNewMessage] = useState('');
   const [selectedImages, setSelectedImages] = useState<{ file: File; preview: string }[]>([]);
@@ -100,6 +103,29 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
     };
   }, [currentUserId, reconstruct]);
 
+  useEffect(() => {
+    if (!communityId || !currentUserId) {
+      setParentMembersHasUser(false);
+      setCommunityAdminId(null);
+      return;
+    }
+    const unsub = onSnapshot(doc(db, 'communities', communityId), (snap) => {
+      if (!snap.exists()) {
+        setParentMembersHasUser(false);
+        setCommunityAdminId(null);
+        return;
+      }
+      const d = snap.data();
+      const raw = (d.members || []) as unknown[];
+      const inArray = raw.some((m) =>
+        typeof m === 'string' ? m === currentUserId : (m as { id?: string })?.id === currentUserId
+      );
+      setParentMembersHasUser(inArray);
+      setCommunityAdminId((d.adminId as string) || null);
+    });
+    return () => unsub();
+  }, [communityId, currentUserId]);
+
   // ── Fetch messages & apply Neural Reconstruction ──────────────────────────
   useEffect(() => {
     if (!initialized) return; // Wait for keys to be ready before rendering
@@ -120,7 +146,9 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
     const unsubMembers = onSnapshot(
       collection(db, 'communities', communityId, 'members'),
       (snapshot) => {
-        setMembers(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Member)));
+        setMembers(
+          snapshot.docs.map((d) => ({ ...d.data(), id: d.id } as Member))
+        );
       }
     );
 
@@ -135,7 +163,10 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
   }, [messages]);
 
   const onlineCount = members.filter(m => m.online).length;
-  const isMember = members.some(m => m.id === currentUserId);
+  const isMember =
+    members.some((m) => m.id === currentUserId) ||
+    parentMembersHasUser ||
+    communityAdminId === currentUserId;
 
   // ── Gravitational Shielding — Send encrypted message ───────────────────────
   const handleSend = async () => {

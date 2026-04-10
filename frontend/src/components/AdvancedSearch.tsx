@@ -175,7 +175,7 @@ export function AdvancedSearch({ onBack, onNavigateToBook }: AdvancedSearchProps
                     <div>
                       <label className="text-sm text-gray-600 flex items-center gap-2 mb-2">
                         <DollarSign className="w-4 h-4" />
-                        Price Range: ${priceRange[0]} - ${priceRange[1]}
+                        Price Range: Rs. {priceRange[0]} - Rs. {priceRange[1]}
                       </label>
                       <Slider
                         value={priceRange}
@@ -338,7 +338,7 @@ export function AdvancedSearch({ onBack, onNavigateToBook }: AdvancedSearchProps
                                       />
                                       <p className="text-sm text-[#2C3E50]">{book.title}</p>
                                       <p className="text-xs text-gray-500">{book.author}</p>
-                                      <p className="text-sm text-[#C4A672] mt-1">${book.price}</p>
+                                      <p className="text-sm text-[#C4A672] mt-1">Rs. {Number(book.price).toLocaleString()}</p>
                                     </div>
                                   ))}
                                 </div>
@@ -417,7 +417,7 @@ export function AdvancedSearch({ onBack, onNavigateToBook }: AdvancedSearchProps
                             {book.condition}
                           </p>
                         </div>
-                        <p className="text-[#C4A672] text-lg mt-2">${book.price}</p>
+                        <p className="text-[#C4A672] text-lg mt-2">Rs. {Number(book.price).toLocaleString()}</p>
                       </div>
                     </div>
                   </Card>

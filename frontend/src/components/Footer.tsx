@@ -6,13 +6,13 @@ export function Footer() {
   return (
     <footer className="bg-[#2C3E50] text-white py-8 px-8">
       <div className="max-w-7xl mx-auto">
-        <nav className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4 mb-4">
-          <Link to="/marketplace" className="hover:opacity-80 transition-opacity">Buy</Link>
-          <Link to="/rent" className="hover:opacity-80 transition-opacity">Rent</Link>
-          <Link to="/sell" className="hover:opacity-80 transition-opacity">Resell</Link>
-          <Link to="/announcements" className="hover:opacity-80 transition-opacity">Announcements</Link>
-          <Link to="/about" className="hover:opacity-80 transition-opacity">About</Link>
-          <Link to="/contact" className="hover:opacity-80 transition-opacity">Contact</Link>
+        <nav className="mb-6 flex w-full flex-wrap items-center justify-between gap-x-6 gap-y-4 sm:gap-x-10">
+          <Link to="/marketplace" className="shrink-0 hover:opacity-80 transition-opacity">Buy</Link>
+          <Link to="/rent" className="shrink-0 hover:opacity-80 transition-opacity">Rent</Link>
+          <Link to="/sell" className="shrink-0 hover:opacity-80 transition-opacity">Resell</Link>
+          <Link to="/announcements" className="shrink-0 hover:opacity-80 transition-opacity">Announcements</Link>
+          <Link to="/about" className="shrink-0 hover:opacity-80 transition-opacity">About</Link>
+          <Link to="/contact" className="shrink-0 hover:opacity-80 transition-opacity">Contact</Link>
         </nav>
 
         <p className="text-center text-sm mb-6">

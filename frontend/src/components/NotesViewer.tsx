@@ -5,7 +5,7 @@ import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { ScrollArea } from './ui/scroll-area';
-import { downloadFile, openFilePreview } from '../utils/fileHandler';
+import { downloadFile, openFilePreview, cannotUseEmbeddedExternalViewer } from '../utils/fileHandler';
 import { toast } from 'sonner';
 import { db, auth } from '../firebase';
 import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, Timestamp } from 'firebase/firestore';
@@ -217,6 +217,29 @@ export function NotesViewer({
 
       // ── PDFs (native browser viewer) ───────────────────────────────
       case 'pdf':
+        if (cannotUseEmbeddedExternalViewer(url)) {
+          return (
+            <div className="w-full h-[80vh] flex flex-col items-center justify-center bg-gray-900 text-white px-6 text-center gap-4">
+              <FileWarning className="w-16 h-16 text-[#C4A672]" />
+              <p className="text-lg font-medium">PDF preview in this window isn&apos;t available</p>
+              <p className="text-sm text-gray-400 max-w-md">
+                Files on localhost or private IPs can break the embedded viewer and trigger browser security errors.
+                Open the PDF in a new tab instead.
+              </p>
+              <div className="flex flex-wrap gap-2 justify-center">
+                <Button type="button" variant="outline" onClick={handlePreview} className="border-[#C4A672] text-[#C4A672]">
+                  Open in new tab
+                </Button>
+                {downloadable && (
+                  <Button type="button" onClick={handleDownload} disabled={isDownloading} className="bg-[#C4A672] text-white">
+                    <Download className="w-4 h-4 mr-2" />
+                    {isDownloading ? 'Downloading…' : 'Download'}
+                  </Button>
+                )}
+              </div>
+            </div>
+          );
+        }
         return (
           <div className="w-full h-[80vh] relative">
             {iframeLoading && (
@@ -238,6 +261,29 @@ export function NotesViewer({
 
       // ── Office documents (Google Docs Viewer) ──────────────────────
       case 'office':
+        if (cannotUseEmbeddedExternalViewer(url)) {
+          return (
+            <div className="w-full h-[80vh] flex flex-col items-center justify-center bg-gray-900 text-white px-6 text-center gap-4">
+              <FileWarning className="w-16 h-16 text-[#C4A672]" />
+              <p className="text-lg font-medium">Inline preview isn&apos;t available for this address</p>
+              <p className="text-sm text-gray-400 max-w-md">
+                Google Docs Viewer cannot fetch localhost or private-network URLs. Opening in a new tab avoids the
+                broken iframe (chrome-error) that can cause &quot;Unsafe attempt to load localhost&quot; messages.
+              </p>
+              <div className="flex flex-wrap gap-2 justify-center">
+                <Button type="button" variant="outline" onClick={handlePreview} className="border-[#C4A672] text-[#C4A672]">
+                  Open in new tab
+                </Button>
+                {downloadable && (
+                  <Button type="button" onClick={handleDownload} disabled={isDownloading} className="bg-[#C4A672] text-white">
+                    <Download className="w-4 h-4 mr-2" />
+                    {isDownloading ? 'Downloading…' : 'Download'}
+                  </Button>
+                )}
+              </div>
+            </div>
+          );
+        }
         return (
           <div className="w-full h-[80vh] relative group">
             {iframeLoading && (

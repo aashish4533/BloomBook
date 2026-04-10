@@ -31,7 +31,7 @@ export interface BookFormData {
 }
 
 export interface LocationData {
-  method: 'pickup' | 'shipping' | 'both';
+  method: 'pickup';
   address: string;
   city: string;
   state: string;
@@ -63,11 +63,12 @@ function SellBookWizard({ onClose }: { onClose: () => void }) {
     publishedYear: '',
     language: 'English',
     pages: '',
-    images: []
+    images: [],
+    imageFiles: [],
   });
 
   const [locationData, setLocationData] = useState<LocationData>({
-    method: 'both',
+    method: 'pickup',
     address: '',
     city: '',
     state: '',
@@ -124,9 +125,13 @@ function SellBookWizard({ onClose }: { onClose: () => void }) {
       const pages = parseInt(bookData.pages);
       const publishedYear = parseInt(bookData.publishedYear);
 
+      if (!bookData.imageFiles?.length) {
+        throw new Error('Add at least one book photo before submitting.');
+      }
+
       // 3. Upload Images to Firebase Storage
       const imageUrls: string[] = [];
-      if (bookData.imageFiles && bookData.imageFiles.length > 0) {
+      if (bookData.imageFiles.length > 0) {
         for (const file of bookData.imageFiles) {
           try {
             const uniqueFilename = `${Date.now()}_${file.name}`;
@@ -279,10 +284,11 @@ function SellBookWizard({ onClose }: { onClose: () => void }) {
                   publishedYear: '',
                   language: 'English',
                   pages: '',
-                  images: []
+                  images: [],
+                  imageFiles: [],
                 });
                 setLocationData({
-                  method: 'both',
+                  method: 'pickup',
                   address: '',
                   city: '',
                   state: '',

@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { auth } from '../firebase';
-import { MessageSquare, Send, Bot, User, Loader2, Sparkles, GraduationCap, Compass, BookOpen, Clock, Menu, Trash2 } from 'lucide-react';
+import { Send, Bot, User, Loader2, Sparkles, GraduationCap, Compass, BookOpen, Menu, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -12,7 +13,8 @@ import { Card } from './ui/card';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from './ui/sheet';
 import { useCart } from '../context/CartContext';
 import { db } from '../firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import { toast } from 'sonner';
 
 interface Message {
   role: 'user' | 'model';
@@ -75,32 +77,108 @@ const AIProductCard = ({ productId }: { productId: string }) => {
   );
 };
 
+const AI_STORAGE_KEY = 'bookbloom_ai_messages_v1';
+const LEGACY_SESSION_KEY = 'bookbloom_ai_messages';
+
+function loadPersistedMessages(): Message[] {
+  try {
+    const local = localStorage.getItem(AI_STORAGE_KEY);
+    if (local) {
+      const parsed = JSON.parse(local);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((m: Message) => m.role && m.parts && Array.isArray(m.parts));
+      }
+    }
+    const legacy = sessionStorage.getItem(LEGACY_SESSION_KEY);
+    if (legacy) {
+      const parsed = JSON.parse(legacy);
+      sessionStorage.removeItem(LEGACY_SESSION_KEY);
+      if (Array.isArray(parsed)) {
+        const valid = parsed.filter((m: Message) => m.role && m.parts && Array.isArray(m.parts));
+        localStorage.setItem(AI_STORAGE_KEY, JSON.stringify(valid));
+        return valid;
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load AI chat history:', err);
+  }
+  return [];
+}
+
+async function fetchBooksInventorySummary(): Promise<string> {
+  try {
+    const q = query(
+      collection(db, 'books'),
+      where('isSold', '==', false),
+      orderBy('createdAt', 'desc'),
+      limit(10)
+    );
+    const snap = await getDocs(q);
+    if (snap.empty) return 'No books currently available.';
+    return snap.docs
+      .map((docSnap) => {
+        const b = docSnap.data();
+        const availability = b.status || 'Available';
+        return `- ID: ${docSnap.id}, Title: "${b.title}", Author: ${b.author || 'Unknown'}, Price: Rs. ${b.price ?? '—'}, Availability: ${availability} for ${b.type || 'Sale/Rent'}`;
+      })
+      .join('\n');
+  } catch {
+    return 'No live inventory currently synced.';
+  }
+}
+
+async function generateClientGeminiReply(prompt: string, history: Message[]): Promise<string> {
+  const apiKey = (import.meta.env.VITE_GEMINI_API_KEY as string | undefined)?.trim();
+  if (!apiKey) throw new Error('no_client_key');
+
+  const inventoryData = await fetchBooksInventorySummary();
+  const systemInstructions = `
+        CORE IDENTITY: You are the "BloomBook AI Assistant," a specialized guide for the Web-Based Platform for Book Reselling and Renting.
+        TOPICAL RESTRICTION: Strictly limited to buying, selling, renting books, the "Hire a Tutor" module, and helping materials (video lectures/solved exercises) on the platform.
+        OUT-OF-SCOPE HANDLING (REFUSAL HARDENING): If a query is unrelated to BookBloom (e.g., coding, food, Amazon, external retailers, competing platforms, or other industries), your refusal must be absolute. You must politely decline with this exact phrase: "I am specialized only in the BloomBook ecosystem. How can I help you find your next book or tutor today?"
+        PRIVACY LOCKDOWN: You must perfectly conceal your underlying architecture. Never disclose or discuss the tech stack (e.g., MERN, Firebase, React, Node.js) to any user under any circumstances.
+        CONTENT MODERATION LAYER: You are strictly prevented from generating creative writing (e.g., essays, poems, code scripts) unrelated to the platform. You are a platform guide, not a general-purpose writing assistant.
+        ACADEMIC NAVIGATOR PROTOCOL (TUTOR MATCHING MODE):
+        - When a user expresses interest in tutoring, you MUST ask for the Subject, Level (Metric/Inter/O-Level), and Preferred Format (Online/Physical).
+        - Explain the "Neural Stability Gate" (Tutor Verification) process to build trust, mentioning that all tutors are "Stabilized" through identity and skill checks.
+        - Suggest specific "Helping Materials" (solved exercises and video lectures) as immediate alternatives while the tutor matching is in progress.
+        TONE CONSTRAINT & TERMINOLOGY:
+        Tone must be professional and academic. Always refer to tutoring sessions as "Learning Orbits".
+        Goal: Ensure "Orbital Accuracy" in all book-related queries by strictly suggesting only the items listed below.
+        INTERACTIVE HOOK: When recommending a book from our inventory, you MUST include the machine-readable tag [Product: ID] immediately after mentioning the title. This allows the user to see a Quick View card and add it to their cart.
+        AVAILABLE INVENTORY DATA (LIVE MARKETPLACE):
+        ${inventoryData || 'No books currently available.'}
+      `;
+
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.0-flash',
+    systemInstruction: systemInstructions,
+  });
+  const cleanHistory = history.filter((m) => m.parts?.[0]?.text);
+  const chat = model.startChat({
+    history: cleanHistory,
+    generationConfig: { maxOutputTokens: 500 },
+  });
+  const result = await chat.sendMessage(prompt);
+  return result.response.text();
+}
+
 export function AIAssistantPage() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [messages, setMessages] = useState<Message[]>(() => {
-    const saved = sessionStorage.getItem('bookbloom_ai_messages');
-    try {
-      if (!saved) return [];
-      const parsed = JSON.parse(saved);
-      // Validate structure to prevent UI crashes
-      if (Array.isArray(parsed)) {
-        return parsed.filter(m => m.role && m.parts && Array.isArray(m.parts));
-      }
-      return [];
-    } catch (err) {
-      console.error("Failed to parse AI session storage:", err);
-      return [];
-    }
-  });
+  const [messages, setMessages] = useState<Message[]>(() => loadPersistedMessages());
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    sessionStorage.setItem('bookbloom_ai_messages', JSON.stringify(messages));
+    try {
+      localStorage.setItem(AI_STORAGE_KEY, JSON.stringify(messages));
+    } catch (err) {
+      console.error('Failed to persist AI chat history:', err);
+    }
   }, [messages]);
-  
+
   const functions = getFunctions();
-  const user = auth.currentUser;
 
   const quickPrompts = [
     { text: "Find a Math tutor for O-Level", icon: GraduationCap, category: "Tutor" },
@@ -118,45 +196,65 @@ export function AIAssistantPage() {
     const messageText = textToSend || input.trim();
     if (!messageText || isLoading) return;
 
+    const hasClientKey = Boolean((import.meta.env.VITE_GEMINI_API_KEY as string | undefined)?.trim());
+    if (!auth.currentUser && !hasClientKey) {
+      toast.error('Please log in to use the AI assistant, or add VITE_GEMINI_API_KEY for offline API access.');
+      return;
+    }
+
+    const priorHistory = messages;
     const newUserMessage: Message = { role: 'user', parts: [{ text: messageText }] };
     setMessages(prev => [...prev, newUserMessage]);
     if (!textToSend) setInput('');
     setIsLoading(true);
 
     try {
-      // 1. Add a 30-second timeout safeguard to the callable function
-      const generateResponse = httpsCallable(functions, 'generateAssistantResponse', {
-        timeout: 30000 
-      });
-      
-      const result = await generateResponse({ 
-        prompt: messageText, 
-        history: messages 
-      }) as any;
-      
-      // 2. Safely check for the text payload
-      if (result.data && result.data.text) {
-        setMessages(prev => [...prev, { role: 'model', parts: [{ text: result.data.text }] }]);
-      } else {
-        throw new Error("Invalid payload received from AI core.");
-      }
-    } catch (error: any) {
-      console.error("Neural Link Error:", error);
-      
-      let errorMessage = "⚠️ Atmospheric interference. I could not reach the Bloom Matrix. Please check your backend connection or API keys and try again.";
-      
-      if (error.code === 'deadline-exceeded') {
-        errorMessage = "🕒 Neural connection timed out. The Bloom Matrix is taking too long to respond. Please try a shorter query.";
-      } else if (error.code === 'unauthenticated') {
-        errorMessage = "🔐 Unauthorized access. Please ensure you are logged into the BookBloom grid.";
-      } else if (error.message?.includes('matrix')) {
-        errorMessage = "📉 AI Matrix unstable. Please try again in 5 seconds.";
+      let replyText: string | null = null;
+
+      if (auth.currentUser) {
+        try {
+          const generateResponse = httpsCallable(functions, 'generateAssistantResponse', {
+            timeout: 60000,
+          });
+          const result = (await generateResponse({
+            prompt: messageText,
+            history: priorHistory,
+          })) as { data?: { text?: string } };
+          if (result?.data?.text?.trim()) {
+            replyText = result.data.text.trim();
+          }
+        } catch (fnErr) {
+          console.warn('Cloud function assistant failed:', fnErr);
+        }
       }
 
-      setMessages(prev => [...prev, { 
-        role: 'model', 
-        parts: [{ text: errorMessage }] 
-      }]);
+      if (!replyText && hasClientKey) {
+        replyText = (await generateClientGeminiReply(messageText, priorHistory)).trim();
+      }
+
+      if (!replyText) {
+        throw new Error('empty_response');
+      }
+
+      setMessages(prev => [...prev, { role: 'model', parts: [{ text: replyText }] }]);
+    } catch (error: unknown) {
+      console.error('Neural Link Error:', error);
+      const err = error as { code?: string; message?: string };
+      const code = String(err?.code ?? '');
+
+      let errorMessage =
+        "⚠️ I could not get a response right now. If you use Cloud Functions, set the GEMINI_API_KEY secret and deploy. For local dev you can set VITE_GEMINI_API_KEY in frontend/.env.local (never commit that key).";
+
+      if (code.includes('deadline-exceeded')) {
+        errorMessage = '🕒 The request timed out. Try a shorter question.';
+      } else if (code.includes('unauthenticated')) {
+        errorMessage = '🔐 Please log in to BookBloom to use the assistant.';
+      } else if (String(err?.message) === 'no_client_key') {
+        errorMessage =
+          '⚠️ The server could not answer and no VITE_GEMINI_API_KEY was found. Add your key to frontend/.env.local and restart the dev server.';
+      }
+
+      setMessages(prev => [...prev, { role: 'model', parts: [{ text: errorMessage }] }]);
     } finally {
       setIsLoading(false);
     }
@@ -171,7 +269,7 @@ export function AIAssistantPage() {
           </Link>
           <h2 className="text-[#2C3E50] font-bold text-lg">Academic Navigator</h2>
         </div>
-        <Button variant="ghost" size="icon" onClick={() => { setMessages([]); sessionStorage.removeItem('bookbloom_ai_messages'); }} title="Clear Chat">
+        <Button variant="ghost" size="icon" onClick={() => { setMessages([]); localStorage.removeItem(AI_STORAGE_KEY); sessionStorage.removeItem(LEGACY_SESSION_KEY); }} title="Clear Chat">
           <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-500" />
         </Button>
       </div>
@@ -217,9 +315,9 @@ export function AIAssistantPage() {
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col h-full min-h-0">
+      <div className="flex-1 flex flex-col h-full min-h-0 min-w-0">
         {/* Chat Header for Mobile */}
-        <div className="bg-white border-b border-[#C4A672]/20 p-4 flex items-center justify-between shadow-sm md:hidden">
+        <div className="bg-white border-b border-[#C4A672]/20 p-4 flex items-center justify-between shadow-sm md:hidden shrink-0">
             <div className="flex items-center gap-3">
                 <Sheet>
                   <SheetTrigger asChild>
@@ -239,16 +337,17 @@ export function AIAssistantPage() {
                     <h3 className="text-[#2C3E50] font-bold text-sm">BloomBook AI</h3>
                     <p className="text-xs text-green-500 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />Online</p>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => { setMessages([]); sessionStorage.removeItem('bookbloom_ai_messages'); }} title="Clear Chat">
+                <Button variant="ghost" size="icon" onClick={() => { setMessages([]); localStorage.removeItem(AI_STORAGE_KEY); sessionStorage.removeItem(LEGACY_SESSION_KEY); }} title="Clear Chat">
                   <Trash2 className="w-5 h-5 text-gray-400 hover:text-red-500" />
                 </Button>
             </div>
         </div>
 
         {/* Messages list / Centered Welcome */}
-        <ScrollArea className="flex-1 px-4 md:px-6 py-6 space-y-4">
+        <ScrollArea className="flex-1 min-h-0 w-full">
+          <div className="max-w-3xl lg:max-w-4xl mx-auto px-4 md:px-6 py-6 space-y-4">
           {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] text-center px-4">
+            <div className="flex flex-col items-center justify-center min-h-[min(70vh,calc(100dvh-10rem))] text-center px-2">
               <div className="w-16 h-16 bg-[#C4A672]/10 rounded-full flex items-center justify-center mb-6 animate-bounce">
                  <Bot className="w-8 h-8 text-[#C4A672]" />
               </div>
@@ -259,25 +358,22 @@ export function AIAssistantPage() {
               <div className="w-full max-w-2xl bg-white rounded-2xl p-4 shadow-xl border border-[#C4A672]/10 mb-8 transform transition-all hover:scale-[1.01]">
                 <form 
                   onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} 
-                  className="flex items-center gap-3 w-full"
+                  className="flex flex-col sm:flex-row gap-3 w-full items-stretch"
                 >
-                  <div className="relative flex-grow">
-                    <Input
-                      placeholder="Query the Bloom Intelligence Matrix..."
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      disabled={isLoading}
-                      className="w-full pr-14 py-7 rounded-xl border-[#C4A672]/20 focus:ring-[#C4A672] focus:border-[#C4A672] shadow-none text-base"
-                    />
-                    <Button 
-                        type="submit" 
-                        size="icon" 
-                        disabled={isLoading || !input.trim()} 
-                        className="absolute right-3 top-1/2 -translate-y-1/2 h-10 w-10 bg-[#C4A672] hover:bg-[#8B7355] rounded-xl transition-all shadow-md hover:shadow-[#C4A672]/20"
-                    >
-                      <Send className="w-4 h-4 text-white" />
-                    </Button>
-                  </div>
+                  <Input
+                    placeholder="Ask Bloom AI about books, tutors, or study materials…"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    disabled={isLoading}
+                    className="flex-1 min-w-0 min-h-[52px] rounded-xl border-[#C4A672]/20 focus-visible:ring-2 focus-visible:ring-[#C4A672]/30 focus-visible:border-[#C4A672] shadow-none text-base"
+                  />
+                  <Button 
+                      type="submit" 
+                      disabled={isLoading || !input.trim()} 
+                      className="min-h-[52px] shrink-0 px-5 sm:px-6 bg-[#C4A672] hover:bg-[#8B7355] rounded-xl shadow-md"
+                  >
+                    <Send className="w-5 h-5 text-white" />
+                  </Button>
                 </form>
               </div>
 
@@ -302,7 +398,7 @@ export function AIAssistantPage() {
               </div>
             </div>
           ) : (
-            <div className="space-y-6 max-w-4xl mx-auto w-full pb-4">
+            <div className="space-y-6 w-full pb-4">
               {messages.map((message: any, i: number) => (
                 <div key={i} className={`flex items-start gap-4 w-full ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
                   <Avatar className="w-8 h-8 md:w-9 md:h-9 border border-gray-100 flex-shrink-0 mt-1">
@@ -360,36 +456,35 @@ export function AIAssistantPage() {
               <div ref={scrollRef} />
             </div>
           )}
+          </div>
         </ScrollArea>
 
         {/* Input Footer - Only rendered when conversation active */}
         {messages.length > 0 && (
-          <div className="p-3 md:p-4 bg-[#FAF8F3] border-t border-[#C4A672]/10 z-10 relative">
-            <div className="max-w-4xl mx-auto">
+          <div className="p-3 md:p-4 bg-[#FAF8F3] border-t border-[#C4A672]/10 z-10 shrink-0">
+            <div className="max-w-3xl lg:max-w-4xl mx-auto w-full px-2">
               <form 
                 onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} 
-                className="flex items-end gap-2 md:gap-3 w-full"
+                className="flex gap-2 md:gap-3 w-full items-center"
               >
-                <div className="relative flex-grow">
-                  <Input
-                    placeholder="Query the Bloom Matrix about books, tutors, and learning orbits..."
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    disabled={isLoading}
-                    className="w-full pr-14 h-14 rounded-xl border-[#C4A672]/30 focus:ring-[#C4A672] focus:border-[#C4A672] shadow-sm text-sm bg-white"
-                  />
-                  <Button 
-                      type="submit" 
-                      size="icon" 
-                      disabled={isLoading || !input.trim()} 
-                      className="absolute right-3 top-1/2 -translate-y-1/2 h-8 w-8 bg-[#C4A672] hover:bg-[#8B7355] rounded-lg transition-transform hover:scale-105 active:scale-95"
-                  >
-                    <Send className="w-4 h-4 text-white" />
-                  </Button>
-                </div>
+                <Input
+                  placeholder="Ask about books, tutors, or learning resources…"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  disabled={isLoading}
+                  className="flex-1 min-w-0 min-h-12 h-12 rounded-xl border-[#C4A672]/30 focus-visible:ring-2 focus-visible:ring-[#C4A672]/30 focus-visible:border-[#C4A672] shadow-sm text-sm bg-white"
+                />
+                <Button 
+                    type="submit" 
+                    size="icon" 
+                    disabled={isLoading || !input.trim()} 
+                    className="h-12 w-12 shrink-0 rounded-xl bg-[#C4A672] hover:bg-[#8B7355]"
+                >
+                  <Send className="w-5 h-5 text-white" />
+                </Button>
               </form>
             </div>
-            <p className="text-center text-[10px] text-gray-400 mt-2 hidden sm:block">Specialized in Learning Orbits, Verification Standards, and live marketplaces.</p>
+            <p className="text-center text-[10px] text-gray-400 mt-2 hidden sm:block max-w-3xl lg:max-w-4xl mx-auto">Specialized in Learning Orbits, verification, and the BookBloom marketplace.</p>
           </div>
         )}
       </div>

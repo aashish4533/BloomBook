@@ -23,11 +23,12 @@ interface RentalBookDetailsProps {
   book: RentalBook;
   onBack: () => void;
   onRent: (period: 'weekly' | 'monthly' | 'yearly') => void;
+  deliveryMethod: 'pickup' | 'shipping';
+  onDeliveryMethodChange: (m: 'pickup' | 'shipping') => void;
 }
 
-export function RentalBookDetails({ book, onBack, onRent }: RentalBookDetailsProps) {
+export function RentalBookDetails({ book, onBack, onRent, deliveryMethod, onDeliveryMethodChange }: RentalBookDetailsProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<'weekly' | 'monthly' | 'yearly'>('monthly');
-  const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'shipping'>('pickup');
   const navigate = useNavigate();
 
   const getPriceForPeriod = () => {
@@ -172,7 +173,7 @@ export function RentalBookDetails({ book, onBack, onRent }: RentalBookDetailsPro
               <div className="space-y-3">
                 {book.deliveryMethods.includes('pickup') && (
                   <button
-                    onClick={() => setDeliveryMethod('pickup')}
+                    onClick={() => onDeliveryMethodChange('pickup')}
                     className={`w-full border-2 rounded-lg p-4 flex items-center gap-3 transition-colors ${deliveryMethod === 'pickup'
                         ? 'border-[#C4A672] bg-[#C4A672]/5'
                         : 'border-gray-200 hover:border-gray-300'
@@ -192,7 +193,7 @@ export function RentalBookDetails({ book, onBack, onRent }: RentalBookDetailsPro
                 )}
                 {book.deliveryMethods.includes('shipping') && (
                   <button
-                    onClick={() => setDeliveryMethod('shipping')}
+                    onClick={() => onDeliveryMethodChange('shipping')}
                     className={`w-full border-2 rounded-lg p-4 flex items-center gap-3 transition-colors ${deliveryMethod === 'shipping'
                         ? 'border-[#C4A672] bg-[#C4A672]/5'
                         : 'border-gray-200 hover:border-gray-300'
@@ -228,13 +229,13 @@ export function RentalBookDetails({ book, onBack, onRent }: RentalBookDetailsPro
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="weekly">
-                      Weekly - ${book.rentalOptions.weekly}/week
+                      Weekly - Rs. {book.rentalOptions.weekly}/week
                     </SelectItem>
                     <SelectItem value="monthly">
-                      Monthly - ${book.rentalOptions.monthly}/month
+                      Monthly - Rs. {book.rentalOptions.monthly}/month
                     </SelectItem>
                     <SelectItem value="yearly">
-                      Yearly - ${book.rentalOptions.yearly}/year
+                      Yearly - Rs. {book.rentalOptions.yearly}/year
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -244,7 +245,7 @@ export function RentalBookDetails({ book, onBack, onRent }: RentalBookDetailsPro
               <div className="bg-gray-50 rounded-lg p-4 space-y-3 mb-6">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">Rental ({selectedPeriod})</span>
-                  <span className="text-[#2C3E50]">${getPriceForPeriod().toFixed(2)}</span>
+                  <span className="text-[#2C3E50]">Rs. {getPriceForPeriod().toFixed(2)}</span>
                 </div>
                 {deliveryMethod === 'shipping' && (
                   <div className="flex items-center justify-between text-sm">
@@ -254,7 +255,7 @@ export function RentalBookDetails({ book, onBack, onRent }: RentalBookDetailsPro
                 )}
                 <div className="pt-3 border-t border-gray-200 flex items-center justify-between">
                   <span className="text-[#2C3E50]">Total</span>
-                  <span className="text-[#C4A672] text-2xl">${getTotalCost()}</span>
+                  <span className="text-[#C4A672] text-2xl">Rs. {getTotalCost()}</span>
                 </div>
               </div>
 

@@ -1,7 +1,7 @@
 import { UserManagement } from './Admin/UserManagement';
 import { BookInventory } from './Admin/BookInventory';
 import { RentalManagement } from './Admin/RentalManagement';
-import { TransactionHistory } from './Admin/TransactionHistory';
+import TransactionHistory from './Admin/TransactionHistory';
 import { SystemSettings } from './Admin/SystemSettings';
 import { CommunityManagement } from './Admin/CommunityManagement';
 import { NotesManagement } from './Admin/NotesManagement';

@@ -1,31 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { Worker, Viewer } from '@react-pdf-viewer/core';
-import { defaultLayoutPlugin } from '@react-pdf-viewer/default-layout';
-import '@react-pdf-viewer/core/lib/styles/index.css';
-import '@react-pdf-viewer/default-layout/lib/styles/index.css';
 import { Loader2, FileWarning, ZoomIn, ZoomOut, Maximize, Minimize, EyeOff, Download, ExternalLink } from 'lucide-react';
 import { Button } from './ui/button';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 import DOMPurify from 'dompurify';
-
-// Use UNPKG for PDF.js worker
-const pdfjsVersion = '3.11.174';
+import { cannotUseEmbeddedExternalViewer, openFilePreview } from '../utils/fileHandler';
 
 interface FilePreviewProps {
     fileUrl: string;
     fileType?: string;
+    /** When true, image previews use “teaser” tooling; PDFs always show the full file in the browser viewer. */
     isTeaser?: boolean;
 }
 
-export const FilePreview: React.FC<FilePreviewProps> = ({ fileUrl, fileType, isTeaser = true }) => {
-    const defaultLayoutPluginInstance = defaultLayoutPlugin();
+export const FilePreview: React.FC<FilePreviewProps> = ({ fileUrl, fileType, isTeaser = false }) => {
     const [loading, setLoading] = useState(true);
     const [content, setContent] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
     const [scale, setScale] = useState(1);
     const [fitToScreen, setFitToScreen] = useState(true);
-    const [pdfFallback, setPdfFallback] = useState(false);
 
     // Blur state for "Exchange" logic
     const [isBlurred, setIsBlurred] = useState(false); // Default to false for now, can be toggled via prop if needed later
@@ -172,119 +165,56 @@ export const FilePreview: React.FC<FilePreviewProps> = ({ fileUrl, fileType, isT
         );
     }
 
-    // PDF 
+    // PDF — use the browser’s built-in viewer (iframe). pdf.js often fails on Firebase Storage URLs (CORS),
+    // while direct embed works the same way as opening the file in a new tab.
     if (type === 'pdf') {
-        // Fallback: use iframe/object when react-pdf-viewer fails (e.g. CORS)
-        if (pdfFallback) {
+        if (cannotUseEmbeddedExternalViewer(fileUrl)) {
             return (
-                <div className="h-full w-full min-h-[600px] flex flex-col">
-                    <div className="flex items-center justify-between p-2 bg-gray-100 border-b">
-                        <span className="text-xs text-gray-500 italic">Using browser PDF viewer (fallback)</span>
-                        <a
-                            href={fileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-xs text-[#C4A672] hover:underline"
-                        >
-                            <ExternalLink className="w-3 h-3" />
-                            Open in new tab
-                        </a>
-                    </div>
-                    <div className="flex-1 relative border rounded-md overflow-hidden bg-gray-100">
-                        <object
-                            data={fileUrl}
-                            type="application/pdf"
-                            className="w-full h-full min-h-[600px]"
-                        >
-                            <iframe
-                                src={fileUrl}
-                                className="w-full h-full min-h-[600px] border-none"
-                                title="PDF Viewer Fallback"
-                            />
-                        </object>
-                        {/* Final fallback: download link */}
-                        <div className="absolute bottom-4 left-0 right-0 flex justify-center">
-                            <a
-                                href={fileUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2 px-4 py-2 bg-white/90 hover:bg-white border border-gray-300 rounded-lg shadow-sm text-sm text-gray-700 transition-colors"
-                            >
-                                <Download className="w-4 h-4" />
-                                Can't see the PDF? Download directly
-                            </a>
-                        </div>
-                    </div>
+                <div className="flex flex-col items-center justify-center h-full min-h-[400px] bg-gray-50 rounded-md text-gray-600 p-8 text-center gap-4">
+                    <FileWarning className="w-12 h-12 text-amber-500" />
+                    <p className="text-sm max-w-md">
+                        PDF iframe preview is skipped for localhost/private URLs to avoid browser errors (e.g. loading https://localhost from a chrome-error frame). Open the file in a new tab.
+                    </p>
+                    <Button type="button" variant="outline" size="sm" onClick={() => openFilePreview(fileUrl)} className="border-[#C4A672] text-[#C4A672]">
+                        <ExternalLink className="w-3 h-3 mr-2" />
+                        Open in new tab
+                    </Button>
                 </div>
             );
         }
-
+        const baseUrl = fileUrl.split('#')[0];
+        const pdfSrc = `${baseUrl}#toolbar=1`;
         return (
-            <div className="h-full w-full min-h-[600px] flex flex-col">
-                <div className="flex justify-end p-2 bg-gray-100 border-b">
-                    <Button
-                        variant={isBlurred ? "destructive" : "outline"}
-                        size="sm"
-                        onClick={() => setIsBlurred(!isBlurred)}
+            <div className="h-full w-full min-h-[600px] flex flex-col min-h-0">
+                <div className="flex items-center justify-between gap-2 p-2 bg-gray-100 border-b flex-shrink-0">
+                    <span className="text-xs text-gray-600">Scroll to browse all pages (browser PDF viewer)</span>
+                    <a
+                        href={fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-[#C4A672] hover:underline shrink-0"
                     >
-                        <EyeOff className="w-4 h-4 mr-2" />
-                        {isBlurred ? "Unblur" : "Blur Mode"}
-                    </Button>
+                        <ExternalLink className="w-3 h-3" />
+                        Open in new tab
+                    </a>
                 </div>
-                <div className="flex-1 relative border rounded-md overflow-hidden bg-gray-100">
-                    <BlurOverlay />
-                    <Worker workerUrl={`https://unpkg.com/pdfjs-dist@${pdfjsVersion}/build/pdf.worker.min.js`}>
-                        <Viewer
-                            fileUrl={fileUrl}
-                            plugins={[defaultLayoutPluginInstance]}
-                            initialPage={0}
-                            renderError={() => {
-                                // Trigger fallback on next render cycle
-                                setTimeout(() => setPdfFallback(true), 0);
-                                return (
-                                    <div className="flex flex-col items-center justify-center h-full p-8 text-gray-500">
-                                        <Loader2 className="w-8 h-8 animate-spin mb-2" />
-                                        <p className="text-sm">Switching to fallback viewer…</p>
-                                    </div>
-                                );
-                            }}
-                            renderPage={(props) => {
-                                // Teaser Mode: Only render the first page (index 0)
-                                if (isTeaser && props.pageIndex > 0) {
-                                    return (
-                                        <div className="flex items-center justify-center h-full w-full bg-gray-50 border-2 border-dashed border-gray-200 m-4 rounded-lg min-h-[500px]">
-                                            <div className="text-center p-6 opacity-50">
-                                                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-200 flex items-center justify-center">
-                                                    <EyeOff className="w-8 h-8 text-gray-400" />
-                                                </div>
-                                                <h3 className="text-xl font-semibold text-gray-700 mb-2">Page {props.pageIndex + 1} Locked</h3>
-                                                <p className="text-gray-500 max-w-sm mx-auto">
-                                                    This content is part of the exchange.
-                                                    <br />
-                                                    Complete the transaction to view the full document.
-                                                </p>
-                                            </div>
-                                        </div>
-                                    );
-                                }
-                                return (
-                                    <>
-                                        {props.canvasLayer.children}
-                                        {props.textLayer.children}
-                                        {props.annotationLayer.children}
-                                    </>
-                                );
-                            }}
-                            renderLoader={(percentages: number) => (
-                                <div className="absolute inset-0 flex items-center justify-center bg-white z-10">
-                                    <div className="flex flex-col items-center gap-2">
-                                        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-                                        <span className="text-sm text-gray-500">Loading PDF {Math.round(percentages)}%</span>
-                                    </div>
-                                </div>
-                            )}
-                        />
-                    </Worker>
+                <div className="flex-1 relative border rounded-md overflow-hidden bg-gray-100 min-h-0">
+                    <iframe
+                        src={pdfSrc}
+                        className="absolute inset-0 w-full h-full border-none"
+                        title="PDF preview"
+                    />
+                </div>
+                <div className="flex justify-center py-2 border-t bg-gray-50 flex-shrink-0">
+                    <a
+                        href={fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                    >
+                        <Download className="w-4 h-4" />
+                        Download
+                    </a>
                 </div>
             </div>
         );

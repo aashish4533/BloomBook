@@ -37,6 +37,10 @@ export interface Book {
   exchangePreferences?: string[];
   isSold?: boolean;
   isRented?: boolean;
+  listingStatus?: 'available' | 'reserved' | 'sold';
+  reservedBy?: string;
+  reservedUntil?: { toDate: () => Date } | Date | null;
+  reservationPurchaseId?: string;
   userId: string;
   createdAt?: any;
   location?: {

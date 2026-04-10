@@ -126,7 +126,7 @@ export function UserPortalShowcase() {
                   <span>•</span>
                   <span>Nov 01, 2024</span>
                   <span>•</span>
-                  <span className="text-[#C4A672]">$15.99</span>
+                  <span className="text-[#C4A672]">Rs. 15.99</span>
                 </div>
                 <div className="flex gap-2 mt-3">
                   <Button size="sm" variant="outline" className="flex-1">
@@ -155,7 +155,7 @@ export function UserPortalShowcase() {
             </h2>
             <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6 mb-4">
               <p className="text-green-700 text-sm mb-1">Total Earnings</p>
-              <p className="text-green-900 text-3xl">$245.50</p>
+              <p className="text-green-900 text-3xl">Rs. 245.50</p>
             </div>
             <div className="border border-gray-200 rounded-lg p-4">
               <div className="flex items-center justify-between mb-2">
@@ -167,7 +167,7 @@ export function UserPortalShowcase() {
                 <span>•</span>
                 <span>Oct 15, 2024</span>
                 <span>•</span>
-                <span className="text-green-600">+$12.00</span>
+                <span className="text-green-600">+Rs. 12.00</span>
               </div>
             </div>
           </div>
@@ -213,7 +213,7 @@ export function UserPortalShowcase() {
                   <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded">Returned</span>
                 </div>
                 <div className="text-sm text-gray-500">
-                  Sep 1 - Oct 1, 2024 • $5.99
+                  Sep 1 - Oct 1, 2024 • Rs. 5.99
                 </div>
               </div>
             </div>
@@ -232,7 +232,7 @@ export function UserPortalShowcase() {
               <div className="border border-gray-200 rounded-lg p-4">
                 <h4 className="text-[#2C3E50] mb-1">The Hobbit</h4>
                 <p className="text-sm text-gray-600 mb-2">by J.R.R. Tolkien</p>
-                <p className="text-[#C4A672] mb-3">$14.99</p>
+                <p className="text-[#C4A672] mb-3">Rs. 14.99</p>
                 <Button size="sm" className="w-full bg-[#C4A672] hover:bg-[#8B7355] text-white">
                   <ShoppingCart className="w-4 h-4 mr-2" />
                   Add to Cart
@@ -241,7 +241,7 @@ export function UserPortalShowcase() {
               <div className="border border-gray-200 rounded-lg p-4">
                 <h4 className="text-[#2C3E50] mb-1">Dune</h4>
                 <p className="text-sm text-gray-600 mb-2">by Frank Herbert</p>
-                <p className="text-[#C4A672] mb-3">$16.50</p>
+                <p className="text-[#C4A672] mb-3">Rs. 16.50</p>
                 <Button size="sm" className="w-full bg-[#C4A672] hover:bg-[#8B7355] text-white">
                   <ShoppingCart className="w-4 h-4 mr-2" />
                   Add to Cart

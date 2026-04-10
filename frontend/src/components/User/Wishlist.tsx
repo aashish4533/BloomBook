@@ -61,7 +61,7 @@ export function Wishlist({ onNavigateToMarketplace }: WishlistProps) {
                     <h4 className="text-[#2C3E50]">{item.title}</h4>
                     <p className="text-sm text-gray-600">by {item.author}</p>
                     <p className="text-[#C4A672] text-lg mt-2">
-                      {item.type === 'rent' ? `$${item.price.toFixed(2)}/term` : `$${item.price.toFixed(2)}`}
+                      {item.type === 'rent' ? `Rs. ${item.price.toFixed(2)}/term` : `Rs. ${item.price.toFixed(2)}`}
                     </p>
                   </div>
                   <button onClick={() => handleRemove(item)} className="text-gray-400 hover:text-red-500">

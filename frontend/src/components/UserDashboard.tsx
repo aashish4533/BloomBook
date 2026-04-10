@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, Link, Navigate, useNavigate } from 'react-router-dom';
 import { ChangePasswordSuccess } from './ChangePasswordSuccess';
 import { Button } from './ui/button';
 import { User, ShoppingBag, DollarSign, Calendar, Heart, BookOpen, LogOut, Users, MessageCircle, ArrowLeftRight, Gavel } from 'lucide-react';
@@ -24,12 +24,11 @@ export function UserDashboard({ onLogout }: UserDashboardProps) {
     { id: 'purchases', label: 'Purchases', icon: ShoppingBag, path: '/dashboard/purchases' },
     { id: 'sales', label: 'Sales', icon: DollarSign, path: '/dashboard/sales' },
     { id: 'rentals', label: 'Rentals', icon: Calendar, path: '/dashboard/rentals' },
-    ...(isAdmin ? [{ id: 'wishlist', label: 'Wishlist', icon: Heart, path: '/dashboard/wishlist' }] : []),
+    { id: 'wishlist', label: 'Wishlist', icon: Heart, path: '/dashboard/wishlist' },
     { id: 'communities', label: 'Communities', icon: Users, path: '/dashboard/communities' },
     { id: 'chats', label: 'Chats', icon: MessageCircle, path: '/dashboard/chats' },
     { id: 'exchanges', label: 'Exchanges', icon: ArrowLeftRight, path: '/dashboard/exchanges' },
     { id: 'negotiations', label: 'Negotiations', icon: Gavel, path: '/dashboard/negotiations' },
-    { id: 'payout', label: 'Payout Settings', icon: DollarSign, path: '/dashboard/payout' },
   ];
 
   if (loading) {
@@ -38,6 +37,10 @@ export function UserDashboard({ onLogout }: UserDashboardProps) {
 
   if (error) {
     return <div className="min-h-screen flex items-center justify-center text-red-500">Error: {error.message}</div>;
+  }
+
+  if (isAdmin) {
+    return <Navigate to="/admin/dashboard" replace />;
   }
 
   return (
