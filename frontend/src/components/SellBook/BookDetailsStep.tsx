@@ -646,7 +646,14 @@ export function BookDetailsStep({ initialData, onNext, onCancel, isExchange = fa
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {formData.images.map((img, idx) => (
                 <div key={idx} className="relative aspect-[3/4] rounded-lg overflow-hidden border border-gray-200 group">
-                  <img src={img} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover" crossOrigin="anonymous" referrerPolicy="no-referrer" />
+                  <img
+                    src={img}
+                    alt={`Preview ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                    {...(img.startsWith('blob:')
+                      ? {}
+                      : { crossOrigin: 'anonymous' as const, referrerPolicy: 'no-referrer' as const })}
+                  />
                   <button
                     type="button"
                     onClick={() => removeImage(idx)}

@@ -6,8 +6,43 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Slider } from './ui/slider';
 import { Search, SlidersHorizontal, Plus, MapPin, ArrowLeft } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { toast } from 'sonner';
 import { db } from '../firebase';
+import { useWishlist } from '../hooks/useWishlist';
 import { collection, query, orderBy, limit, startAfter, where, getDocs, DocumentSnapshot, QueryConstraint } from 'firebase/firestore';
+
+function normalizeIsbn(s: string) {
+  return s.replace(/[\s-]/g, '').toLowerCase();
+}
+
+/** Align marketplace condition filter with Firestore values (e.g. GiveBooksOnRent: new, good, fair, excellent). */
+function conditionMatchesFilter(bookCondition: string | undefined, filter: string): boolean {
+  if (filter === 'all') return true;
+  const b = (bookCondition || '').toLowerCase().trim();
+  const f = filter.toLowerCase().trim();
+  if (b === f) return true;
+  if (f === 'new' || f === 'like new') {
+    return b === 'new' || b === 'like new' || b === 'excellent';
+  }
+  if (f === 'good') return b === 'good';
+  if (f === 'fair') return b === 'fair';
+  if (f === 'poor') return b === 'poor';
+  return false;
+}
+
+function effectiveListPrice(book: Book): number {
+  if (book.availableFor?.includes('sale')) return Number(book.price) || 0;
+  if (book.availableFor?.includes('rent')) return Number(book.rentPrice ?? book.price) || 0;
+  return Number(book.price) || 0;
+}
+
+function isMarketplaceVisible(book: Book): boolean {
+  if (book.isSold === true) return false;
+  if (book.listingStatus === 'sold') return false;
+  if (book.listingStatus === 'reserved') return false;
+  if (book.status != null && book.status !== '' && book.status !== 'active') return false;
+  return true;
+}
 
 export interface Book {
   id: string;
@@ -59,6 +94,20 @@ interface BookMarketplaceProps {
 export function BookMarketplace({ onBack }: BookMarketplaceProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const routeState = location.state as {
+    pickForWishlist?: boolean;
+    wishlistType?: string;
+    wishlistReturnTo?: string;
+  } | null;
+  const pickForWishlist = Boolean(routeState?.pickForWishlist);
+  const wishlistType: 'buy' | 'rent' | 'exchange' =
+    routeState?.wishlistType === 'rent'
+      ? 'rent'
+      : routeState?.wishlistType === 'exchange'
+        ? 'exchange'
+        : 'buy';
+  const wishlistReturnTo = routeState?.wishlistReturnTo;
+  const { toggleWishlist } = useWishlist();
   const [books, setBooks] = useState<Book[]>([]);
   const [lastDoc, setLastDoc] = useState<DocumentSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
@@ -166,18 +215,46 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
   // Client-side filtering for fields that are too complex for simple Firestore queries without many indexes
   // or text search (which Firestore doesn't natively support well for partial matches)
   const filteredBooks = books.filter(book => {
-    const matchesSearch = book.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      book.author?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCondition = conditionFilter === 'all' || book.condition === conditionFilter;
-    const matchesIsbn = !isbnFilter || book.isbn?.includes(isbnFilter);
-    const matchesPrice = book.price >= priceRange[0] && book.price <= priceRange[1];
+    if (!isMarketplaceVisible(book)) return false;
 
-    // Updated filtering logic using availableFor
-    const matchesType = listingType === 'all'
-      ? true
-      : book.availableFor?.includes(listingType === 'sell' ? 'sale' : listingType);
+    const q = searchQuery.trim().toLowerCase();
+    const matchesSearch =
+      !q ||
+      book.title?.toLowerCase().includes(q) ||
+      book.author?.toLowerCase().includes(q);
 
-    return matchesSearch && matchesCondition && matchesIsbn && matchesPrice && matchesType;
+    const matchesCondition = conditionMatchesFilter(book.condition, conditionFilter);
+
+    const isbnNeedle = normalizeIsbn(isbnFilter.trim());
+    const matchesIsbn =
+      !isbnNeedle || normalizeIsbn(book.isbn || '').includes(isbnNeedle);
+
+    const listPrice = effectiveListPrice(book);
+    const matchesPrice = listPrice >= priceRange[0] && listPrice <= priceRange[1];
+
+    const loc = locationFilter.trim().toLowerCase();
+    const matchesLocation =
+      !loc ||
+      book.seller?.name?.toLowerCase().includes(loc) ||
+      book.location?.city?.toLowerCase().includes(loc) ||
+      book.location?.state?.toLowerCase().includes(loc) ||
+      String(book.location?.zipCode || '')
+        .toLowerCase()
+        .includes(loc);
+
+    const matchesType =
+      listingType === 'all'
+        ? true
+        : book.availableFor?.includes(listingType === 'sell' ? 'sale' : listingType);
+
+    return (
+      matchesSearch &&
+      matchesCondition &&
+      matchesIsbn &&
+      matchesPrice &&
+      matchesLocation &&
+      matchesType
+    );
   });
 
   const activeFiltersCount = [
@@ -187,6 +264,33 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
     locationFilter !== '',
     priceRange[0] > 0 || priceRange[1] < 5000
   ].filter(Boolean).length;
+
+  const handleBookSelect = async (book: Book) => {
+    if (pickForWishlist) {
+      const canBuy =
+        book.availableFor?.includes('sale') || book.type === 'sell' || book.type === 'both';
+      const canRent =
+        book.availableFor?.includes('rent') || book.type === 'rent' || book.type === 'both';
+      const canExchange =
+        book.availableFor?.includes('exchange') || book.type === 'exchange';
+      if (wishlistType === 'rent' && !canRent) {
+        toast.error('This book is not listed for rent');
+        return;
+      }
+      if (wishlistType === 'buy' && !canBuy) {
+        toast.error('This book is not listed for sale');
+        return;
+      }
+      if (wishlistType === 'exchange' && !canExchange) {
+        toast.error('This book is not listed for exchange');
+        return;
+      }
+      const ok = await toggleWishlist(book, { forceType: wishlistType, mode: 'add' });
+      if (ok) navigate(wishlistReturnTo || '/wishlist', { replace: true });
+      return;
+    }
+    navigate(`/book/${book.id}`);
+  };
 
   const clearAllFilters = () => {
     setCategoryFilter('all');
@@ -232,6 +336,13 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
             </Link>
           </div>
         </div>
+
+        {pickForWishlist && (
+          <div className="mb-6 rounded-lg border border-[#C4A672] bg-amber-50 px-4 py-3 text-[#2C3E50] text-sm">
+            Select a book to add it to your{' '}
+            {wishlistType === 'rent' ? 'rent' : wishlistType === 'exchange' ? 'exchange' : 'buy'} wishlist.
+          </div>
+        )}
 
         {/* Listing Type Tabs */}
         <div className="flex justify-center mb-6">
@@ -401,13 +512,8 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
         {filteredBooks.length > 0 ? (
           <div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredBooks.map(book => (
-                <div key={book.id} onClick={() => navigate(`/book/${book.id}`)} className="cursor-pointer">
-                  <BookCard
-                    book={book}
-                    onClick={() => navigate(`/book/${book.id}`)}
-                  />
-                </div>
+              {filteredBooks.map((book) => (
+                <BookCard key={book.id} book={book} onClick={() => handleBookSelect(book)} />
               ))}
             </div>
 

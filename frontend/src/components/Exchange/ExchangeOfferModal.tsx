@@ -3,12 +3,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '../ui/button';
 import { useCollection, useDocument } from 'react-firebase-hooks/firestore';
 import { db, auth } from '../../firebase';
-import { collection, query, where, addDoc, serverTimestamp, doc } from 'firebase/firestore';
+import { collection, query, where, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { Book } from '../BookMarketplace';
 import { Loader2, AlertTriangle, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { startChatWithUser } from '../../utils/chatUtils';
+import { notifyExchangeParty } from '../../utils/chatNotifications';
 
 interface ExchangeOfferModalProps {
     requestedBook: Book;
@@ -41,28 +42,56 @@ export function ExchangeOfferModal({ requestedBook, onClose, isOpen }: ExchangeO
 
         setIsSubmitting(true);
         try {
-            await addDoc(collection(db, 'exchanges'), {
+            const ownerId = requestedBook.userId || requestedBook.seller?.id;
+            if (!ownerId) {
+                toast.error('Unable to find the listing owner for this book.');
+                return;
+            }
+
+            const offered = userBooks.find((b) => b.id === selectedBookId);
+            const exchangeRef = await addDoc(collection(db, 'exchanges'), {
                 requesterId: currentUser.uid,
-                requesterName: currentUser.displayName,
-                requesterAvatar: currentUser.photoURL,
-                ownerId: requestedBook.userId,
-                ownerName: requestedBook.seller.name,
+                requesterName: currentUser.displayName || 'Someone',
+                requesterAvatar: currentUser.photoURL || '',
+                ownerId,
+                ownerName: requestedBook.seller?.name || 'Owner',
                 requestedBookId: requestedBook.id,
                 requestedBookTitle: requestedBook.title,
-                requestedBookImage: requestedBook.images[0],
+                requestedBookImage: requestedBook.images?.[0] || '',
                 offeredBookId: selectedBookId,
-                offeredBookTitle: userBooks.find(b => b.id === selectedBookId)?.title,
-                offeredBookImage: userBooks.find(b => b.id === selectedBookId)?.images[0],
+                offeredBookTitle: offered?.title,
+                offeredBookImage: offered?.images?.[0] || '',
                 status: 'pending',
+                ownerAccepted: false,
+                requesterAccepted: false,
                 createdAt: serverTimestamp(),
             });
+            const exchangeId = exchangeRef.id;
+
+            notifyExchangeParty({
+                recipientUserId: ownerId,
+                title: 'New exchange offer',
+                message: `${currentUser.displayName || 'Someone'} proposed a book swap for "${requestedBook.title}". Open Dashboard → Exchanges to accept or decline.`,
+                exchangeId,
+            });
+
+            const chatId = await startChatWithUser(
+                navigate,
+                currentUser.uid,
+                ownerId,
+                { name: requestedBook.seller?.name || 'Owner', avatar: requestedBook.seller?.avatar || '' },
+                {
+                    id: requestedBook.id,
+                    title: requestedBook.title,
+                    price: 0,
+                    image: requestedBook.images?.[0],
+                    initialChatMessage: `I've sent you an exchange offer for "${requestedBook.title}". Please open Dashboard → Exchanges to accept or decline. We can coordinate the swap here in chat.`,
+                }
+            );
+            await updateDoc(doc(db, 'exchanges', exchangeId), { chatId });
+
             toast.success('Exchange offer sent!');
             onClose();
-            
-            const targetId = requestedBook.userId || requestedBook.seller?.id;
-            if (targetId) {
-                startChatWithUser(navigate, currentUser.uid, targetId, { name: requestedBook.seller.name, avatar: 'S' }, { id: requestedBook.id, title: `Exchange Offer For: ${requestedBook.title}`, price: 0, image: requestedBook.images[0] });
-            }
         } catch (err) {
             console.error(err);
             toast.error('Failed to send exchange offer');

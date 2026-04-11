@@ -111,7 +111,7 @@ export function ChatMessage({
           {/* Message Bubble with hover actions */}
           <div className="relative group">
             {/* Action Bar */}
-            <div className={`absolute -top-3 flex gap-1 bg-white border border-gray-100 rounded-full shadow-md p-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity ${message.isOwn ? 'left-0' : 'right-0'}`}>
+            <div className={`absolute -top-3 flex gap-1 bg-white border border-gray-100 rounded-full shadow-md p-1 z-10 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity ${message.isOwn ? 'left-0' : 'right-0'}`}>
               {onReply && <button onClick={onReply} className="p-1 hover:bg-gray-100 rounded text-gray-500" title="Reply"><Reply className="w-3.5 h-3.5" /></button>}
               {onReact && <button onClick={() => onReact('👍')} className="p-1 hover:bg-gray-50 rounded">👍</button>}
               {onReact && <button onClick={() => onReact('❤️')} className="p-1 hover:bg-gray-50 rounded">❤️</button>}

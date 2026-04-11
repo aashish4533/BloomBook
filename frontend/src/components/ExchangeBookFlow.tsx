@@ -15,6 +15,7 @@ import { BookFormData, LocationData } from './SellBookFlow'; // Reuse types
 import { Button } from './ui/button';
 import { BookCard } from './BookCard';
 import { Book } from './BookMarketplace';
+import { useNavigate } from 'react-router-dom';
 
 interface ExchangeBookFlowProps {
     onClose: () => void;
@@ -36,6 +37,7 @@ function ExchangeBookWizard({ onClose }: { onClose: () => void }) {
         language: 'English',
         pages: '',
         images: [],
+        imageFiles: [],
         exchangePreferences: ''
     });
 
@@ -105,6 +107,10 @@ function ExchangeBookWizard({ onClose }: { onClose: () => void }) {
                 }
             }
 
+            if (imageUrls.length === 0) {
+                throw new Error('Could not upload book photos. Check your connection and try again.');
+            }
+
             const listingData = {
                 ...bookData,
                 title: bookData.bookName,
@@ -119,7 +125,7 @@ function ExchangeBookWizard({ onClose }: { onClose: () => void }) {
                     totalSales: 0,
                     avatar: user.photoURL || ''
                 },
-                images: imageUrls.length > 0 ? imageUrls : bookData.images,
+                images: imageUrls,
                 type: 'exchange', // Explicitly 'exchange'
                 availableFor: ['exchange'],
                 status: 'active',
@@ -250,36 +256,34 @@ function ExchangeBookWizard({ onClose }: { onClose: () => void }) {
     );
 }
 
+function isExchangeListingVisible(book: Book): boolean {
+    if (book.isSold === true) return false;
+    if (book.listingStatus === 'sold') return false;
+    if (book.listingStatus === 'reserved') return false;
+    if (book.status != null && book.status !== '' && book.status !== 'active') return false;
+    return true;
+}
+
 export function ExchangeBookFlow({ onClose }: ExchangeBookFlowProps) {
+    const navigate = useNavigate();
     const [showWizard, setShowWizard] = useState(false);
-    const [userListings, setUserListings] = useState<Book[]>([]);
+    const [exchangeListings, setExchangeListings] = useState<Book[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Fetch Listings
     useEffect(() => {
         const fetchListings = async () => {
-            const user = auth.currentUser;
-            if (!user) {
-                setLoading(false);
-                return;
-            }
-
             try {
-                // Fetch books where type is exchange or availableFor contains exchange
-                // Note: availableFor is easier to check if we always set it.
-                // Let's stick to 'type' == 'exchange' for now for simplicity, 
-                // or check both if we implemented a composite index.
-                // Assuming 'type' is the primary classifier for now as per my previous implementations.
                 const q = query(
                     collection(db, 'books'),
-                    where('userId', '==', user.uid),
                     where('availableFor', 'array-contains', 'exchange')
                 );
                 const snapshot = await getDocs(q);
-                const books = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Book));
-                setUserListings(books);
+                const books = snapshot.docs
+                    .map((doc) => ({ id: doc.id, ...doc.data() } as Book))
+                    .filter(isExchangeListingVisible);
+                setExchangeListings(books);
             } catch (error) {
-                console.error("Error fetching user listings:", error);
+                console.error('Error fetching exchange listings:', error);
             } finally {
                 setLoading(false);
             }
@@ -299,8 +303,8 @@ export function ExchangeBookFlow({ onClose }: ExchangeBookFlowProps) {
                             <ArrowLeft className="w-6 h-6" />
                         </Button>
                         <div>
-                            <h1 className="text-3xl font-bold text-[#2C3E50]">My Exchange Listings</h1>
-                            <p className="text-gray-600">List books you want to trade with others</p>
+                            <h1 className="text-3xl font-bold text-[#2C3E50]">Book Exchange</h1>
+                            <p className="text-gray-600">Browse listings open for trade and add your own</p>
                         </div>
                     </div>
                     <Button
@@ -314,12 +318,11 @@ export function ExchangeBookFlow({ onClose }: ExchangeBookFlowProps) {
 
                 {loading ? (
                     <div className="flex justify-center py-12">Loading listings...</div>
-                ) : userListings.length > 0 ? (
+                ) : exchangeListings.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {userListings.map(book => (
+                        {exchangeListings.map((book) => (
                             <div key={book.id} className="relative group">
-                                <BookCard book={book} onClick={() => { }} />
-                                {/* Overlay button for Exchange specific action if needed, or just let BookCard handle it */}
+                                <BookCard book={book} onClick={() => navigate(`/book/${book.id}`)} />
                             </div>
                         ))}
                     </div>

@@ -8,10 +8,12 @@ import {
   addDoc,
   updateDoc,
   doc,
-  serverTimestamp
+  serverTimestamp,
+  setDoc,
+  deleteDoc,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { ArrowLeft, Paperclip, Loader2, Download, Lock } from 'lucide-react';
+import { ArrowLeft, Paperclip, Loader2, Download, Lock, Reply, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { downloadFile } from '../../utils/fileHandler';
 import { useNeuralPrivacy } from '../../hooks/useNeuralPrivacy';
@@ -26,6 +28,8 @@ interface Message {
   fileName?: string;
   ciphertext?: string;
   iv?: string;
+  replyToId?: string;
+  replySnippet?: string;
 }
 
 interface PrivateChatProps {
@@ -44,34 +48,181 @@ interface PrivateChatProps {
   onBack: () => void;
   currentUserId: string;
   chatId: string;
-  /** When true, chat is embedded in a page instead of a full-screen overlay. */
   embedded?: boolean;
+}
+
+function replyPreviewForMessage(msg: Message, displayText: string): string {
+  if (msg.fileUrl || msg.fileName) {
+    return msg.fileName ? `File: ${msg.fileName}` : 'Attachment';
+  }
+  const t = (displayText || '').replace(/\s+/g, ' ').trim();
+  return t.length > 120 ? `${t.slice(0, 120)}…` : t || 'Message';
+}
+
+function PrivateChatMessageBubble({
+  chatId,
+  currentUserId,
+  msg,
+  displayText,
+  isMe,
+  onReply,
+}: {
+  chatId: string;
+  currentUserId: string;
+  msg: Message;
+  displayText: string;
+  isMe: boolean;
+  onReply: () => void;
+}) {
+  const [reactions, setReactions] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      collection(db, 'chats', chatId, 'messages', msg.id, 'reactions'),
+      (snap) => {
+        const next: Record<string, string> = {};
+        snap.docs.forEach((d) => {
+          const e = d.data().emoji;
+          if (typeof e === 'string') next[d.id] = e;
+        });
+        setReactions(next);
+      },
+      () => {}
+    );
+    return () => unsub();
+  }, [chatId, msg.id]);
+
+  const myEmoji = reactions[currentUserId];
+  const aggregated = Object.values(reactions).reduce(
+    (acc, emoji) => {
+      acc[emoji] = (acc[emoji] || 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>
+  );
+
+  const toggleReaction = async (emoji: string) => {
+    try {
+      const ref = doc(db, 'chats', chatId, 'messages', msg.id, 'reactions', currentUserId);
+      if (myEmoji === emoji) {
+        await deleteDoc(ref);
+      } else {
+        await setDoc(ref, { emoji, createdAt: serverTimestamp() }, { merge: true });
+      }
+    } catch {
+      toast.error('Could not update reaction');
+    }
+  };
+
+  return (
+    <div className={`flex flex-col gap-1 ${isMe ? 'items-end' : 'items-start'}`}>
+      <div className={`flex ${isMe ? 'justify-end' : 'justify-start'} group`}>
+        <div
+          className={`max-w-[85%] sm:max-w-xs px-4 py-2 rounded-lg shadow-sm break-words ${
+            isMe ? 'bg-blue-600 text-white' : 'bg-white text-gray-800 border border-gray-200'
+          }`}
+        >
+          {msg.replySnippet && (
+            <div
+              className={`text-xs mb-2 pl-2 border-l-2 py-1 rounded ${
+                isMe ? 'border-white/60 bg-black/10' : 'border-gray-400 bg-gray-50 text-gray-600'
+              }`}
+            >
+              {msg.replySnippet}
+            </div>
+          )}
+          {displayText ? <p className="text-sm whitespace-pre-wrap">{displayText}</p> : null}
+          {msg.fileUrl && (
+            <div className={`mt-2 flex flex-col gap-1.5 ${isMe ? 'items-end' : 'items-start'}`}>
+              <button
+                type="button"
+                onClick={() => {
+                  void downloadFile(msg.fileUrl!, msg.fileName || 'attachment');
+                  toast.success('Download started');
+                }}
+                className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium ${
+                  isMe ? 'bg-white/20 text-white hover:bg-white/30' : 'bg-[#C4A672] text-white hover:bg-[#8B7355]'
+                }`}
+              >
+                <Download className="w-4 h-4 shrink-0" />
+                Download
+              </button>
+              <a
+                href={msg.fileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`text-xs underline ${isMe ? 'text-white/90' : 'text-blue-600'}`}
+              >
+                Open in new tab
+              </a>
+            </div>
+          )}
+        </div>
+      </div>
+      <div
+        className={`flex flex-wrap items-center gap-1 max-w-[85%] sm:max-w-xs ${isMe ? 'justify-end' : 'justify-start'} opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity`}
+      >
+        <button
+          type="button"
+          onClick={onReply}
+          className="p-1 rounded-md border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+          title="Reply"
+        >
+          <Reply className="w-3.5 h-3.5" />
+        </button>
+        {['\u{1F44D}', '\u2764\uFE0F', '\u{1F602}'].map((e) => (
+          <button
+            key={e}
+            type="button"
+            onClick={() => toggleReaction(e)}
+            className={`px-1.5 py-0.5 rounded-md text-sm border ${
+              myEmoji === e ? 'border-[#C4A672] bg-amber-50' : 'border-gray-200 bg-white hover:bg-gray-50'
+            }`}
+          >
+            {e}
+          </button>
+        ))}
+      </div>
+      {Object.keys(aggregated).length > 0 && (
+        <div
+          className={`flex flex-wrap gap-1 text-xs bg-white border border-gray-200 rounded-full px-2 py-0.5 shadow-sm ${
+            isMe ? 'self-end' : 'self-start'
+          }`}
+        >
+          {Object.entries(aggregated).map(([emoji, count]) => (
+            <span key={emoji}>
+              {emoji}
+              {count > 1 ? <span className="text-gray-500 ml-0.5">{count}</span> : null}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId, embedded = false }: PrivateChatProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<(Message & { displayText: string }) | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dummy = useRef<HTMLDivElement>(null);
   const seenMessageIdsRef = useRef<Set<string>>(new Set());
+  const displayByIdRef = useRef<Record<string, string>>({});
 
   const { initialized, shield, reconstruct } = useNeuralPrivacy(currentUserId);
 
-  // 1. Subscribe to Real-time Updates (after E2EE keys are ready)
   useEffect(() => {
     if (!chatId || !initialized) return;
     seenMessageIdsRef.current = new Set();
 
-    const q = query(
-      collection(db, "chats", chatId, "messages"),
-      orderBy("createdAt", "asc")
-    );
+    const q = query(collection(db, 'chats', chatId, 'messages'), orderBy('createdAt', 'asc'));
 
     const unsubscribe = onSnapshot(q, async (snapshot) => {
-      const rawList = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
+      const rawList = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
       })) as Message[];
 
       const prevIds = seenMessageIdsRef.current;
@@ -120,13 +271,27 @@ export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId, embedded
         rawList.map(async (msg) => {
           if (msg.ciphertext && msg.iv) {
             const plain = await reconstruct(msg.ciphertext, msg.iv, otherUser.id);
-            return { ...msg, text: plain ?? '[Cannot decrypt — keys may not match 🔒]' };
+            return { ...msg, text: plain ?? '[Cannot decrypt — keys may not match]' };
           }
           return msg;
         })
       );
 
-      setMessages(list);
+      const disp: Record<string, string> = {};
+      list.forEach((m) => {
+        disp[m.id] = m.text || (m.fileName ? `File: ${m.fileName}` : '');
+      });
+      displayByIdRef.current = disp;
+
+      const enriched = list.map((m) => {
+        if (!m.replySnippet && m.replyToId && disp[m.replyToId]) {
+          const s = disp[m.replyToId];
+          return { ...m, replySnippet: s.length > 120 ? `${s.slice(0, 120)}…` : s };
+        }
+        return m;
+      });
+
+      setMessages(enriched);
 
       setTimeout(() => {
         dummy.current?.scrollIntoView({ behavior: 'smooth' });
@@ -136,7 +301,6 @@ export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId, embedded
     return () => unsubscribe();
   }, [chatId, currentUserId, otherUser.id, otherUser.name, initialized, reconstruct]);
 
-  // 2. Send Message Function (E2EE text via neural_vault / ECDH + AES-GCM)
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !initialized) return;
@@ -150,16 +314,22 @@ export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId, embedded
         return;
       }
 
-      await addDoc(collection(db, "chats", chatId, "messages"), {
+      const payload: Record<string, unknown> = {
         ciphertext: enc.ciphertext,
         iv: enc.iv,
         senderId: currentUserId,
         createdAt: serverTimestamp(),
-        displayName: auth.currentUser?.displayName || "User"
-      });
-      await updateDoc(doc(db, "chats", chatId), {
-        lastMessage: '🔒 Encrypted message',
-        lastMessageTimestamp: serverTimestamp()
+        displayName: auth.currentUser?.displayName || 'User',
+      };
+      if (replyingTo) {
+        payload.replyToId = replyingTo.id;
+        payload.replySnippet = replyPreviewForMessage(replyingTo, replyingTo.displayText);
+      }
+
+      await addDoc(collection(db, 'chats', chatId, 'messages'), payload);
+      await updateDoc(doc(db, 'chats', chatId), {
+        lastMessage: 'Encrypted message',
+        lastMessageTimestamp: serverTimestamp(),
       });
       notifyChatRecipient({
         recipientUserId: otherUser.id,
@@ -168,8 +338,9 @@ export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId, embedded
         chatId,
       });
       setNewMessage('');
+      setReplyingTo(null);
     } catch (error) {
-      console.error("Error sending message:", error);
+      console.error('Error sending message:', error);
       toast.error('Failed to send message');
     }
   };
@@ -190,19 +361,24 @@ export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId, embedded
       const storageRef = ref(storage, storagePath);
       await uploadBytes(storageRef, file);
       const fileUrl = await getDownloadURL(storageRef);
-      const summary = `📎 ${file.name}`;
-      await addDoc(collection(db, "chats", chatId, "messages"), {
+      const summary = `File: ${file.name}`;
+      const payload: Record<string, unknown> = {
         text: summary,
         fileUrl,
         fileName: file.name,
         senderId: currentUserId,
         createdAt: serverTimestamp(),
-        displayName: auth.currentUser?.displayName || "User"
-      });
-      await updateDoc(doc(db, "chats", chatId), {
+        displayName: auth.currentUser?.displayName || 'User',
+      };
+      if (replyingTo) {
+        payload.replyToId = replyingTo.id;
+        payload.replySnippet = replyPreviewForMessage(replyingTo, replyingTo.displayText);
+      }
+      await addDoc(collection(db, 'chats', chatId, 'messages'), payload);
+      await updateDoc(doc(db, 'chats', chatId), {
         lastMessage: summary,
         lastMessageTimestamp: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
       });
       notifyChatRecipient({
         recipientUserId: otherUser.id,
@@ -210,9 +386,10 @@ export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId, embedded
         preview: `Shared a file: ${file.name}`,
         chatId,
       });
+      setReplyingTo(null);
     } catch (err) {
-      console.error("File upload failed:", err);
-      alert("Could not upload file. Check your connection and storage permissions.");
+      console.error('File upload failed:', err);
+      alert('Could not upload file. Check your connection and storage permissions.');
     } finally {
       setUploadingFile(false);
     }
@@ -233,20 +410,20 @@ export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId, embedded
             : 'w-full max-w-2xl bg-white rounded-lg shadow-xl overflow-hidden flex flex-col h-[calc(100dvh-2rem)] max-h-[800px]'
         }
       >
-
-        {/* Header (Added to support Back navigation) */}
         <div className="bg-[#C4A672] p-4 flex items-center text-white shadow-sm gap-2">
           <button onClick={onBack} className="mr-2 hover:bg-white/20 p-1 rounded-full text-white shrink-0">
             <ArrowLeft className="w-6 h-6" />
           </button>
           <div className="font-bold text-lg flex-1 min-w-0 truncate">{otherUser.name}</div>
-          <div className="flex items-center gap-1 text-xs bg-white/15 px-2 py-1 rounded-md shrink-0" title="Text messages use end-to-end encryption on this device. File links are sent over HTTPS; download only from people you trust.">
+          <div
+            className="flex items-center gap-1 text-xs bg-white/15 px-2 py-1 rounded-md shrink-0"
+            title="Text messages use end-to-end encryption on this device. File links are sent over HTTPS; download only from people you trust."
+          >
             <Lock className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">E2EE</span>
           </div>
         </div>
 
-        {/* User's Original UI Structure - Flex 1 to fill remaining space */}
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
           {!initialized && (
             <div className="absolute inset-0 z-10 bg-gray-50/90 flex items-center justify-center text-sm text-gray-600 p-4">
@@ -254,50 +431,53 @@ export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId, embedded
               Securing your chat…
             </div>
           )}
-          {/* Messages Area */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
             {messages.map((msg) => {
               const isMe = msg.senderId === currentUserId;
+              const displayText =
+                msg.text ||
+                (msg.fileUrl && !msg.ciphertext
+                  ? msg.fileName
+                    ? `File: ${msg.fileName}`
+                    : 'Attachment'
+                  : '');
               return (
-                <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-xs px-4 py-2 rounded-lg shadow-sm break-words ${isMe ? 'bg-blue-600 text-white' : 'bg-white text-gray-800 border border-gray-200'
-                    }`}>
-                    {msg.text ? <p className="text-sm">{msg.text}</p> : null}
-                    {msg.fileUrl && (
-                      <div className={`mt-2 flex flex-col gap-1.5 ${isMe ? 'items-end' : 'items-start'}`}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            void downloadFile(msg.fileUrl!, msg.fileName || 'attachment');
-                            toast.success('Download started');
-                          }}
-                          className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium ${
-                            isMe
-                              ? 'bg-white/20 text-white hover:bg-white/30'
-                              : 'bg-[#C4A672] text-white hover:bg-[#8B7355]'
-                          }`}
-                        >
-                          <Download className="w-4 h-4 shrink-0" />
-                          Download
-                        </button>
-                        <a
-                          href={msg.fileUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={`text-xs underline ${isMe ? 'text-white/90' : 'text-blue-600'}`}
-                        >
-                          Open in new tab
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <PrivateChatMessageBubble
+                  key={msg.id}
+                  chatId={chatId}
+                  currentUserId={currentUserId}
+                  msg={msg}
+                  displayText={displayText}
+                  isMe={isMe}
+                  onReply={() =>
+                    setReplyingTo({
+                      ...msg,
+                      displayText: displayText || replyPreviewForMessage(msg, displayText),
+                    })
+                  }
+                />
               );
             })}
             <div ref={dummy}></div>
           </div>
 
-          {/* Input Area */}
+          {replyingTo && (
+            <div className="px-4 py-2 bg-gray-100 border-t border-gray-200 flex items-center justify-between text-sm text-gray-700">
+              <span className="truncate">
+                Replying to <strong>{replyingTo.senderId === currentUserId ? 'yourself' : otherUser.name}</strong>
+                {replyingTo.displayText ? `: ${replyingTo.displayText.slice(0, 80)}${replyingTo.displayText.length > 80 ? '…' : ''}` : ''}
+              </span>
+              <button
+                type="button"
+                onClick={() => setReplyingTo(null)}
+                className="p-1 text-gray-500 hover:text-gray-800 shrink-0"
+                aria-label="Cancel reply"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
           <form onSubmit={sendMessage} className="p-4 border-t bg-white flex gap-2 shrink-0 items-center">
             <input
               ref={fileInputRef}
@@ -335,5 +515,3 @@ export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId, embedded
     </div>
   );
 };
-
-

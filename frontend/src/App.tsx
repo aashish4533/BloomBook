@@ -55,6 +55,7 @@ import { UserCommunities } from './components/User/UserCommunities';
 import { UserChats } from './components/User/UserChats';
 import { UserExchanges } from './components/User/UserExchanges';
 import { NegotiationInbox } from './components/User/NegotiationInbox';
+import { UserReservations } from './components/User/UserReservations';
 
 // AI Integration
 import { AIChatbox } from './components/Chat/AIChatbox';
@@ -118,6 +119,7 @@ function PrivateChatByIdWrapper() {
   const { chatId } = useParams<{ chatId: string }>();
   const [user] = useAuthState(auth);
   const stateOtherUser = location.state?.otherUser;
+  const stateBookContext = location.state?.bookContext;
 
   const [otherUser, setOtherUser] = useState<{ id: string; name: string; avatar: string; online: boolean } | null>(
     stateOtherUser || null
@@ -176,6 +178,7 @@ function PrivateChatByIdWrapper() {
     <PrivateChat
       chatId={chatId}
       otherUser={otherUser}
+      bookContext={stateBookContext}
       onBack={() => navigate(-1)}
       currentUserId={user?.uid || ''}
     />
@@ -222,7 +225,22 @@ function GroupChatWrapper() {
 
 function DashboardWishlistWrapper() {
   const navigate = useNavigate();
-  return <Wishlist onNavigateToMarketplace={() => navigate('/marketplace')} />;
+  return (
+    <Wishlist
+      onNavigateToMarketplace={(opts) =>
+        navigate('/marketplace', {
+          state:
+            opts?.pickForWishlist === true
+              ? {
+                  pickForWishlist: true,
+                  wishlistType: opts.wishlistType ?? 'buy',
+                  wishlistReturnTo: '/dashboard/wishlist',
+                }
+              : undefined,
+        })
+      }
+    />
+  );
 }
 
 function AdvancedSearchWrapper() {
@@ -232,7 +250,20 @@ function AdvancedSearchWrapper() {
 
 function WishlistPageWrapper() {
   const navigate = useNavigate();
-  return <WishlistPage onBack={() => navigate('/')} onNavigateToMarketplace={() => navigate('/marketplace')} />;
+  return (
+    <WishlistPage
+      onBack={() => navigate('/')}
+      onNavigateToMarketplace={(opts) =>
+        navigate('/marketplace', {
+          state:
+            opts?.pickForWishlist === true
+              ? { pickForWishlist: true, wishlistType: opts.wishlistType ?? 'buy' }
+              : undefined,
+        })
+      }
+      onNavigateToBook={(bookId) => navigate(`/book/${bookId}`)}
+    />
+  );
 }
 
 function TuitionHubWrapper() {
@@ -321,6 +352,7 @@ function AppContent() {
 
             <Route path="/dashboard" element={<UserDashboard onLogout={handleLogout} />}>
               <Route index element={<UserProfile />} />
+              <Route path="reservations" element={<UserReservations />} />
               <Route path="purchases" element={<PurchaseHistory />} />
               <Route path="sales" element={<SalesHistory />} />
               <Route path="rentals" element={<RentalHistory />} />

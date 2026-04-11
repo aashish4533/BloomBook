@@ -22,3 +22,81 @@ export function notifyChatRecipient(params: {
     ...(chatId ? { chatId } : {}),
   }).catch((err) => console.warn('notifyChatRecipient:', err));
 }
+
+/** In-app notification for exchange offers / accept / decline. */
+export function notifyExchangeParty(params: {
+  recipientUserId: string;
+  title: string;
+  message: string;
+  exchangeId?: string;
+}): void {
+  const { recipientUserId, title, message, exchangeId } = params;
+  if (!recipientUserId) return;
+  const safeMsg = message.length > 500 ? `${message.slice(0, 497)}…` : message;
+  void addDoc(collection(db, 'notifications'), {
+    userId: recipientUserId,
+    type: 'system',
+    title,
+    message: safeMsg,
+    read: false,
+    timestamp: serverTimestamp(),
+    ...(exchangeId ? { exchangeId } : {}),
+  }).catch((err) => console.warn('notifyExchangeParty:', err));
+}
+
+/** Notify all community members (except the author) when a new feed post is created. */
+export function notifyCommunityMembersNewPost(params: {
+  communityId: string;
+  communityName: string;
+  postId: string;
+  authorId: string;
+  authorName: string;
+  contentPreview: string;
+  recipientUserIds: string[];
+}): void {
+  const {
+    communityId,
+    communityName,
+    postId,
+    authorId,
+    authorName,
+    contentPreview,
+    recipientUserIds,
+  } = params;
+  const trimmed = contentPreview.replace(/\s+/g, ' ').trim();
+  const preview =
+    trimmed.length > 180 ? `${trimmed.slice(0, 180)}…` : trimmed;
+  const unique = [...new Set(recipientUserIds.filter((uid) => uid && uid !== authorId))];
+  unique.forEach((userId) => {
+    void addDoc(collection(db, 'notifications'), {
+      userId,
+      type: 'community',
+      title: `New post in ${communityName}`,
+      message: `${authorName}: ${preview || '(see community)'}`,
+      read: false,
+      timestamp: serverTimestamp(),
+      communityId,
+      postId,
+    }).catch((err) => console.warn('notifyCommunityMembersNewPost:', err));
+  });
+}
+
+/** Notify community admin when a user requests to join a private community. */
+export function notifyCommunityAdminJoinRequest(params: {
+  adminUserId: string;
+  communityId: string;
+  communityName: string;
+  requesterName: string;
+}): void {
+  const { adminUserId, communityId, communityName, requesterName } = params;
+  if (!adminUserId) return;
+  void addDoc(collection(db, 'notifications'), {
+    userId: adminUserId,
+    type: 'community',
+    title: 'New join request',
+    message: `${requesterName} asked to join "${communityName}". Open the community to approve or decline.`,
+    read: false,
+    timestamp: serverTimestamp(),
+    communityId,
+  }).catch((err) => console.warn('notifyCommunityAdminJoinRequest:', err));
+}

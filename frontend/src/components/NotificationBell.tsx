@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Bell, X, Check, Trash2, Settings, Eye } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -10,15 +11,39 @@ import { toast } from 'sonner';
 
 interface Notification {
   id: string;
-  type: 'order' | 'message' | 'community' | 'system' | 'community_approved' | 'community_rejected';
+  type: 'order' | 'message' | 'community' | 'system' | 'community_approved' | 'community_rejected' | string;
   title: string;
   message: string;
   timestamp: any;
   read: boolean;
   icon?: string;
+  chatId?: string;
+  exchangeId?: string;
+  negotiationId?: string;
+  rentalId?: string;
+  purchaseId?: string;
+  bookId?: string;
+  communityId?: string;
+  postId?: string;
+}
+
+function notificationTargetPath(n: Notification): string | null {
+  if (n.chatId) return `/chat/${n.chatId}`;
+  if (n.exchangeId) return '/dashboard/exchanges';
+  if (n.negotiationId) return '/dashboard/negotiations';
+  if (n.rentalId) return `/rental/${n.rentalId}/handover`;
+  if (n.bookId) return `/book/${n.bookId}`;
+  if (n.purchaseId) return '/dashboard/purchases';
+  if (n.communityId) {
+    return n.postId
+      ? `/communities/${n.communityId}?post=${encodeURIComponent(n.postId)}`
+      : `/communities/${n.communityId}`;
+  }
+  return null;
 }
 
 export function NotificationBell() {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -98,6 +123,17 @@ export function NotificationBell() {
     } catch (error) {
       console.error('Error marking all as read:', error);
       toast.error('Failed to update notifications');
+    }
+  };
+
+  const handleNotificationNavigate = async (notification: Notification) => {
+    const path = notificationTargetPath(notification);
+    if (!notification.read) {
+      await markAsRead(notification.id);
+    }
+    setIsOpen(false);
+    if (path) {
+      navigate(path);
     }
   };
 
@@ -196,10 +232,21 @@ export function NotificationBell() {
             <>
               <ScrollArea className="max-h-96">
                 <div className="divide-y divide-gray-100">
-                  {notifications.map((notification) => (
-                    <div
-                      key={notification.id}
-                      className={`p-4 hover:bg-gray-50 transition-colors ${!notification.read ? 'bg-blue-50/50' : ''
+                  {notifications.map((notification) => {
+                    const target = notificationTargetPath(notification);
+                    return (
+                      <div key={notification.id}
+                      role={target ? 'button' : undefined}
+                      tabIndex={target ? 0 : undefined}
+                      onClick={() => target && handleNotificationNavigate(notification)}
+                      onKeyDown={(e) => {
+                        if (!target) return;
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleNotificationNavigate(notification);
+                        }
+                      }}
+                      className={`p-4 transition-colors ${target ? 'cursor-pointer hover:bg-gray-50' : 'hover:bg-gray-50'} ${!notification.read ? 'bg-blue-50/50' : ''
                         }`}
                     >
                       <div className="flex gap-3">
@@ -220,7 +267,11 @@ export function NotificationBell() {
                             <div className="flex items-center gap-1">
                               {!notification.read && (
                                 <button
-                                  onClick={() => markAsRead(notification.id)}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    markAsRead(notification.id);
+                                  }}
                                   className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
                                   title="Mark as read"
                                 >
@@ -228,7 +279,11 @@ export function NotificationBell() {
                                 </button>
                               )}
                               <button
-                                onClick={() => deleteNotification(notification.id)}
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteNotification(notification.id);
+                                }}
                                 className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
                                 title="Delete"
                               >
@@ -239,7 +294,8 @@ export function NotificationBell() {
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </ScrollArea>
 

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Outlet, NavLink, Link, Navigate, useNavigate } from 'react-router-dom';
 import { ChangePasswordSuccess } from './ChangePasswordSuccess';
 import { Button } from './ui/button';
-import { User, ShoppingBag, DollarSign, Calendar, Heart, BookOpen, LogOut, Users, MessageCircle, ArrowLeftRight, Gavel } from 'lucide-react';
+import { User, ShoppingBag, DollarSign, Calendar, Heart, BookOpen, LogOut, Users, MessageCircle, ArrowLeftRight, Gavel, Bookmark } from 'lucide-react';
 import { auth } from '../firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useUserRole } from '../context/UserRoleContext';
@@ -21,6 +21,7 @@ export function UserDashboard({ onLogout }: UserDashboardProps) {
 
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User, path: '/dashboard' },
+    { id: 'reservations', label: 'Reservations', icon: Bookmark, path: '/dashboard/reservations' },
     { id: 'purchases', label: 'Purchases', icon: ShoppingBag, path: '/dashboard/purchases' },
     { id: 'sales', label: 'Sales', icon: DollarSign, path: '/dashboard/sales' },
     { id: 'rentals', label: 'Rentals', icon: Calendar, path: '/dashboard/rentals' },

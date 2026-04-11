@@ -159,6 +159,10 @@ function SellBookWizard({ onClose }: { onClose: () => void }) {
         }
       }
 
+      if (imageUrls.length === 0) {
+        throw new Error('Could not upload book photos. Check your connection and try again.');
+      }
+
       const listingData = {
         ...bookData,
         title: bookData.bookName, // Map bookName to title for DB consistency
@@ -174,7 +178,7 @@ function SellBookWizard({ onClose }: { onClose: () => void }) {
           totalSales: 0,
           avatar: user.photoURL || ''
         },
-        images: imageUrls.length > 0 ? imageUrls : bookData.images,
+        images: imageUrls,
         type: 'sell',
         availableFor: ['sale'], // Explicit availableFor
         status: 'active',

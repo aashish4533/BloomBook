@@ -39,6 +39,12 @@ service firebase.storage {
       allow write: if isAuthenticated() && request.auth.uid == userId && isImageUnder5MB();
     }
 
+    // Legacy book images: book_images/{fileName} (older single-segment paths — still need public read)
+    match /book_images/{legacyFile} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Admin-added inventory images: book_images/admin/{fileName}
     match /book_images/admin/{fileName} {
       allow read: if true;
@@ -51,9 +57,15 @@ service firebase.storage {
       allow write: if isAuthenticated() && isImageUnder5MB();
     }
 
-    // Chat Attachments
-    match /chat_attachments/{messageId} {
+    // Community chat images: chat_attachments/{communityId}/{fileName} (GroupChat.tsx)
+    match /chat_attachments/{communityId}/{fileName} {
       allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isImageUnder5MB();
+    }
+
+    // Post images (CreatePost.tsx): post_images/{fileName}
+    match /post_images/{fileName} {
+      allow read: if true;
       allow write: if isAuthenticated() && isImageUnder5MB();
     }
 

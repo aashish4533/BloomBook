@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { httpsCallable } from 'firebase/functions';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { auth } from '../firebase';
+import { auth, db, functions } from '../firebase';
 import { Send, Bot, User, Loader2, Sparkles, GraduationCap, Compass, BookOpen, Menu, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from './ui/button';
@@ -12,7 +12,6 @@ import { Avatar, AvatarFallback } from './ui/avatar';
 import { Card } from './ui/card';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from './ui/sheet';
 import { useCart } from '../context/CartContext';
-import { db } from '../firebase';
 import { doc, getDoc, collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { toast } from 'sonner';
 
@@ -178,8 +177,6 @@ export function AIAssistantPage() {
     }
   }, [messages]);
 
-  const functions = getFunctions();
-
   const quickPrompts = [
     { text: "Find a Math tutor for O-Level", icon: GraduationCap, category: "Tutor" },
     { text: "Recommend speculative fiction books", icon: BookOpen, category: "Books" },
@@ -202,6 +199,22 @@ export function AIAssistantPage() {
       return;
     }
 
+    // #region agent log
+    fetch('http://127.0.0.1:7923/ingest/79ac5cb1-e3a3-4310-8419-22151450dd83', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '01ac4b' },
+      body: JSON.stringify({
+        sessionId: '01ac4b',
+        runId: 'post-fix-2',
+        hypothesisId: 'H1',
+        location: 'AIAssistantPage.tsx:handleSendMessage:entry',
+        message: 'assistant request start',
+        data: { hasClientKey, isLoggedIn: Boolean(auth.currentUser) },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+
     const priorHistory = messages;
     const newUserMessage: Message = { role: 'user', parts: [{ text: messageText }] };
     setMessages(prev => [...prev, newUserMessage]);
@@ -211,7 +224,47 @@ export function AIAssistantPage() {
     try {
       let replyText: string | null = null;
 
-      if (auth.currentUser) {
+      // Prefer browser Gemini when VITE_GEMINI_API_KEY is set so a missing server secret does not block replies.
+      if (hasClientKey) {
+        try {
+          replyText = (await generateClientGeminiReply(messageText, priorHistory)).trim();
+          // #region agent log
+          fetch('http://127.0.0.1:7923/ingest/79ac5cb1-e3a3-4310-8419-22151450dd83', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '01ac4b' },
+            body: JSON.stringify({
+              sessionId: '01ac4b',
+              runId: 'post-fix-2',
+              hypothesisId: 'H2',
+              location: 'AIAssistantPage.tsx:handleSendMessage:clientFirstOk',
+              message: 'client Gemini first path success',
+              data: { replyLen: replyText?.length ?? 0 },
+              timestamp: Date.now(),
+            }),
+          }).catch(() => {});
+          // #endregion
+        } catch (clientFirstErr: unknown) {
+          const ce = clientFirstErr as { message?: string };
+          // #region agent log
+          fetch('http://127.0.0.1:7923/ingest/79ac5cb1-e3a3-4310-8419-22151450dd83', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '01ac4b' },
+            body: JSON.stringify({
+              sessionId: '01ac4b',
+              runId: 'post-fix-2',
+              hypothesisId: 'H2',
+              location: 'AIAssistantPage.tsx:handleSendMessage:clientFirstErr',
+              message: 'client Gemini first path failed',
+              data: { errSnippet: String(ce?.message ?? clientFirstErr).slice(0, 220) },
+              timestamp: Date.now(),
+            }),
+          }).catch(() => {});
+          // #endregion
+          console.warn('Client Gemini (first) failed, will try cloud function if logged in:', clientFirstErr);
+        }
+      }
+
+      if (!replyText && auth.currentUser) {
         try {
           const generateResponse = httpsCallable(functions, 'generateAssistantResponse', {
             timeout: 60000,
@@ -223,16 +276,61 @@ export function AIAssistantPage() {
           if (result?.data?.text?.trim()) {
             replyText = result.data.text.trim();
           }
-        } catch (fnErr) {
+          // #region agent log
+          fetch('http://127.0.0.1:7923/ingest/79ac5cb1-e3a3-4310-8419-22151450dd83', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '01ac4b' },
+            body: JSON.stringify({
+              sessionId: '01ac4b',
+              runId: 'post-fix-2',
+              hypothesisId: 'H3',
+              location: 'AIAssistantPage.tsx:handleSendMessage:afterCF',
+              message: 'cloud function attempt finished',
+              data: { gotReply: Boolean(replyText), replyLen: replyText?.length ?? 0 },
+              timestamp: Date.now(),
+            }),
+          }).catch(() => {});
+          // #endregion
+        } catch (fnErr: unknown) {
+          const fe = fnErr as { code?: string; message?: string };
+          // #region agent log
+          fetch('http://127.0.0.1:7923/ingest/79ac5cb1-e3a3-4310-8419-22151450dd83', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '01ac4b' },
+            body: JSON.stringify({
+              sessionId: '01ac4b',
+              runId: 'post-fix-2',
+              hypothesisId: 'H1',
+              location: 'AIAssistantPage.tsx:handleSendMessage:cfError',
+              message: 'cloud function rejected',
+              data: {
+                cfCode: fe?.code ?? 'unknown',
+                cfMsgSnippet: String(fe?.message ?? '').slice(0, 220),
+              },
+              timestamp: Date.now(),
+            }),
+          }).catch(() => {});
+          // #endregion
           console.warn('Cloud function assistant failed:', fnErr);
         }
       }
 
-      if (!replyText && hasClientKey) {
-        replyText = (await generateClientGeminiReply(messageText, priorHistory)).trim();
-      }
-
       if (!replyText) {
+        // #region agent log
+        fetch('http://127.0.0.1:7923/ingest/79ac5cb1-e3a3-4310-8419-22151450dd83', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '01ac4b' },
+          body: JSON.stringify({
+            sessionId: '01ac4b',
+            runId: 'post-fix-2',
+            hypothesisId: 'H4',
+            location: 'AIAssistantPage.tsx:handleSendMessage:empty',
+            message: 'no reply from client or CF',
+            data: { hasClientKey, triedCf: Boolean(auth.currentUser) },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
         throw new Error('empty_response');
       }
 

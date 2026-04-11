@@ -59,16 +59,20 @@ export function BookDetailsPage() {
 
     const book = { id: value.id, ...value.data() } as Book;
 
-    // Backward compatibility shim for 'availableFor' if missing
-    if (!book.availableFor && book.type) {
+    const availabilityUnset =
+        !book.availableFor ||
+        (Array.isArray(book.availableFor) && book.availableFor.length === 0);
+    if (availabilityUnset && book.type) {
         if (book.type === 'sell') book.availableFor = ['sale'];
         else if (book.type === 'rent') book.availableFor = ['rent'];
         else if (book.type === 'exchange') book.availableFor = ['exchange'];
         else if (book.type === 'both') book.availableFor = ['sale', 'rent'];
         else book.availableFor = [];
     }
-    // Ensure array exists
     if (!book.availableFor) book.availableFor = [];
+    if (book.type === 'exchange' && !book.availableFor.includes('exchange')) {
+        book.availableFor = [...book.availableFor, 'exchange'];
+    }
 
     const getConditionColor = (condition: string) => {
         switch (condition) {
@@ -119,14 +123,36 @@ export function BookDetailsPage() {
             return;
         }
 
-        startChatWithUser(navigate, auth.currentUser.uid, sellerId, {
-            name: book.seller.name,
-            avatar: book.seller.avatar || 'S'
-        }, {
+        const chatBookContext: {
+            id: string;
+            title: string;
+            price: number;
+            image: string | undefined;
+            initialChatMessage?: string;
+        } = {
             id: book.id,
             title: book.title,
-            price: book.price,
-            image: book.images?.[0]
+            price: book.availableFor?.includes('sale') ? book.price : 0,
+            image: book.images?.[0],
+        };
+        if (book.availableFor?.includes('exchange')) {
+            chatBookContext.initialChatMessage = `Hi, I'd like to discuss a book exchange for "${book.title}". Let's coordinate here.`;
+        }
+
+        void startChatWithUser(
+            navigate,
+            auth.currentUser.uid,
+            sellerId,
+            {
+                name: book.seller.name,
+                avatar: book.seller.avatar || 'S',
+            },
+            chatBookContext
+        ).catch((e: unknown) => {
+            console.error(e);
+            toast.error(
+                e instanceof Error ? e.message : 'Could not open chat. Please try again or contact support if it persists.'
+            );
         });
     };
 
@@ -330,11 +356,11 @@ export function BookDetailsPage() {
                                     </Button>
                                 )}
 
-                                {/* Exchange Button */}
-                                {book.availableFor?.includes('exchange') && (
+                                {/* Exchange — show when listing is for swap (handles legacy/empty availableFor) */}
+                                {(book.availableFor?.includes('exchange') || book.type === 'exchange') && (
                                     <Button
                                         onClick={() => setShowExchangeModal(true)}
-                                        className="w-full h-12 bg-purple-600 hover:bg-purple-700 text-white"
+                                        className="w-full h-12 bg-[#F5A623] hover:bg-[#8B7355] text-white shadow-md"
                                     >
                                         <Package className="w-5 h-5 mr-2" />
                                         Propose Exchange
@@ -342,14 +368,18 @@ export function BookDetailsPage() {
                                 )}
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
-                                <Button
-                                    onClick={handleNegotiate}
-                                    variant="outline"
-                                    className="h-11 border-[#C4A672] text-[#C4A672] hover:bg-[#C4A672] hover:text-white"
-                                >
-                                    Negotiate Price
-                                </Button>
+                            <div
+                                className={`grid gap-3 ${book.availableFor?.includes('sale') ? 'grid-cols-2' : 'grid-cols-1'}`}
+                            >
+                                {book.availableFor?.includes('sale') && (
+                                    <Button
+                                        onClick={handleNegotiate}
+                                        variant="outline"
+                                        className="h-11 border-[#C4A672] text-[#C4A672] hover:bg-[#C4A672] hover:text-white"
+                                    >
+                                        Negotiate Price
+                                    </Button>
+                                )}
                                 <Button
                                     onClick={handleContactSeller}
                                     variant="outline"

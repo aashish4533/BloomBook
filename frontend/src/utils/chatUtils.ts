@@ -78,19 +78,17 @@ export const startChatWithUser = async (
 ) => {
   const chatId = [currentUserId, targetUserId].sort().join('_');
   const chatRef = doc(db, 'chats', chatId);
-  
-  const chatSnap = await getDoc(chatRef);
-  let isNewChat = false;
 
-  if (!chatSnap.exists()) {
-    isNewChat = true;
-    await setDoc(chatRef, {
+  await setDoc(
+    chatRef,
+    {
       participants: [currentUserId, targetUserId],
       createdAt: serverTimestamp(),
       lastMessage: '',
-      lastMessageTimestamp: serverTimestamp()
-    });
-  }
+      lastMessageTimestamp: serverTimestamp(),
+    },
+    { merge: true }
+  );
 
   // Handle specific contextual initial messages
   if (bookContext) {
@@ -137,7 +135,7 @@ export const startChatWithUser = async (
     }
   }
 
-  navigate('/chat', {
+  navigate(`/chat/${chatId}`, {
     state: {
       otherUser: {
         id: targetUserId,
@@ -148,6 +146,6 @@ export const startChatWithUser = async (
       bookContext
     }
   });
-  
+
   return chatId;
 };

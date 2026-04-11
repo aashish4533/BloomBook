@@ -31,6 +31,16 @@ interface BookData {
   imageFiles: File[];
 }
 
+function bookDetailsRentError(book: BookData): string | null {
+  if (!book.title.trim() || !book.author.trim() || !book.condition) {
+    return 'Each book needs title, author, and condition.';
+  }
+  if (!book.imageFiles?.length) {
+    return 'Upload at least one photo for each book you list.';
+  }
+  return null;
+}
+
 export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
   const [currentStep, setCurrentStep] = useState<Step>('details');
   const [addedBooks, setAddedBooks] = useState<BookData[]>([]);
@@ -59,6 +69,14 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
   });
 
   const handleNext = () => {
+    if (currentStep === 'details') {
+      const err = bookDetailsRentError(formData);
+      if (err) {
+        toast.error(err);
+        return;
+      }
+    }
+
     if (currentStep === 'pricing') {
       // Validate Pricing
       const original = parseFloat(formData.originalPrice);
@@ -100,6 +118,11 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
       toast.error('Maximum 4 books allowed');
       return;
     }
+    const err = bookDetailsRentError(formData);
+    if (err) {
+      toast.error(err);
+      return;
+    }
     setAddedBooks([...addedBooks, formData]);
     // Reset form for next book
     setFormData({
@@ -131,32 +154,35 @@ export function GiveBooksOnRent({ onClose, onSuccess }: GiveBooksOnRentProps) {
 
     try {
       const allBooks = [...addedBooks, formData];
-      const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-      const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-
-      if (!cloudName || !uploadPreset) {
-        toast.error("Configuration error: Cloudinary credentials missing");
-        return;
+      for (const book of allBooks) {
+        const err = bookDetailsRentError(book);
+        if (err) {
+          toast.error(err);
+          return;
+        }
       }
 
       // Process each book
       for (const book of allBooks) {
         // Upload images to Firebase Storage
         const imageUrls: string[] = [];
-        if (book.imageFiles && book.imageFiles.length > 0) {
-          for (const file of book.imageFiles) {
-            try {
-              const uniqueId = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-              const storageRef = ref(storage, `book_images/${user.uid}/${uniqueId}`);
-              
-              await uploadBytes(storageRef, file);
-              const url = await getDownloadURL(storageRef);
-              imageUrls.push(url);
-            } catch (err) {
-              console.error('[Storage] Upload failed:', err);
-              toast.error(`Failed to upload ${file.name}`);
-            }
+        for (const file of book.imageFiles) {
+          try {
+            const uniqueId = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+            const storageRef = ref(storage, `book_images/${user.uid}/${uniqueId}`);
+
+            await uploadBytes(storageRef, file);
+            const url = await getDownloadURL(storageRef);
+            imageUrls.push(url);
+          } catch (err) {
+            console.error('[Storage] Upload failed:', err);
+            toast.error(`Failed to upload ${file.name}`);
           }
+        }
+
+        if (imageUrls.length === 0) {
+          toast.error(`Could not upload photos for "${book.title}". Check your connection and try again.`);
+          return;
         }
 
         const listingData = {

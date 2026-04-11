@@ -1,8 +1,9 @@
 // src/components/AIRecommendations.tsx
 import { Sparkles, ChevronLeft, ChevronRight, BookOpen } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useAuthState } from 'react-firebase-hooks/auth';
 import { Button } from './ui/button';
-import { functions } from '../firebase';
+import { auth, functions } from '../firebase';
 import { httpsCallable } from 'firebase/functions';
 import { toast } from 'sonner';
 
@@ -35,6 +36,7 @@ const genreColor: Record<string, string> = {
 };
 
 export function AIRecommendations({ context = 'home', onBookClick }: AIRecommendationsProps) {
+  const [user] = useAuthState(auth);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [startIndex, setStartIndex] = useState(0);
   const itemsToShow = 3;
@@ -49,7 +51,8 @@ export function AIRecommendations({ context = 'home', onBookClick }: AIRecommend
           'getAntigravityRecommendations'
         );
         const result = await getAntigravityRecommendations();
-        setRecommendations(result.data.recommendations);
+        setRecommendations(result.data.recommendations ?? []);
+        setStartIndex(0);
       } catch (err) {
         toast.error('Failed to fetch AI recommendations');
         console.error(err);
@@ -58,7 +61,7 @@ export function AIRecommendations({ context = 'home', onBookClick }: AIRecommend
       }
     };
     fetchRecommendations();
-  }, []);
+  }, [user?.uid]);
 
   const handlePrevious = () => {
     setStartIndex((prev) => Math.max(0, prev - 1));
@@ -97,8 +100,12 @@ export function AIRecommendations({ context = 'home', onBookClick }: AIRecommend
             <Sparkles className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h2 className="text-xl text-gray-900">AI Librarian Picks</h2>
-            <p className="text-sm text-gray-600">Antigravity &amp; Gravity Manipulation</p>
+            <h2 className="text-xl text-gray-900">Book recommendations</h2>
+            <p className="text-sm text-gray-600">
+              {user
+                ? 'Based on your wishlist and BookBloom activity'
+                : 'Live picks from the marketplace — sign in to personalize'}
+            </p>
           </div>
         </div>
 
@@ -171,7 +178,7 @@ export function AIRecommendations({ context = 'home', onBookClick }: AIRecommend
       {/* Footer */}
       <div className="mt-4 text-center">
         <p className="text-xs text-gray-500">
-          Powered by BookBloom AI Librarian • Speculative Fiction &amp; Advanced Physics
+          Book recommendations • Uses your wishlist and purchase, rental, and sales history when signed in
         </p>
       </div>
     </div>

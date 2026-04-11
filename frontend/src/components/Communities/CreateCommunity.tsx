@@ -378,8 +378,9 @@ export function CreateCommunity({ onBack, onSuccess, userId, userName, initialDa
                   src={formData.image}
                   alt="Community preview"
                   className="w-full h-48 object-cover rounded-lg"
-                  crossOrigin="anonymous"
-                  referrerPolicy="no-referrer"
+                  {...(formData.image.startsWith('http')
+                    ? { crossOrigin: 'anonymous' as const, referrerPolicy: 'no-referrer' as const }
+                    : {})}
                 />
                 <button
                   type="button"

@@ -11,6 +11,7 @@ import { PostDetail } from './PostDetail';
 import { toast } from 'sonner';
 import { db, auth } from '../../firebase';
 import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, deleteDoc, onSnapshot, collection, query, orderBy, increment, addDoc, serverTimestamp, deleteField, setDoc, getDocs } from 'firebase/firestore';
+import { notifyCommunityMembersNewPost, notifyCommunityAdminJoinRequest } from '../../utils/chatNotifications';
 import { CreateCommunity } from './CreateCommunity';
 import {
   AlertDialog,
@@ -196,6 +197,16 @@ export function CommunityDetails({ userId }: CommunityDetailsProps) {
       pendingUnsub();
     };
   }, [communityId]);
+
+  useEffect(() => {
+    const postId = new URLSearchParams(location.search).get('post');
+    if (!postId || !communityId || posts.length === 0) return;
+    const p = posts.find((x) => x.id === postId);
+    if (p) {
+      setSelectedPost(p);
+      navigate(`/communities/${communityId}`, { replace: true });
+    }
+  }, [location.search, posts, communityId, navigate]);
  
   // Healing trigger for admin sync defaults
   useEffect(() => {
@@ -227,6 +238,15 @@ export function CommunityDetails({ userId }: CommunityDetailsProps) {
           joinedAt: serverTimestamp(),
           role: 'member'
         });
+        const adminId = community.adminId as string | undefined;
+        if (adminId && adminId !== user.uid) {
+          notifyCommunityAdminJoinRequest({
+            adminUserId: adminId,
+            communityId,
+            communityName: community.name || 'Community',
+            requesterName: user.displayName || 'User',
+          });
+        }
         toast.success('Join request sent');
       } else {
         const commRef = doc(db, 'communities', communityId);
@@ -316,7 +336,7 @@ export function CommunityDetails({ userId }: CommunityDetailsProps) {
     if (!communityId || !auth.currentUser) return;
 
     try {
-      await addDoc(collection(db, 'communities', communityId, 'posts'), {
+      const postRef = await addDoc(collection(db, 'communities', communityId, 'posts'), {
         authorId: auth.currentUser.uid,
         authorName: auth.currentUser.displayName || 'User',
         authorAvatar: auth.currentUser.photoURL || 'U',
@@ -331,6 +351,27 @@ export function CommunityDetails({ userId }: CommunityDetailsProps) {
       const commRef = doc(db, 'communities', communityId);
       await updateDoc(commRef, {
         postsCount: increment(1)
+      });
+
+      const recipientIds = new Set<string>();
+      if (Array.isArray(community?.members)) {
+        community.members.forEach((uid: string) => {
+          if (typeof uid === 'string') recipientIds.add(uid);
+        });
+      }
+      if (community?.adminId && typeof community.adminId === 'string') {
+        recipientIds.add(community.adminId);
+      }
+      members.filter((m) => !m.status && m.id).forEach((m) => recipientIds.add(m.id));
+
+      notifyCommunityMembersNewPost({
+        communityId,
+        communityName: community?.name || 'Community',
+        postId: postRef.id,
+        authorId: auth.currentUser.uid,
+        authorName: auth.currentUser.displayName || 'User',
+        contentPreview: content,
+        recipientUserIds: [...recipientIds],
       });
 
       toast.success('Post created successfully');

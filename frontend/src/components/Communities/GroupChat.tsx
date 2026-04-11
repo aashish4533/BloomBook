@@ -23,6 +23,7 @@ interface Message {
   timestamp: Date;
   isOwn: boolean;
   shielded: boolean;         // Whether the message was E2E encrypted
+  replyTo?: { id: string; senderName: string };
 }
 
 interface Member {
@@ -100,6 +101,9 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
       timestamp: raw.timestamp?.toDate() ?? new Date(),
       isOwn,
       shielded,
+      replyTo: raw.replyTo?.id
+        ? { id: raw.replyTo.id, senderName: raw.replyTo.senderName || 'Member' }
+        : undefined,
     };
   }, [currentUserId, reconstruct]);
 
@@ -382,7 +386,7 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
               <div className="max-w-3xl mx-auto flex gap-2 overflow-x-auto">
                 {selectedImages.map((img, i) => (
                   <div key={i} className="relative flex-shrink-0">
-                    <img src={img.preview} alt="Preview" className="w-20 h-20 object-cover rounded-lg" crossOrigin="anonymous" referrerPolicy="no-referrer" />
+                    <img src={img.preview} alt="Preview" className="w-20 h-20 object-cover rounded-lg" />
                     <button onClick={() => removeImage(i)} className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center">
                       <X className="w-4 h-4" />
                     </button>

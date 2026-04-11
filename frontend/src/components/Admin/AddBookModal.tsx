@@ -58,6 +58,12 @@ export function AddBookModal({ onClose }: AddBookModalProps) {
       return;
     }
 
+    if (imageFiles.length === 0) {
+      toast.error('Add at least one book image before publishing');
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       const availableFor = [];
       if (price > 0) availableFor.push('sale');
@@ -85,6 +91,12 @@ export function AddBookModal({ onClose }: AddBookModalProps) {
         }
       }
 
+      if (imageUrls.length === 0) {
+        toast.error('Could not upload images. Check storage permissions and try again.');
+        setIsSubmitting(false);
+        return;
+      }
+
       const user = auth.currentUser;
 
       await addDoc(collection(db, 'books'), {
@@ -93,7 +105,7 @@ export function AddBookModal({ onClose }: AddBookModalProps) {
         rentalPrice,
         type,
         availableFor,
-        images: imageUrls.length > 0 ? imageUrls : ['https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&q=80&w=600'],
+        images: imageUrls,
         userId: user?.uid || 'admin',
         sellerName: user?.displayName || 'Admin',
         status: 'active',
@@ -229,7 +241,7 @@ export function AddBookModal({ onClose }: AddBookModalProps) {
               <div className="flex flex-wrap gap-4 items-start">
                 {imagePreviews.map((preview, index) => (
                   <div key={index} className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200">
-                    <img src={preview} alt={`preview-${index}`} className="w-full h-full object-cover" crossOrigin="anonymous" referrerPolicy="no-referrer" />
+                    <img src={preview} alt={`preview-${index}`} className="w-full h-full object-cover" />
                     <button
                       type="button"
                       onClick={() => removeImage(index)}
@@ -270,4 +282,4 @@ export function AddBookModal({ onClose }: AddBookModalProps) {
       </DialogContent>
     </Dialog>
   );
-}
+}
