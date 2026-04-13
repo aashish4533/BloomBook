@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { toast } from 'sonner';
 import { db, auth } from '../firebase';
+import { getFirebaseJwt } from '../utils/jwtAuth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 export interface CartItem {
@@ -34,7 +35,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const unsubscribe = auth.onAuthStateChanged(async (user) => {
             if (user) {
                 try {
-                    await user.getIdToken();
+                    await getFirebaseJwt();
                     const docRef = doc(db, 'carts', user.uid);
                     const docSnap = await getDoc(docRef);
                     if (docSnap.exists()) {

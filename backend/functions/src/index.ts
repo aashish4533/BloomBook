@@ -36,3 +36,4 @@ export const onCommunityMessageCreate = onDocumentCreated(
 export * from "./payments";
 export * from "./aiAssistant";
 export * from "./analytics";
+export { sendAdminEmailOtp, verifyAdminEmailOtp } from "./adminEmailOtp";

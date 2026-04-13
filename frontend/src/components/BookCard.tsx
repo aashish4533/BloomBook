@@ -63,7 +63,7 @@ export function BookCard({ book, onClick }: BookCardProps) {
   return (
     <div
       onClick={onClick}
-      className="bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-500 cursor-pointer overflow-hidden group perspective-[1000px] hover:[transform:rotateY(5deg)_scale(1.02)]"
+      className="bg-white rounded-xl shadow-sm sm:hover:shadow-xl transition-all duration-500 cursor-pointer overflow-hidden group perspective-[1000px] active:scale-[0.99] sm:hover:[transform:rotateY(5deg)_scale(1.02)]"
       style={{ transformStyle: 'preserve-3d' }}
     >
       {/* Book Image */}
@@ -71,7 +71,7 @@ export function BookCard({ book, onClick }: BookCardProps) {
         <ImageWithFallback
           src={book.images && book.images.length > 0 ? book.images[0] : ''}
           alt={book.title}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          className="w-full h-full object-cover sm:group-hover:scale-105 transition-transform duration-300"
         />
 
         <button
@@ -100,10 +100,10 @@ export function BookCard({ book, onClick }: BookCardProps) {
       </div>
 
       {/* Book Info */}
-      <div className="p-4 space-y-3">
+      <div className="p-3 sm:p-4 space-y-2 sm:space-y-3">
         <div>
-          <h3 className="text-[#2C3E50] line-clamp-1">{book.title}</h3>
-          <p className="text-gray-600 text-sm mt-1">{book.author}</p>
+          <h3 className="text-[#2C3E50] line-clamp-2 sm:line-clamp-1 text-sm sm:text-base font-semibold leading-snug">{book.title}</h3>
+          <p className="text-gray-600 text-xs sm:text-sm mt-1 line-clamp-1">{book.author}</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -113,10 +113,10 @@ export function BookCard({ book, onClick }: BookCardProps) {
           <span className="text-xs text-gray-500">{book.category}</span>
         </div>
 
-        <div className="pt-3 border-t border-gray-100">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-[#C4A672] text-xl font-bold">
+        <div className="pt-2 sm:pt-3 border-t border-gray-100">
+          <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
+            <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+              <span className="text-[#C4A672] text-base sm:text-lg md:text-xl font-bold tabular-nums truncate">
                 {book.availableFor?.includes('sale') ? `Rs. ${book.price.toLocaleString()}` :
                   book.availableFor?.includes('rent') ? `Rs. ${(book.rentPrice || book.price)?.toLocaleString() || '?'}/term` :
                     'Exchange Only'}

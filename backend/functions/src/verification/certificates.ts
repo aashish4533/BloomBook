@@ -1,7 +1,6 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import * as logger from "firebase-functions/logger";
-import { ImageAnnotatorClient } from "@google-cloud/vision";
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -29,6 +28,7 @@ export const verifyCertificate = onCall({ cors: true, memory: "1GiB", timeoutSec
   try {
     let extractedText = "";
     try {
+      const { ImageAnnotatorClient } = await import("@google-cloud/vision");
       const client = new ImageAnnotatorClient();
       const [result] = await client.textDetection(certificateUrl);
       extractedText = result.fullTextAnnotation?.text || "";

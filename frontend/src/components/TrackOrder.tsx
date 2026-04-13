@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ArrowLeft, Package, Truck, CheckCircle, MapPin, Phone, Mail } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
+import { SUPPORT_EMAIL } from '../config/support';
 
 interface TrackOrderProps {
   orderId: string;
@@ -180,9 +181,10 @@ export function TrackOrder({ orderId, onBack }: TrackOrderProps) {
             <Button
               variant="outline"
               className="w-full justify-start hover:bg-gray-50 transition-smooth"
+              onClick={() => window.open(`mailto:${SUPPORT_EMAIL}`, '_blank')}
             >
               <Mail className="w-4 h-4 mr-3" />
-              Email Support: support@bookbloom.com
+              Email Support: {SUPPORT_EMAIL}
             </Button>
           </div>
         </Card>

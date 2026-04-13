@@ -1,5 +1,6 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useUserRole } from '../../context/UserRoleContext';
+import { hasAdminOtpVerified } from '../../utils/adminOtpSession';
 
 interface AdminRouteProps {
     redirectPath?: string;
@@ -13,6 +14,10 @@ export function AdminRoute({ redirectPath = '/admin/login' }: AdminRouteProps) {
     }
 
     if (userRole !== 'admin') {
+        return <Navigate to={redirectPath} replace />;
+    }
+
+    if (!hasAdminOtpVerified()) {
         return <Navigate to={redirectPath} replace />;
     }
 

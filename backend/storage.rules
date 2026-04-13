@@ -33,6 +33,14 @@ service firebase.storage {
              );
     }
 
+    // Tutor ID / certificate uploads (image or PDF, max 10MB)
+    function isVerificationDocUpload() {
+      return request.resource.size < 10 * 1024 * 1024 && (
+               request.resource.contentType.matches('image/.*')
+               || request.resource.contentType.matches('application/pdf')
+             );
+    }
+
     // Book listing images: book_images/{uid}/{fileName} (GiveBooksOnRent, SellBookFlow, ExchangeBookFlow)
     match /book_images/{userId}/{fileName} {
       allow read: if true;
@@ -69,10 +77,16 @@ service firebase.storage {
       allow write: if isAuthenticated() && isImageUnder5MB();
     }
 
-    // Tutor Verification Documents
+    // Tutor verification files (TuitionHub certificates) — plural path
     match /verifications/{userId}/{docId} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || request.auth.token.admin == true);
-      allow write: if isAuthenticated() && request.auth.uid == userId && isImageUnder5MB();
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isStorageAdmin());
+      allow write: if isAuthenticated() && request.auth.uid == userId && isVerificationDocUpload();
+    }
+
+    // TutorVerificationForm identity/certificate step — singular path (must match client)
+    match /verification/{userId}/{docId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isStorageAdmin());
+      allow write: if isAuthenticated() && request.auth.uid == userId && isVerificationDocUpload();
     }
 
     // Notes / Helping Material uploads

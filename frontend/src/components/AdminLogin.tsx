@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth, db } from '../firebase';
+import { FirebaseError } from 'firebase/app';
+import { auth } from '../firebase';
 import { useUserRole } from '../context/UserRoleContext';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -10,26 +10,56 @@ import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
 import { toast } from 'sonner';
 import { ArrowLeft, Shield, Mail, Lock, AlertCircle } from 'lucide-react';
+import { hasAdminOtpVerified } from '../utils/adminOtpSession';
+import { ensureAdminUserDocument, callSendAdminEmailOtp } from '../utils/adminLoginFlow';
 
-interface AdminLoginProps {
-  onLogin?: () => void;
+function formatFirebaseAuthError(err: unknown): string {
+  const code =
+    err && typeof err === 'object' && 'code' in err ? String((err as { code: string }).code) : '';
+  const rawMessage =
+    err && typeof err === 'object' && 'message' in err ? String((err as { message: string }).message) : '';
+
+  const mapCode = (c: string) => {
+    switch (c) {
+      case 'auth/invalid-credential':
+      case 'auth/wrong-password':
+      case 'auth/user-not-found':
+        return 'Firebase rejected this email/password. In Firebase Console → Authentication, create the user (or reset the password) so it exactly matches what you use here.';
+      case 'auth/operation-not-allowed':
+        return 'Email/Password sign-in is turned off. Enable it in Firebase Console → Authentication → Sign-in method.';
+      case 'auth/user-disabled':
+        return 'This account is disabled in Firebase.';
+      case 'auth/too-many-requests':
+        return 'Too many failed attempts. Wait a few minutes or use a different network.';
+      case 'auth/invalid-email':
+        return 'That email format is not valid for Firebase Auth.';
+      case 'auth/multi-factor-auth-required':
+        return 'This account still uses app-based 2FA in Firebase. Remove multi-factor for this user under Firebase Console → Authentication, then use email codes instead.';
+      default:
+        return rawMessage ? `${rawMessage} (${c})` : `Sign-in failed (${c || 'unknown'}).`;
+    }
+  };
+
+  if (err instanceof FirebaseError && err.code) {
+    return mapCode(err.code);
+  }
+  if (code.startsWith('auth/')) {
+    return mapCode(code);
+  }
+  return rawMessage || 'Login failed.';
 }
 
-export function AdminLogin({ onLogin }: AdminLoginProps) {
+export function AdminLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isLoading, setIsLoading] = useState(false);
-  const [showTwoFactor, setShowTwoFactor] = useState(false);
-  const [generatedOTP, setGeneratedOTP] = useState('');
-  const [twoFactorCode, setTwoFactorCode] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const navigate = useNavigate();
   const { isAdmin, loading } = useUserRole();
 
-  // Redirect if already logged in as admin
   useEffect(() => {
-    if (!loading && isAdmin) {
+    if (!loading && isAdmin && hasAdminOtpVerified()) {
       navigate('/admin/dashboard', { replace: true });
     }
   }, [isAdmin, loading, navigate]);
@@ -51,114 +81,56 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
     }
 
     setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) return;
 
-    if (Object.keys(newErrors).length === 0) {
-      setIsLoading(true);
+    const ADMIN_EMAIL = (import.meta.env.VITE_ADMIN_EMAIL as string | undefined)?.trim().toLowerCase();
+    const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD as string | undefined;
+
+    if (!ADMIN_EMAIL || ADMIN_PASSWORD === undefined || String(ADMIN_PASSWORD).length === 0) {
+      toast.error('Admin login is not configured (missing or empty VITE_ADMIN_EMAIL / VITE_ADMIN_PASSWORD).');
+      return;
+    }
+
+    if (email.trim().toLowerCase() !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) {
+      setErrors({ ...newErrors, form: 'Invalid admin credentials.' });
+      toast.error('Invalid admin credentials.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
       try {
-        const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
-        const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD;
-
-        if (email !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) {
-          throw new Error('Invalid admin credentials');
-        }
+        const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
+        const user = userCredential.user;
+        await ensureAdminUserDocument(user, email.trim());
 
         try {
-          // Sign in to Firebase Auth
-          const userCredential = await signInWithEmailAndPassword(auth, email, password);
-          const user = userCredential.user;
-
-          // Self-heal: ensure the Firestore admin document exists
-          const userDocRef = doc(db, 'users', user.uid);
-          const userDocSnap = await getDoc(userDocRef);
-          if (!userDocSnap.exists()) {
-            await setDoc(userDocRef, {
-              email: email,
-              name: 'Admin',
-              role: 'admin',
-              createdAt: serverTimestamp(),
-              verified: true
-            });
-            toast.info('Admin profile restored in database.');
-          } else if (userDocSnap.data().role !== 'admin') {
-            await auth.signOut();
-            throw new Error('This account does not have admin privileges.');
-          }
-        } catch (firebaseError: any) {
-          // Map Firebase error codes to readable messages
-          const code = firebaseError.code || '';
-          if (code === 'auth/user-not-found' || code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
-            throw new Error('Invalid admin credentials. Please check your email and password.');
-          }
-          throw firebaseError;
+          await callSendAdminEmailOtp();
+        } catch (sendErr) {
+          await auth.signOut();
+          throw sendErr;
         }
-
-        // Direct login success
-
-        /*
-        try {
-          // Send OTP via Backend
-          const response = await fetch('http://localhost:3001/api/send-otp', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, otp: code }),
-          });
-
-          if (!response.ok) throw new Error('Failed to send email');
-
-          setGeneratedOTP(code);
-          setShowTwoFactor(true);
-          toast.success('Verification code sent to your email');
-        } catch (mailError) {
-          console.error("Email failed, falling back to demo mode", mailError);
-          setGeneratedOTP(code);
-          setShowTwoFactor(true);
-          toast.warning('Email service unavailable. Check console for OTP code.');
+        toast.success('Check your email for a 6-digit code.');
+        navigate('/admin/login/verify', { replace: true, state: { email: email.trim() } });
+      } catch (firebaseError: unknown) {
+        const fe = firebaseError as { code?: string };
+        if (fe.code === 'auth/multi-factor-auth-required') {
+          await auth.signOut();
+          throw new Error(formatFirebaseAuthError(firebaseError));
         }
-        */
-
-        // DIRECT LOGIN
-        if (onLogin) onLogin();
-        toast.success('Admin login successful');
-        navigate('/admin/dashboard');
-
-      } catch (error: any) {
-        toast.error(error.message);
-        setErrors({ ...newErrors, form: error.message });
-      } finally {
-        setIsLoading(false);
+        throw firebaseError;
       }
-    }
-  };
-
-  const handleTwoFactorSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const newErrors: { [key: string]: string } = {};
-
-    if (!twoFactorCode) {
-      newErrors.twoFactorCode = '2FA code is required';
-    } else if (twoFactorCode.length !== 6) {
-      newErrors.twoFactorCode = 'Code must be 6 digits';
-    } else if (twoFactorCode !== generatedOTP) {
-      newErrors.twoFactorCode = 'Invalid OTP code';
-    }
-
-    setErrors(newErrors);
-
-    if (Object.keys(newErrors).length === 0) {
-      setIsLoading(true);
-      // Simulate 2FA verification
-      setTimeout(() => {
-        setIsLoading(false);
-        if (onLogin) onLogin();
-        toast.success('Admin login successful');
-        navigate('/admin/dashboard');
-      }, 1000);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : formatFirebaseAuthError(error);
+      toast.error(msg);
+      setErrors({ ...newErrors, form: msg });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#2C3E50] to-[#34495E] flex items-center justify-center p-4">
-      {/* Back Button */}
       <Link
         to="/"
         className="fixed top-6 left-6 flex items-center gap-2 text-white/80 hover:text-white transition-colors group"
@@ -170,7 +142,6 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
       </Link>
 
       <div className="w-full max-w-md">
-        {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-[#C4A672] rounded-full mb-4">
             <Shield className="w-8 h-8 text-white" />
@@ -179,16 +150,13 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
           <p className="text-white/80">Secure access for BookBloom administrators</p>
         </div>
 
-        {/* Login Card */}
         <div className="bg-white rounded-2xl shadow-2xl p-8">
-          {!showTwoFactor ? (
-            <form onSubmit={handleInitialLogin} className="space-y-6">
+          <form onSubmit={handleInitialLogin} className="space-y-6">
               <div>
                 <h2 className="text-[#2C3E50] text-2xl mb-2">Sign In</h2>
                 <p className="text-gray-600 text-sm">Enter your administrator credentials</p>
               </div>
 
-              {/* Email */}
               <div className="space-y-2">
                 <Label htmlFor="admin-email">Email Address</Label>
                 <div className="relative">
@@ -196,7 +164,7 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
                   <Input
                     id="admin-email"
                     type="email"
-                    placeholder="admin@bookbloom.com"
+                    placeholder="bookbloom78@gmail.com"
                     value={email}
                     onChange={(e) => {
                       setEmail(e.target.value);
@@ -205,12 +173,9 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
                     className={`pl-10 ${errors.email ? 'border-red-500' : ''}`}
                   />
                 </div>
-                {errors.email && (
-                  <p className="text-sm text-red-500">{errors.email}</p>
-                )}
+                {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
               </div>
 
-              {/* Password */}
               <div className="space-y-2">
                 <Label htmlFor="admin-password">Password</Label>
                 <div className="relative">
@@ -227,12 +192,9 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
                     className={`pl-10 ${errors.password ? 'border-red-500' : ''}`}
                   />
                 </div>
-                {errors.password && (
-                  <p className="text-sm text-red-500">{errors.password}</p>
-                )}
+                {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
               </div>
 
-              {/* Remember Me */}
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="remember"
@@ -244,84 +206,19 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
                 </Label>
               </div>
 
-              {/* Submit Button */}
-              <Button
-                type="submit"
-                disabled={isLoading}
-                className="w-full h-12 bg-[#C4A672] hover:bg-[#8B7355] text-white"
-              >
+              <Button type="submit" disabled={isLoading} className="w-full h-12 bg-[#C4A672] hover:bg-[#8B7355] text-white">
                 {isLoading ? 'Signing in...' : 'Sign In to Admin Portal'}
               </Button>
 
-              {/* Security Notice */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
                 <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-blue-900">
-                  This is a secure admin area. All login attempts are monitored and logged.
+                  After password verification, a one-time code is sent to your admin email. Configure SMTP for Cloud Functions using{' '}
+                  <code className="text-xs">EMAIL_USER</code> / <code className="text-xs">EMAIL_PASS</code> (Gmail app password) or{' '}
+                  <code className="text-xs">ADMIN_OTP_SMTP_*</code>.
                 </p>
               </div>
-            </form>
-          ) : (
-            <form onSubmit={handleTwoFactorSubmit} className="space-y-6">
-              <div>
-                <h2 className="text-[#2C3E50] text-2xl mb-2">Two-Factor Authentication</h2>
-                <p className="text-gray-600 text-sm mb-4">Enter the 6-digit code sent to your email</p>
-
-                {/* DEMO ONLY: Display OTP for testing */}
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-6 text-center">
-                  <p className="text-xs text-yellow-800 uppercase font-bold mb-1">Demo Mode: Your OTP Code</p>
-                  <p className="text-3xl font-mono tracking-widest text-[#2C3E50]">{generatedOTP}</p>
-                </div>
-              </div>
-
-              {/* 2FA Code */}
-              <div className="space-y-2">
-                <Label htmlFor="twoFactorCode">Authentication Code</Label>
-                <Input
-                  id="twoFactorCode"
-                  type="text"
-                  placeholder="000000"
-                  maxLength={6}
-                  value={twoFactorCode}
-                  onChange={(e) => {
-                    setTwoFactorCode(e.target.value.replace(/\D/g, ''));
-                    setErrors({ ...errors, twoFactorCode: '' });
-                  }}
-                  className={`text-center text-2xl tracking-widest ${errors.twoFactorCode ? 'border-red-500' : ''}`}
-                />
-                {errors.twoFactorCode && (
-                  <p className="text-sm text-red-500">{errors.twoFactorCode}</p>
-                )}
-              </div>
-
-              {/* Actions */}
-              <div className="space-y-3">
-                <Button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full h-12 bg-[#C4A672] hover:bg-[#8B7355] text-white"
-                >
-                  {isLoading ? 'Verifying...' : 'Verify & Sign In'}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowTwoFactor(false)}
-                  className="w-full"
-                >
-                  Back
-                </Button>
-              </div>
-
-              {/* Help Text */}
-              <p className="text-sm text-gray-600 text-center">
-                Don't have access to your authenticator?{' '}
-                <a href="#" className="text-[#C4A672] hover:underline">
-                  Use backup codes
-                </a>
-              </p>
-            </form>
-          )}
+          </form>
         </div>
       </div>
     </div>

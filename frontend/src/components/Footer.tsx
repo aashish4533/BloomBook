@@ -4,9 +4,9 @@ import { Link } from 'react-router-dom';
 
 export function Footer() {
   return (
-    <footer className="bg-[#2C3E50] text-white py-8 px-8">
-      <div className="max-w-7xl mx-auto">
-        <nav className="mb-6 flex w-full flex-wrap items-center justify-between gap-x-6 gap-y-4 sm:gap-x-10">
+    <footer className="bg-[#2C3E50] text-white py-6 sm:py-8 px-4 sm:px-6 lg:px-8 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+      <div className="max-w-7xl mx-auto w-full min-w-0">
+        <nav className="mb-6 flex w-full flex-wrap items-center justify-center sm:justify-between gap-x-4 gap-y-3 sm:gap-x-8 text-sm sm:text-base">
           <Link to="/marketplace" className="shrink-0 hover:opacity-80 transition-opacity">Buy</Link>
           <Link to="/rent" className="shrink-0 hover:opacity-80 transition-opacity">Rent</Link>
           <Link to="/sell" className="shrink-0 hover:opacity-80 transition-opacity">Resell</Link>
@@ -19,13 +19,13 @@ export function Footer() {
           © 2025 BookBloom. All rights reserved.
         </p>
 
-        <div className="flex items-center justify-center gap-3 max-w-md mx-auto">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 max-w-md mx-auto w-full">
           <Input
             type="email"
             placeholder="Subscribe to our newsletter"
-            className="flex-1 bg-white text-black border-none"
+            className="flex-1 min-w-0 bg-white text-black border-none text-base"
           />
-          <Button className="bg-[#F5A623] hover:bg-[#E69610] text-white px-6">
+          <Button className="bg-[#F5A623] hover:bg-[#E69610] text-white px-6 shrink-0 w-full sm:w-auto">
             Subscribe
           </Button>
         </div>

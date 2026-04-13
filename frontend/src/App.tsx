@@ -6,6 +6,7 @@ import { auth, db } from './firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { CartProvider } from './context/CartContext';
 import { UserRoleProvider, useUserRole } from './context/UserRoleContext';
+import { clearAdminOtpSession } from './utils/adminOtpSession';
 
 // Layouts
 import { MainLayout } from './components/Layouts/MainLayout';
@@ -20,6 +21,7 @@ import { HomeScreen } from './components/HomeScreen';
 import { LoginForm } from './components/LoginForm';
 import { SignUpForm } from './components/SignUpForm';
 import { AdminLogin } from './components/AdminLogin';
+import { AdminLoginOtpScreen } from './components/AdminLoginOtpScreen';
 import { AdminDashboard } from './components/AdminDashboard';
 import { UserDashboard } from './components/UserDashboard';
 import { BookMarketplace } from './components/BookMarketplace';
@@ -297,6 +299,7 @@ function AppContent() {
   const { user, loading } = useUserRole();
 
   const handleLogout = () => {
+    clearAdminOtpSession();
     auth.signOut();
     // UserRoleContext handles state updates automatically via onAuthStateChanged
   };
@@ -312,7 +315,8 @@ function AppContent() {
         <Route element={<AuthLayout />}>
           <Route path="/login" element={<LoginForm onLogin={() => { }} />} />
           <Route path="/register" element={<SignUpForm onSignUp={() => { }} />} />
-          <Route path="/admin/login" element={<AdminLogin onLogin={() => { }} />} />
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin/login/verify" element={<AdminLoginOtpScreen />} />
         </Route>
 
         {/* Main App Routes */}

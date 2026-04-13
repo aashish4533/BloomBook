@@ -1,0 +1,9 @@
+/* Loaded after index.css — fluid type and horizontal overflow guard */
+:root {
+  --font-size: clamp(14px, 0.28vw + 13px, 17px);
+}
+
+#root {
+  min-height: 100dvh;
+  overflow-x: hidden;
+}

@@ -3,8 +3,6 @@ import { Outlet } from 'react-router-dom';
 import { Navbar } from '../Navbar';
 import { Footer } from '../Footer';
 import { Toaster } from '../ui/sonner';
-import { GlobalChatWidget } from '../Chat/GlobalChatWidget';
-import { MainSidebar } from './MainSidebar';
 
 interface MainLayoutProps {
     isLoggedIn: boolean;
@@ -12,30 +10,14 @@ interface MainLayoutProps {
 }
 
 export function MainLayout({ isLoggedIn, onLogout }: MainLayoutProps) {
-    const [isCollapsed, setIsCollapsed] = React.useState(false);
-    const [isMobileOpen, setIsMobileOpen] = React.useState(false);
-
     return (
-        <div className="min-h-screen flex">
-            {/* Sidebar */}
-            <MainSidebar
-                onLogout={onLogout}
-                isCollapsed={isCollapsed}
-                onToggle={() => setIsCollapsed(!isCollapsed)}
-                isMobileOpen={isMobileOpen}
-                onMobileClose={() => setIsMobileOpen(false)}
-            />
-
-            {/* Main Content Area - with left padding for sidebar */}
-            <div className={`flex-1 flex flex-col transition-all duration-300 ${isCollapsed ? 'md:ml-16' : 'md:ml-64'} min-w-0 overflow-x-hidden`}>
-                <Navbar isLoggedIn={isLoggedIn} onLogout={onLogout} />
-                <main className="flex-1 relative z-0 flex flex-wrap">
-                    <Outlet />
-                </main>
-                <Footer />
-                <Toaster />
-            </div>
+        <div className="min-h-screen flex flex-col min-w-0 overflow-x-hidden">
+            <Navbar isLoggedIn={isLoggedIn} onLogout={onLogout} />
+            <main className="flex-1 relative z-0 w-full min-w-0 overflow-x-hidden">
+                <Outlet />
+            </main>
+            <Footer />
+            <Toaster />
         </div>
     );
 }
-

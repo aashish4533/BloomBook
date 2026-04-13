@@ -1,9 +1,6 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import * as path from "path";
-import * as faceapi from "face-api.js";
-import * as canvas from "canvas";
-import { ImageAnnotatorClient } from "@google-cloud/vision";
 import * as logger from "firebase-functions/logger";
 
 // Initialize Firebase Admin if not already initialized
@@ -11,14 +8,16 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 
-// Environment patching for face-api.js in Node.js
-const { Canvas, Image, ImageData } = canvas;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-faceapi.env.monkeyPatch({ Canvas, Image, ImageData } as any);
-
+/** Defer canvas / face-api / Vision until invocation so the Functions emulator can discover exports within its startup timeout. */
 let modelsLoaded = false;
 async function loadFaceApiModels() {
   if (modelsLoaded) return;
+  const [{ Canvas, Image, ImageData }, faceapi] = await Promise.all([
+    import("canvas"),
+    import("face-api.js"),
+  ]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  faceapi.env.monkeyPatch({ Canvas, Image, ImageData } as any);
   const modelsPath = path.join(__dirname, "../../models");
   try {
     await faceapi.nets.ssdMobilenetv1.loadFromDisk(modelsPath);
@@ -60,6 +59,7 @@ export const verifyIdentity = onCall({ cors: "*", memory: "2GiB", timeoutSeconds
 
     // Try OCR using Google Cloud Vision
     try {
+      const { ImageAnnotatorClient } = await import("@google-cloud/vision");
       const client = new ImageAnnotatorClient();
       const [result] = await client.textDetection(idUrl);
       extractedText = result.fullTextAnnotation?.text || "";
@@ -68,10 +68,17 @@ export const verifyIdentity = onCall({ cors: "*", memory: "2GiB", timeoutSeconds
       extractedText = "";
     }
 
-    // Phase 2: Name Matching OCR Verification
+    // Phase 2: Name Matching OCR Verification (Integrity Checksum)
     const userDoc = await admin.firestore().collection("users").doc(request.auth.uid).get();
-    const profileName = userDoc.data()?.name || userDoc.data()?.displayName || "";
-    const nameMatches = extractedText.toLowerCase().includes(profileName.toLowerCase()) || isMatch; // isMatch is previous face match mock
+    let profileName = String(userDoc.data()?.name || userDoc.data()?.displayName || "").trim();
+    if (!profileName) {
+      const tutorDoc = await admin.firestore().collection("tutors").doc(request.auth.uid).get();
+      profileName = String(tutorDoc.data()?.name || "").trim();
+    }
+    // Empty name must not count as a match (includes("") is always true in JS).
+    const nameMatches =
+      profileName.length > 0 &&
+      extractedText.toLowerCase().includes(profileName.toLowerCase());
 
     // 5. Fetch previous verification attempts (Integrity Checksums)
     const verificationRef = admin.firestore()
@@ -91,11 +98,11 @@ export const verifyIdentity = onCall({ cors: "*", memory: "2GiB", timeoutSeconds
        }
     }
 
-    if (!nameMatches) {
-       failedAttempts += 1;
+    if (!nameMatches && profileName.length > 0) {
+      failedAttempts += 1;
     }
 
-    const isGrounded = failedAttempts >= 2 && !nameMatches;
+    const isGrounded = failedAttempts >= 2 && !nameMatches && profileName.length > 0;
     // Phase 3 States: Pending Manual Review, Verified, Rejected
     const finalStatus = isGrounded ? "Rejected" : (nameMatches ? "Verified" : "Pending Manual Review");
 

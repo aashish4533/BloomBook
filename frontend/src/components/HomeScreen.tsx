@@ -106,7 +106,7 @@ export function HomeScreen({ isLoggedIn }: HomeScreenProps) {
       <AnnouncementCarousel onViewAll={() => navigate('/announcements')} />
 
       {/* Notification Carousel */}
-      <div className="max-w-7xl mx-auto px-4 pt-4">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 pt-3 sm:pt-4">
         <NotificationCarousel
           notifications={notifications}
           onDismiss={handleDismissNotification}
@@ -115,28 +115,28 @@ export function HomeScreen({ isLoggedIn }: HomeScreenProps) {
       </div>
 
       {/* Hero Section */}
-      <div className="max-w-7xl mx-auto px-4 py-8 md:py-12">
-        <div className="relative overflow-hidden bg-gradient-to-br from-[#2C3E50] to-[#1a252f] rounded-3xl p-8 md:p-12 shadow-2xl border border-[#C4A672]/30">
-          <div className="grid md:grid-cols-2 gap-12 items-center relative z-10">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 sm:py-8 md:py-12">
+        <div className="relative overflow-hidden bg-gradient-to-br from-[#2C3E50] to-[#1a252f] rounded-2xl sm:rounded-3xl p-5 sm:p-8 md:p-12 shadow-2xl border border-[#C4A672]/30">
+          <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center relative z-10">
             {/* Left Column */}
-            <div className="space-y-6">
-              <h1 className="text-3xl md:text-5xl font-extrabold text-white leading-tight">
+            <div className="space-y-4 sm:space-y-6">
+              <h1 className="text-2xl sm:text-3xl md:text-5xl font-extrabold text-white leading-tight">
                 Knowledge that <span className="text-[#C4A672] inline-block animate-pulse-slow">Grows</span>
               </h1>
-              <p className="text-lg text-gray-300 max-w-lg">
+              <p className="text-base sm:text-lg text-gray-300 max-w-lg">
                 Join the most vibrant community of book lovers. Buy, sell, rent, and exchange books in a thriving ecosystem designed for knowledge seekers.
               </p>
-              <div className="flex gap-4 pt-4">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-2 sm:pt-4 w-full sm:w-auto">
                 <Button
                   onClick={() => navigate('/marketplace')}
-                  className="bg-[#C4A672] hover:bg-[#d6b783] text-[#2C3E50] font-bold rounded-full px-8 py-6 text-lg shadow-[0_0_20px_rgba(196,166,114,0.3)] hover:shadow-[0_0_25px_rgba(196,166,114,0.5)] transition-all transform hover:-translate-y-1"
+                  className="bg-[#C4A672] hover:bg-[#d6b783] text-[#2C3E50] font-bold rounded-full px-6 py-5 sm:px-8 sm:py-6 text-base sm:text-lg shadow-[0_0_20px_rgba(196,166,114,0.3)] hover:shadow-[0_0_25px_rgba(196,166,114,0.5)] transition-all transform hover:-translate-y-1 w-full sm:w-auto"
                 >
                   Start Exploring
                 </Button>
                 <Button
                   variant="outline"
                   onClick={() => navigate('/communities')}
-                  className="border-2 border-white/30 text-white hover:bg-white/10 bg-transparent rounded-full px-8 py-6 text-lg hover:border-white transition-all transform hover:-translate-y-1"
+                  className="border-2 border-white/30 text-white hover:bg-white/10 bg-transparent rounded-full px-6 py-5 sm:px-8 sm:py-6 text-base sm:text-lg hover:border-white transition-all transform hover:-translate-y-1 w-full sm:w-auto"
                 >
                   Join Community
                 </Button>
@@ -175,7 +175,7 @@ export function HomeScreen({ isLoggedIn }: HomeScreenProps) {
       </div>
 
       {/* Search Section */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
         <div
           className="relative cursor-pointer shadow-subtle rounded-lg transition-smooth hover:shadow-card"
           onClick={() => navigate('/search')}
@@ -187,7 +187,7 @@ export function HomeScreen({ isLoggedIn }: HomeScreenProps) {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onFocus={() => navigate('/search')}
-            className="pl-12 pr-4 h-14 text-lg bg-white border-2 border-blue-600/30 focus:border-blue-600 focus-glow cursor-pointer"
+            className="pl-12 pr-4 h-12 sm:h-14 text-base sm:text-lg bg-white border-2 border-blue-600/30 focus:border-blue-600 focus-glow cursor-pointer"
             readOnly
           />
         </div>
@@ -214,18 +214,18 @@ export function HomeScreen({ isLoggedIn }: HomeScreenProps) {
       </div>
 
       {/* AI Recommendations */}
-      <div className="max-w-7xl mx-auto px-4">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4">
         <AIRecommendations context="home" onBookClick={(id) => navigate(`/book/${id}`)} />
       </div>
 
       {/* Featured Books Section - Book Marketplace */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 sm:py-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
           <div>
-            <h2 className="text-gray-900 text-3xl mb-1">Book Marketplace</h2>
-            <p className="text-gray-600">Buy, sell, or rent your favorite books</p>
+            <h2 className="text-gray-900 text-2xl sm:text-3xl mb-1">Book Marketplace</h2>
+            <p className="text-gray-600 text-sm sm:text-base">Buy, sell, or rent your favorite books</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"
               onClick={() => navigate('/marketplace')}
@@ -262,16 +262,16 @@ export function HomeScreen({ isLoggedIn }: HomeScreenProps) {
       </div>
 
       {/* Communities Section */}
-      <div className="bg-gradient-to-b from-blue-50 to-transparent py-12">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-center justify-between mb-6">
+      <div className="bg-gradient-to-b from-blue-50 to-transparent py-8 sm:py-12">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
             <div>
-              <h2 className="text-gray-900 text-3xl mb-2">Book Communities</h2>
-              <p className="text-gray-600">Connect with readers who share your interests</p>
+              <h2 className="text-gray-900 text-2xl sm:text-3xl mb-2">Book Communities</h2>
+              <p className="text-gray-600 text-sm sm:text-base">Connect with readers who share your interests</p>
             </div>
             <Button
               onClick={() => navigate('/communities')}
-              className="bg-blue-600 hover:bg-blue-700 text-white transition-smooth btn-scale shadow-subtle"
+              className="bg-blue-600 hover:bg-blue-700 text-white transition-smooth btn-scale shadow-subtle w-full sm:w-auto lg:h-8 lg:px-3 lg:text-xs lg:gap-1"
             >
               Browse All →
             </Button>
@@ -285,23 +285,23 @@ export function HomeScreen({ isLoggedIn }: HomeScreenProps) {
       </div>
 
       {/* Stats Section */}
-      <div className="max-w-7xl mx-auto px-4 py-12">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          <div className="text-center p-6 bg-white rounded-xl shadow-card border border-gray-100 transition-smooth hover:shadow-hover">
-            <div className="text-4xl text-blue-600 mb-2">{stats.books.toLocaleString()}</div>
-            <div className="text-gray-600">Books Listed</div>
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-8 sm:py-12">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6">
+          <div className="text-center p-4 sm:p-6 bg-white rounded-xl shadow-card border border-gray-100 transition-smooth hover:shadow-hover">
+            <div className="text-2xl sm:text-4xl text-blue-600 mb-2 tabular-nums">{stats.books.toLocaleString()}</div>
+            <div className="text-gray-600 text-xs sm:text-base">Books Listed</div>
           </div>
-          <div className="text-center p-6 bg-white rounded-xl shadow-card border border-gray-100 transition-smooth hover:shadow-hover">
-            <div className="text-4xl text-blue-600 mb-2">{stats.users.toLocaleString()}</div>
-            <div className="text-gray-600">Active Users</div>
+          <div className="text-center p-4 sm:p-6 bg-white rounded-xl shadow-card border border-gray-100 transition-smooth hover:shadow-hover">
+            <div className="text-2xl sm:text-4xl text-blue-600 mb-2 tabular-nums">{stats.users.toLocaleString()}</div>
+            <div className="text-gray-600 text-xs sm:text-base">Active Users</div>
           </div>
-          <div className="text-center p-6 bg-white rounded-xl shadow-card border border-gray-100 transition-smooth hover:shadow-hover">
-            <div className="text-4xl text-blue-600 mb-2">{stats.communities.toLocaleString()}</div>
-            <div className="text-gray-600">Communities</div>
+          <div className="text-center p-4 sm:p-6 bg-white rounded-xl shadow-card border border-gray-100 transition-smooth hover:shadow-hover">
+            <div className="text-2xl sm:text-4xl text-blue-600 mb-2 tabular-nums">{stats.communities.toLocaleString()}</div>
+            <div className="text-gray-600 text-xs sm:text-base">Communities</div>
           </div>
-          <div className="text-center p-6 bg-white rounded-xl shadow-card border border-gray-100 transition-smooth hover:shadow-hover">
-            <div className="text-4xl text-blue-600 mb-2">{stats.readers.toLocaleString()}</div>
-            <div className="text-gray-600">Happy Readers</div>
+          <div className="text-center p-4 sm:p-6 bg-white rounded-xl shadow-card border border-gray-100 transition-smooth hover:shadow-hover">
+            <div className="text-2xl sm:text-4xl text-blue-600 mb-2 tabular-nums">{stats.readers.toLocaleString()}</div>
+            <div className="text-gray-600 text-xs sm:text-base">Happy Readers</div>
           </div>
         </div>
       </div>

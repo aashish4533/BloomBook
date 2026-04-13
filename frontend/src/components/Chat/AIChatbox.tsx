@@ -1,14 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { auth, db } from '../../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { auth, db, functions } from '../../firebase';
 import { collection, query, where, onSnapshot, doc, updateDoc, getDocs } from 'firebase/firestore';
 import { MessageSquare, Send, X, Bot, User, Loader2 } from 'lucide-react';
 
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { Input } from '../ui/input';
-import { ScrollArea } from '../ui/scroll-area';
 import { Avatar, AvatarFallback } from '../ui/avatar';
+import { AIAssistantMessageContent } from '../AI/AIChatMessage';
 
 interface Message {
   role: 'user' | 'model';
@@ -30,7 +30,6 @@ export function AIChatbox() {
   });
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const functions = getFunctions();
   const currentUserId = auth.currentUser?.uid;
 
   // Persist messages to sessionStorage
@@ -137,9 +136,9 @@ export function AIChatbox() {
           )}
         </div>
       ) : (
-        <Card className="w-80 sm:w-96 h-[500px] flex flex-col shadow-2xl border-[#C4A672]/30">
+        <Card className="w-80 sm:w-96 h-[500px] flex flex-col min-h-0 overflow-hidden shadow-2xl border-[#C4A672]/30">
           {/* Header */}
-          <div className="p-4 bg-gradient-to-r from-[#C4A672] to-[#8B7355] text-white flex justify-between items-center rounded-t-lg">
+          <div className="shrink-0 p-4 bg-gradient-to-r from-[#C4A672] to-[#8B7355] text-white flex justify-between items-center rounded-t-lg">
             <div className="flex items-center gap-2">
               <Bot className="w-5 h-5" />
               <span className="font-medium">BloomBook AI Assistant</span>
@@ -149,8 +148,15 @@ export function AIChatbox() {
             </button>
           </div>
 
-          {/* Chat Body */}
-          <ScrollArea className="flex-1 p-4 bg-gray-50">
+          {/* Chat Body — flex min-h-0 + overflow-y-auto so messages scroll inside the card */}
+          <div
+            className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 bg-gray-50
+              [scrollbar-width:thin] [scrollbar-color:#d4d4d8_#27272a]
+              [&::-webkit-scrollbar]:w-2
+              [&::-webkit-scrollbar-track]:bg-zinc-800 [&::-webkit-scrollbar-track]:rounded-sm
+              [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300
+              hover:[&::-webkit-scrollbar-thumb]:bg-gray-200"
+          >
             {messages.length === 0 && (
               <div className="text-center text-gray-500 mt-10">
                 <Bot className="w-10 h-10 mx-auto mb-2 opacity-20" />
@@ -170,7 +176,14 @@ export function AIChatbox() {
                     ? 'bg-[#C4A672] text-white rounded-tr-none' 
                     : 'bg-white border border-gray-200 text-gray-800 rounded-tl-none'
                   }`}>
-                    {msg.parts[0].text}
+                    {msg.role === 'user' ? (
+                      msg.parts[0].text
+                    ) : (
+                      <AIAssistantMessageContent
+                        text={msg.parts[0].text}
+                        proseClassName="prose prose-sm max-w-none prose-p:my-1 prose-p:leading-snug prose-headings:my-2 prose-ul:my-1 prose-ol:my-1"
+                      />
+                    )}
                   </div>
                 </div>
               ))}
@@ -184,10 +197,10 @@ export function AIChatbox() {
               )}
               <div ref={scrollRef} />
             </div>
-          </ScrollArea>
+          </div>
 
           {/* Input Footer */}
-          <div className="p-4 border-t bg-white rounded-b-lg">
+          <div className="shrink-0 p-4 border-t bg-white rounded-b-lg">
             <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex gap-2">
               <Input
                 placeholder="Ask about books, rentals, or tutors..."

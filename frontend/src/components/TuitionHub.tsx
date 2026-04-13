@@ -630,20 +630,23 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {activeSessions.map((session) => (
-                <div key={session.id} className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 bg-white rounded-lg border border-gray-200">
-                  <div className="w-12 h-12 bg-[#C4A672] rounded-lg flex items-center justify-center">
+                <div
+                  key={session.id}
+                  className="min-w-0 flex flex-col sm:flex-row sm:items-center gap-4 p-4 bg-white rounded-lg border border-gray-200 overflow-hidden"
+                >
+                  <div className="w-12 h-12 shrink-0 bg-[#C4A672] rounded-lg flex items-center justify-center">
                     <Video className="w-6 h-6 text-white" />
                   </div>
-                  <div className="flex-1">
-                    <h4 className="text-[#2C3E50]">{session.subject}</h4>
-                    <p className="text-sm text-gray-600">{session.topic}</p>
-                    <p className="text-xs text-gray-500 mt-1">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-[#2C3E50] break-words">{session.subject}</h4>
+                    <p className="text-sm text-gray-600 break-words">{session.topic}</p>
+                    <p className="text-xs text-gray-500 mt-1 break-words">
                       Connected with {session.roleLabel}: {session.counterpartName}
                     </p>
                   </div>
                   <Button
                     size="sm"
-                    className="bg-[#C4A672] hover:bg-[#8B7355] w-full sm:w-auto"
+                    className="bg-[#C4A672] hover:bg-[#8B7355] w-full shrink-0 sm:w-auto sm:max-w-full"
                     onClick={() => openTuitionChat({
                       targetUserId: session.counterpartId,
                       targetUserName: session.counterpartName,

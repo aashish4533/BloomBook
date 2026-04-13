@@ -1,6 +1,14 @@
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
 
+/** Firebase ID tokens (JWTs) for custom REST APIs — see `utils/jwtAuth.ts`. Callable functions already send auth automatically. */
+export {
+  getFirebaseJwt,
+  getFirebaseIdTokenResult,
+  getBearerAuthorizationHeader,
+  authenticatedFetch,
+} from '../utils/jwtAuth';
+
 export interface IdentityVerificationData {
     idUrl: string;
     selfieUrl: string;

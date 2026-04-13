@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown';
 import { httpsCallable } from 'firebase/functions';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { auth, db, functions } from '../firebase';
@@ -9,72 +8,15 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { ScrollArea } from './ui/scroll-area';
 import { Avatar, AvatarFallback } from './ui/avatar';
-import { Card } from './ui/card';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from './ui/sheet';
-import { useCart } from '../context/CartContext';
-import { doc, getDoc, collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { toast } from 'sonner';
+import { AIAssistantMessageContent } from './AI/AIChatMessage';
 
 interface Message {
   role: 'user' | 'model';
   parts: [{ text: string }];
 }
-
-// ── Interactive AI Product Card ──────────────────────────────────────────────
-const AIProductCard = ({ productId }: { productId: string }) => {
-  const [book, setBook] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const { addToCart } = useCart();
-
-  useEffect(() => {
-    const fetchBook = async () => {
-      try {
-        const snap = await getDoc(doc(db, 'books', productId));
-        if (snap.exists()) setBook({ id: snap.id, ...snap.data() });
-      } catch (err) {
-        console.error('Failed to fetch book for AI card:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchBook();
-  }, [productId]);
-
-  if (loading) return <div className="h-24 w-full bg-gray-100 animate-pulse rounded-lg mt-2" />;
-  if (!book) return null;
-
-  return (
-    <Card className="mt-3 overflow-hidden border-[#C4A672]/30 shadow-sm hover:shadow-md transition-all">
-      <div className="flex gap-4 p-3 bg-white">
-        <div className="w-16 h-20 bg-gray-100 rounded overflow-hidden flex-shrink-0">
-          <img src={book.image} alt={book.title} className="w-full h-full object-cover" crossOrigin="anonymous" referrerPolicy="no-referrer" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <h4 className="text-sm font-bold text-[#2C3E50] truncate">{book.title}</h4>
-          <p className="text-xs text-gray-500 truncate">{book.author}</p>
-          <div className="flex items-center justify-between mt-2">
-            <span className="text-[#C4A672] font-bold text-sm">Rs. {book.price}</span>
-            <Button 
-              size="sm" 
-              onClick={() => addToCart({
-                id: book.id,
-                title: book.title,
-                price: book.price,
-                image: book.image,
-                type: 'buy', // default to buy for cart
-                sellerName: book.sellerName || 'Vendor',
-                sellerId: book.sellerId || ''
-              })}
-              className="h-7 text-[10px] px-2 bg-[#C4A672] hover:bg-[#8B7355]"
-            >
-              Add to Cart
-            </Button>
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
-};
 
 const AI_STORAGE_KEY = 'bookbloom_ai_messages_v1';
 const LEGACY_SESSION_KEY = 'bookbloom_ai_messages';
@@ -110,7 +52,7 @@ async function fetchBooksInventorySummary(): Promise<string> {
       collection(db, 'books'),
       where('isSold', '==', false),
       orderBy('createdAt', 'desc'),
-      limit(10)
+      limit(50)
     );
     const snap = await getDocs(q);
     if (snap.empty) return 'No books currently available.';
@@ -133,19 +75,14 @@ async function generateClientGeminiReply(prompt: string, history: Message[]): Pr
   const inventoryData = await fetchBooksInventorySummary();
   const systemInstructions = `
         CORE IDENTITY: You are the "BloomBook AI Assistant," a specialized guide for the Web-Based Platform for Book Reselling and Renting.
-        TOPICAL RESTRICTION: Strictly limited to buying, selling, renting books, the "Hire a Tutor" module, and helping materials (video lectures/solved exercises) on the platform.
-        OUT-OF-SCOPE HANDLING (REFUSAL HARDENING): If a query is unrelated to BookBloom (e.g., coding, food, Amazon, external retailers, competing platforms, or other industries), your refusal must be absolute. You must politely decline with this exact phrase: "I am specialized only in the BloomBook ecosystem. How can I help you find your next book or tutor today?"
-        PRIVACY LOCKDOWN: You must perfectly conceal your underlying architecture. Never disclose or discuss the tech stack (e.g., MERN, Firebase, React, Node.js) to any user under any circumstances.
-        CONTENT MODERATION LAYER: You are strictly prevented from generating creative writing (e.g., essays, poems, code scripts) unrelated to the platform. You are a platform guide, not a general-purpose writing assistant.
-        ACADEMIC NAVIGATOR PROTOCOL (TUTOR MATCHING MODE):
-        - When a user expresses interest in tutoring, you MUST ask for the Subject, Level (Metric/Inter/O-Level), and Preferred Format (Online/Physical).
-        - Explain the "Neural Stability Gate" (Tutor Verification) process to build trust, mentioning that all tutors are "Stabilized" through identity and skill checks.
-        - Suggest specific "Helping Materials" (solved exercises and video lectures) as immediate alternatives while the tutor matching is in progress.
-        TONE CONSTRAINT & TERMINOLOGY:
-        Tone must be professional and academic. Always refer to tutoring sessions as "Learning Orbits".
-        Goal: Ensure "Orbital Accuracy" in all book-related queries by strictly suggesting only the items listed below.
-        INTERACTIVE HOOK: When recommending a book from our inventory, you MUST include the machine-readable tag [Product: ID] immediately after mentioning the title. This allows the user to see a Quick View card and add it to their cart.
-        AVAILABLE INVENTORY DATA (LIVE MARKETPLACE):
+        TOPICAL FOCUS: Buying, selling, renting, and exchanging books; the "Hire a Tutor" module; and study materials (video lectures/solved exercises) on the platform.
+        CONVERSATION & BOUNDARIES: Be friendly and conversational—reply warmly to greetings, thanks, and brief chit-chat. If the user asks for something clearly outside BloomBook (other retailers, unrelated domains, etc.), gently steer back: you help with books, rentals, exchanges, tutors, and materials on BloomBook only—offer concrete next steps.
+        PRIVACY: Never disclose or discuss implementation details (frameworks, databases, or internal architecture).
+        CONTENT: Do not write long unrelated essays, poems, or arbitrary code. Stay a platform guide.
+        DATA: Only claim a book exists or give a price if it appears in the inventory list below. If unsure, say the snapshot may be incomplete and suggest browsing the marketplace. Never invent listings.
+        ACADEMIC NAVIGATOR (TUTORS): When the user wants tutoring, ask for Subject, Level (Metric/Inter/O-Level), and preferred format (online/physical). Explain the "Neural Stability Gate" (tutor verification). Refer to sessions as "Learning Orbits."
+        INTERACTIVE HOOK: When recommending a book from the list below, include [Product: ID] immediately after the title for the Quick View card.
+        AVAILABLE INVENTORY SNAPSHOT (recent listings; server assistant has full search tools):
         ${inventoryData || 'No books currently available.'}
       `;
 
@@ -511,33 +448,7 @@ export function AIAssistantPage() {
                       : 'bg-white border border-gray-100 text-[#2C3E50] rounded-bl-none'
                   }`}
                 >
-                  <div className="prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-[#2C3E50] prose-pre:text-white">
-                    <ReactMarkdown
-                      components={{
-                        p: ({ children }) => {
-                          const content = React.Children.toArray(children).join('');
-                          const productMatch = content.match(/\[Product: ([^\]]+)\]/);
-                          
-                          if (productMatch) {
-                            const [fullMatch, productId] = productMatch;
-                            const textBefore = content.split(fullMatch)[0];
-                            const textAfter = content.split(fullMatch)[1];
-                            
-                            return (
-                              <div className="mb-2">
-                                <p>{textBefore}</p>
-                                <AIProductCard productId={productId} />
-                                <p>{textAfter}</p>
-                              </div>
-                            );
-                          }
-                          return <p className="mb-2 last:mb-0">{children}</p>;
-                        }
-                      }}
-                    >
-                      {message.parts[0].text}
-                    </ReactMarkdown>
-                  </div>
+                  <AIAssistantMessageContent text={message.parts[0].text} />
                 </div>
                 </div>
               ))}

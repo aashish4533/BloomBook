@@ -308,7 +308,7 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 py-4 sm:py-8 px-3 sm:px-6 lg:px-8 w-full min-w-0 overflow-x-hidden">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
@@ -317,19 +317,19 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
               <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="-ml-2">
                 <ArrowLeft className="w-6 h-6" />
               </Button>
-              <h1 className="text-3xl font-bold text-[#2C3E50]">Book Marketplace</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-[#2C3E50] break-words">Book Marketplace</h1>
             </div>
             <p className="text-gray-600">Buy and sell textbooks and literature within your community</p>
           </div>
-          <div className="flex gap-2">
-            <Link to="/rent">
-              <Button className="bg-[#C4A672] hover:bg-[#8B7355] text-white">
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+            <Link to="/rent" className="flex-1 min-w-[8rem] sm:flex-initial">
+              <Button className="bg-[#C4A672] hover:bg-[#8B7355] text-white w-full sm:w-auto">
                 <Plus className="w-4 h-4 mr-2" />
                 Rent
               </Button>
             </Link>
-            <Link to="/exchange">
-              <Button variant="outline" className="border-[#C4A672] text-[#C4A672] hover:bg-[#C4A672] hover:text-white">
+            <Link to="/exchange" className="flex-1 min-w-[8rem] sm:flex-initial">
+              <Button variant="outline" className="border-[#C4A672] text-[#C4A672] hover:bg-[#C4A672] hover:text-white w-full sm:w-auto">
                 <Plus className="w-4 h-4 mr-2" />
                 Exchange
               </Button>
@@ -345,13 +345,14 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
         )}
 
         {/* Listing Type Tabs */}
-        <div className="flex justify-center mb-6">
-          <div className="bg-white p-1 rounded-lg border border-gray-200 inline-flex">
+        <div className="flex justify-center mb-6 w-full overflow-x-auto pb-1 -mx-1 px-1">
+          <div className="bg-white p-1 rounded-lg border border-gray-200 inline-flex flex-wrap justify-center gap-1 max-w-full">
             {['all', 'sell', 'rent', 'exchange'].map((type) => (
               <button
                 key={type}
+                type="button"
                 onClick={() => setListingType(type as any)}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${listingType === type ? 'bg-[#C4A672] text-white' : 'text-gray-600 hover:bg-gray-50'
+                className={`px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${listingType === type ? 'bg-[#C4A672] text-white' : 'text-gray-600 hover:bg-gray-50'
                   }`}
               >
                 {type === 'all' ? 'All Books' : type.charAt(0).toUpperCase() + type.slice(1) + (type === 'sell' ? ' (Sale)' : '')}
@@ -511,7 +512,7 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
         {/* Book Grid */}
         {filteredBooks.length > 0 ? (
           <div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
               {filteredBooks.map((book) => (
                 <BookCard key={book.id} book={book} onClick={() => handleBookSelect(book)} />
               ))}
@@ -541,30 +542,6 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
             </Button>
           </div>
         )}
-        {/* Help Section */}
-        <div className="mt-16 bg-white rounded-xl shadow-sm p-8 text-center border border-gray-100">
-          <h3 className="text-[#2C3E50] text-xl font-semibold mb-2">Can't find a specific book?</h3>
-          <p className="text-gray-600 mb-6">Our academic navigation team can help you locate specific textbooks or literature.</p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Button 
-              onClick={() => navigate('/contact')} 
-              variant="outline"
-              className="border-[#C4A672] text-[#C4A672] hover:bg-[#C4A672]/10 w-full sm:w-auto"
-            >
-              Contact Support
-            </Button>
-            <Button 
-              onClick={() => window.location.href = 'mailto:aashish.maheshwari65@gmail.com'} 
-              variant="ghost"
-              className="text-gray-500 hover:text-gray-800 w-full sm:w-auto"
-            >
-              Email aashish.maheshwari65@gmail.com
-            </Button>
-          </div>
-          <p className="text-center text-sm mb-6">
-          © 2025 BookBloom. All rights reserved.
-        </p>
-        </div>
       </div>
     </div>
   );

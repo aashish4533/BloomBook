@@ -1,5 +1,6 @@
 import { Phone, X, Clock, Mail, MessageCircle, Video, Headphones } from 'lucide-react';
 import { Button } from './ui/button';
+import { SUPPORT_EMAIL } from '../config/support';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 
@@ -153,10 +154,10 @@ export function CallSupport({ onClose }: CallSupportProps) {
                   For non-urgent inquiries or detailed questions
                 </p>
                 <a
-                  href="mailto:support@bookbloom.com"
+                  href={`mailto:${SUPPORT_EMAIL}`}
                   className="text-[#C4A672] hover:underline text-sm"
                 >
-                  support@bookbloom.com
+                  {SUPPORT_EMAIL}
                 </a>
                 <p className="text-xs text-gray-500 mt-2">Response within 24 hours</p>
               </div>

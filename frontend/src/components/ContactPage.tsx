@@ -6,6 +6,7 @@ import { Textarea } from './ui/textarea';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { SUPPORT_EMAIL } from '../config/support';
 
 export function ContactPage() {
     const navigate = useNavigate();
@@ -49,7 +50,7 @@ export function ContactPage() {
                                     </div>
                                     <div>
                                         <h3 className="font-semibold text-[#2C3E50]">Email Us</h3>
-                                        <p className="text-sm text-gray-600">support@bookbloom.com</p>
+                                        <p className="text-sm text-gray-600">{SUPPORT_EMAIL}</p>
                                         <p className="text-sm text-gray-600">partners@bookbloom.com</p>
                                     </div>
                                 </div>

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Home, ShoppingBag, Calendar, DollarSign, User, LogIn, UserPlus, LogOut, ChevronDown, UserCircle2, History, Heart, Settings, Users, Search, ArrowLeftRight, BookOpen, Sprout, Menu, Info, Phone, FileText, HelpCircle, Shield, ChevronRight, GraduationCap, Bot, X } from 'lucide-react';
+import { Home, ShoppingBag, Calendar, DollarSign, User, LogIn, UserPlus, LogOut, ChevronDown, UserCircle2, History, Heart, Settings, Users, Search, ArrowLeftRight, BookOpen, Sprout, Menu, Info, Phone, FileText, HelpCircle, Shield, ChevronRight, GraduationCap, Bot, X, PanelLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import { NotificationBell } from './NotificationBell';
 import { Link, useLocation } from 'react-router-dom';
@@ -9,11 +9,14 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose,
 interface NavbarProps {
   isLoggedIn: boolean;
   onLogout: () => void;
+  /** Opens the main app sidebar (drawer) on small screens */
+  onOpenAppMenu?: () => void;
 }
 
 export function Navbar({
   isLoggedIn,
   onLogout,
+  onOpenAppMenu,
 }: NavbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
@@ -75,86 +78,93 @@ export function Navbar({
 
   return (
     <>
-      <nav className="sticky top-0 w-full bg-[#C4A672] shadow-lg z-50 relative" ref={menuRef}>
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex items-center justify-between p-4 w-full">
-            {/* LEFT SIDE: Hamburger Button + Logo */}
-            <div className="flex items-center gap-4">
-              {/* Hamburger Button (Visible on mobile/tablet, hides on desktop screens using 'lg:hidden') */}
+      <nav className="sticky top-0 w-full bg-[#C4A672] shadow-lg z-50 relative pt-[env(safe-area-inset-top)]" ref={menuRef}>
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6">
+          <div className="flex items-center justify-between gap-2 py-3 sm:py-4 w-full min-w-0 min-h-[52px] lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-center lg:justify-between">
+            {/* LEFT: App sidebar + Hamburger + Logo */}
+            <div className="flex items-center gap-1 sm:gap-3 min-w-0 shrink-0 justify-self-start">
+              {onOpenAppMenu && (
+                <button
+                  type="button"
+                  onClick={onOpenAppMenu}
+                  className="md:hidden p-2 rounded-md hover:bg-[#8B7355]/80 focus:outline-none transition-colors shrink-0"
+                  aria-label="Open navigation sidebar"
+                >
+                  <PanelLeft className="w-6 h-6 text-[#2C3E50]" />
+                </button>
+              )}
               <button
+                type="button"
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="p-2 rounded-md hover:bg-[#8B7355] focus:outline-none transition-colors"
-                aria-label="Toggle Menu"
+                className="p-2 rounded-md hover:bg-[#8B7355] focus:outline-none transition-colors shrink-0"
+                aria-label={isMenuOpen ? "Close menu" : "Open site menu"}
               >
                 {isMenuOpen ? <X className="w-6 h-6 text-[#2C3E50]" /> : <Menu className="w-6 h-6 text-[#2C3E50]" />}
               </button>
 
-              {/* Existing BookBloom Logo Component/Link goes exactly here */}
-              <Link to="/" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-2 group">
-                <div className="relative w-10 h-10 flex items-center justify-center bg-[#2C3E50] rounded-lg group-hover:bg-[#1a252f] transition-colors">
-                  <BookOpen className="w-6 h-6 text-white" />
-                  <Sprout className="w-4 h-4 text-[#C4A672] absolute -top-1 -right-1 animate-bounce-slow" />
+              <Link to="/" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-2 group min-w-0">
+                <div className="relative w-9 h-9 sm:w-10 sm:h-10 shrink-0 flex items-center justify-center bg-[#2C3E50] rounded-lg group-hover:bg-[#1a252f] transition-colors">
+                  <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                  <Sprout className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#C4A672] absolute -top-1 -right-1 animate-bounce-slow" />
                 </div>
-                <span className="text-[#2C3E50] text-xl font-bold tracking-tight">BookBloom</span>
+                <span className="text-[#2C3E50] text-base sm:text-lg md:text-xl font-bold tracking-tight truncate">BookBloom</span>
               </Link>
             </div>
 
-            {/* CENTER/RIGHT SIDE: Desktop Links & Profile/Cart */}
-            <div className="flex items-center gap-4">
-              {/* Desktop Navigation (Hidden on mobile, visible on desktop using 'hidden lg:flex') */}
-              <div className="hidden lg:flex items-center gap-6">
-                <div className="flex items-center gap-1">
-                  {navItems.map((item) => {
-                    const Icon = item.icon;
-                    const active = isActive(item.path);
-                    return (
-                      <Link
-                        key={item.id}
-                        to={item.path}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 font-medium ${active
-                          ? 'bg-[#2C3E50] text-white'
-                          : 'text-[#2C3E50] hover:bg-[#8B7355] hover:text-white'
-                          }`}
-                      >
-                        <Icon className={`w-5 h-5 ${active ? 'stroke-[2.5px]' : ''}`} />
-                        <span className="hidden xl:inline">{item.label}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
+            {/* CENTER: Desktop nav icons (middle column — avoids z-index blocking clicks) */}
+            <div className="hidden lg:flex items-center justify-center gap-0.5 xl:gap-1 justify-self-center min-w-0">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const active = isActive(item.path);
+                return (
+                  <Link
+                    key={item.id}
+                    to={item.path}
+                    title={item.label}
+                    className={`flex items-center justify-center p-2 rounded-lg transition-all duration-200 ${active
+                      ? 'bg-[#2C3E50] text-white shadow-sm'
+                      : 'text-[#2C3E50] hover:bg-[#8B7355] hover:text-white'
+                      }`}
+                  >
+                    <Icon className={`w-5 h-5 shrink-0 ${active ? 'stroke-[2.5px]' : ''}`} />
+                    <span className="sr-only">{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
 
-              {/* Keep existing Profile/Cart/Action icons here (Visible on all devices) */}
-              <div className="flex items-center gap-3">
+            {/* RIGHT: Notifications, assistant shortcut, profile / auth */}
+            <div className="flex items-center gap-1 sm:gap-2 md:gap-3 shrink-0 ml-auto justify-self-end">
                 {isLoggedIn ? (
                   <>
                     <NotificationBell />
 
                     <Link
                       to="/assistant"
-                      className={`relative p-2 rounded-lg transition-colors ${isActive('/assistant')
+                      className={`relative p-1.5 sm:p-2 rounded-lg transition-colors shrink-0 ${isActive('/assistant')
                           ? 'bg-[#C4A672]/20 text-[#2C3E50]'
                           : 'text-[#2C3E50] hover:bg-[#8B7355] hover:text-white'
                         }`}
                       title="AI Assistant"
                     >
-                      <Bot className="w-6 h-6" />
+                      <Bot className="w-5 h-5 sm:w-6 sm:h-6" />
                     </Link>
 
                     <div className="relative" ref={dropdownRef}>
                       <button
+                        type="button"
                         onClick={() => setShowProfileDropdown(!showProfileDropdown)}
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#2C3E50] text-white hover:bg-[#1a252f] transition-colors"
+                        className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 rounded-lg bg-[#2C3E50] text-white hover:bg-[#1a252f] transition-colors max-w-[10rem] sm:max-w-none"
                       >
-                        <div className="w-8 h-8 bg-[#C4A672] rounded-full flex items-center justify-center">
-                          <User className="w-5 h-5 text-white" />
+                        <div className="w-7 h-7 sm:w-8 sm:h-8 bg-[#C4A672] rounded-full flex items-center justify-center shrink-0">
+                          <User className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                         </div>
-                        <span className="hidden lg:inline">Profile</span>
-                        <ChevronDown className={`w-4 h-4 transition-transform ${showProfileDropdown ? 'rotate-180' : ''}`} />
+                        <span className="hidden lg:inline truncate">Profile</span>
+                        <ChevronDown className={`w-4 h-4 transition-transform shrink-0 ${showProfileDropdown ? 'rotate-180' : ''}`} />
                       </button>
 
                       {showProfileDropdown && (
-                        <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="absolute right-0 mt-2 w-[min(16rem,calc(100vw-1.5rem))] sm:w-64 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
                           <div className="px-4 py-3 border-b border-gray-200">
                             <p className="text-sm text-gray-500">Signed in as</p>
                             <p className="text-[#2C3E50] truncate">{auth.currentUser?.email}</p>
@@ -248,11 +258,10 @@ export function Navbar({
               </div>
             </div>
           </div>
-        </div>
 
         {/* Mobile Collapsible Menu */}
         {isMenuOpen && (
-          <div className="absolute top-16 left-0 w-full h-screen bg-white dark:bg-gray-900 z-[9999] shadow-2xl flex flex-col p-4 overflow-y-auto">
+          <div className="absolute left-0 right-0 top-full w-full max-h-[calc(100dvh-4rem-env(safe-area-inset-bottom))] bg-white dark:bg-gray-900 z-[9999] shadow-2xl flex flex-col p-3 sm:p-4 overflow-y-auto overscroll-contain pb-[max(1rem,env(safe-area-inset-bottom))]">
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.path);

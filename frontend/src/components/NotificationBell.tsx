@@ -1,10 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, X, Check, Trash2, Settings, Eye } from 'lucide-react';
+import { Bell, X, Trash2, Settings, Eye } from 'lucide-react';
 import { Button } from './ui/button';
-import { Card } from './ui/card';
 import { Badge } from './ui/badge';
-import { ScrollArea } from './ui/scroll-area';
 import { db, auth } from '../firebase';
 import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, deleteDoc, writeBatch, Timestamp } from 'firebase/firestore';
 import { toast } from 'sonner';
@@ -71,7 +69,7 @@ export function NotificationBell() {
     return () => unsubscribe();
   }, [user]);
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = notifications.filter((n) => n.read !== true).length;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -85,9 +83,15 @@ export function NotificationBell() {
   }, []);
 
   const formatTimestamp = (timestamp: any) => {
-    if (!timestamp) return '';
+    if (timestamp == null) return '';
 
-    const date = timestamp instanceof Timestamp ? timestamp.toDate() : new Date(timestamp);
+    const date =
+      timestamp instanceof Timestamp
+        ? timestamp.toDate()
+        : typeof timestamp?.toDate === 'function'
+          ? timestamp.toDate()
+          : new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return '';
     const now = new Date();
     const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
@@ -111,7 +115,7 @@ export function NotificationBell() {
   const markAllAsRead = async () => {
     try {
       const batch = writeBatch(db);
-      const unreadNotifications = notifications.filter(n => !n.read);
+      const unreadNotifications = notifications.filter((n) => n.read !== true);
 
       unreadNotifications.forEach(n => {
         const ref = doc(db, 'notifications', n.id);
@@ -128,7 +132,7 @@ export function NotificationBell() {
 
   const handleNotificationNavigate = async (notification: Notification) => {
     const path = notificationTargetPath(notification);
-    if (!notification.read) {
+    if (notification.read !== true) {
       await markAsRead(notification.id);
     }
     setIsOpen(false);
@@ -198,9 +202,9 @@ export function NotificationBell() {
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-96 max-w-[calc(100vw-2rem)] bg-white rounded-lg shadow-xl border border-gray-200 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="absolute z-50 left-2 right-2 sm:left-auto sm:right-0 mt-2 w-auto sm:w-96 max-h-[min(32rem,75dvh)] flex flex-col min-h-0 overflow-hidden bg-white rounded-lg shadow-xl border border-gray-200 animate-in fade-in slide-in-from-top-2 duration-200">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200">
+          <div className="shrink-0 flex items-center justify-between p-4 border-b border-gray-200">
             <div className="flex items-center gap-2">
               <h3 className="text-[#2C3E50]">Notifications</h3>
               {unreadCount > 0 && (
@@ -230,10 +234,13 @@ export function NotificationBell() {
           {/* Notifications List */}
           {notifications.length > 0 ? (
             <>
-              <ScrollArea className="max-h-96">
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
                 <div className="divide-y divide-gray-100">
                   {notifications.map((notification) => {
                     const target = notificationTargetPath(notification);
+                    const titleText = notification.title?.trim() || 'Notification';
+                    const messageText = notification.message?.trim() ?? '';
+                    const isUnread = notification.read !== true;
                     return (
                       <div key={notification.id}
                       role={target ? 'button' : undefined}
@@ -246,7 +253,7 @@ export function NotificationBell() {
                           handleNotificationNavigate(notification);
                         }
                       }}
-                      className={`p-4 transition-colors ${target ? 'cursor-pointer hover:bg-gray-50' : 'hover:bg-gray-50'} ${!notification.read ? 'bg-blue-50/50' : ''
+                      className={`p-4 transition-colors ${target ? 'cursor-pointer hover:bg-gray-50' : 'hover:bg-gray-50'} ${isUnread ? 'bg-blue-50/50' : ''
                         }`}
                     >
                       <div className="flex gap-3">
@@ -254,18 +261,18 @@ export function NotificationBell() {
                         {/* Content */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2 mb-1">
-                            <h4 className="text-[#2C3E50] text-sm">{notification.title}</h4>
-                            {!notification.read && (
+                            <h4 className="text-[#2C3E50] text-sm font-medium break-words">{titleText}</h4>
+                            {isUnread && (
                               <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-1" />
                             )}
                           </div>
-                          <p className="text-sm text-gray-600 mb-2">
-                            {notification.message}
+                          <p className="text-sm text-gray-600 mb-2 break-words whitespace-pre-wrap">
+                            {messageText || '—'}
                           </p>
                           <div className="flex items-center justify-between">
                             <p className="text-xs text-gray-500">{formatTimestamp(notification.timestamp)}</p>
                             <div className="flex items-center gap-1">
-                              {!notification.read && (
+                              {isUnread && (
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -297,10 +304,10 @@ export function NotificationBell() {
                     );
                   })}
                 </div>
-              </ScrollArea>
+              </div>
 
               {/* Footer */}
-              <div className="p-3 border-t border-gray-200 flex items-center justify-between">
+              <div className="shrink-0 p-3 border-t border-gray-200 flex items-center justify-between">
                 <Button
                   variant="ghost"
                   size="sm"
