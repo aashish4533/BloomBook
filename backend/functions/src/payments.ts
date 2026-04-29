@@ -38,7 +38,7 @@ export const initiateP2PDeal = onCall(
         type: transactionType || 'buy',
         itemTitle: itemTitle || 'Order',
         baseAmount: amount, // Total charged
-        platformFee: 0, 
+        platformFee: 0,
         sellerPayout: amount,
         paymentMethod: 'system_confirmation',
         status: "completed", // Bypassing locked_for_payment
@@ -70,7 +70,7 @@ export const initiateP2PDeal = onCall(
   }
 );
 
-/* 
+/*
   LEGACY P2P VERIFICATION FLOWS
   The functions below are disabled in the current financial pivot.
   They are preserved here as comments for potential future escrow reinstatement.

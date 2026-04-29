@@ -192,9 +192,9 @@ export const onUserCreated = onDocumentCreated("users/{userId}", async (event) =
 export const notifyUpcomingRentalReturns = onSchedule(
   {
     schedule: "0 9 * * *",
-    timeZone: "Asia/Karachi" // Example timezone
+    timeZone: "Asia/Karachi", // Example timezone
   },
-  async (event) => {
+  async () => {
     try {
       const now = new Date();
       const in24Hours = new Date(now.getTime() + 24 * 60 * 60 * 1000);

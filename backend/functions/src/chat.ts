@@ -73,9 +73,12 @@ export const handleGroupChatMessage = onCall(
                     timestamp: FieldValue.serverTimestamp(),
                 };
 
-                // Sanitation: Avoid undefined additions
-                if (content && content.trim()) payload.content = content.trim();
-                if (encryptions && Object.keys(encryptions).length > 0) payload.encryptions = encryptions;
+                // E2EE: never persist plaintext when ciphertext map is present (defense in depth).
+                if (encryptions && Object.keys(encryptions).length > 0) {
+                    payload.encryptions = encryptions;
+                } else if (content && content.trim()) {
+                    payload.content = content.trim();
+                }
                 if (images && images.length > 0) payload.images = images;
                 if (replyTo && replyTo.id) payload.replyTo = replyTo;
 
@@ -121,10 +124,15 @@ export const handleGroupChatMessage = onCall(
                 if (!messageId || !emoji) throw new HttpsError("invalid-argument", "Missing messageId or emoji for reaction.");
 
                 const reactRef = messagesRef.doc(messageId).collection("reactions").doc(uid);
-                await reactRef.set({
-                    emoji,
-                    timestamp: FieldValue.serverTimestamp(),
-                });
+                const prev = await reactRef.get();
+                if (prev.exists && prev.data()?.emoji === emoji) {
+                    await reactRef.delete();
+                } else {
+                    await reactRef.set({
+                        emoji,
+                        timestamp: FieldValue.serverTimestamp(),
+                    });
+                }
                 return { success: true };
             }
 

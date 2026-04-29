@@ -9,12 +9,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 
 import { db, auth, storage } from '../firebase';
-import { collection, addDoc, serverTimestamp, query, deleteDoc, doc, updateDoc, orderBy, getDoc, setDoc, getDocs, limit } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, deleteDoc, doc, updateDoc, orderBy, getDoc, setDoc, getDocs, limit, where, Timestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useCollection, useDocument } from 'react-firebase-hooks/firestore';
 import { toast } from 'sonner';
 import { notifyChatRecipient } from '../utils/chatNotifications';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
+import { StudentTuitionVerification } from './StudentTuitionVerification';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -54,6 +55,42 @@ interface TuitionRequest {
   assignedTutorName?: string;
   status?: string;
   updatedAt?: any;
+  /** Open requests auto-expire; tutors can no longer take them. */
+  expiresAt?: { toMillis: () => number; toDate?: () => Date };
+  tuitionAgreementDueAt?: { toMillis: () => number; toDate?: () => Date };
+  tuitionAgreementAccepted?: boolean;
+}
+
+interface TutorReview {
+  id: string;
+  rating: number;
+  text: string;
+  createdAt?: unknown;
+  sentimentScore?: number;
+}
+
+const OPEN_TUITION_REQUEST_DAYS = 14;
+
+function formatFirestoreDate(value: unknown): string {
+  try {
+    const v = value as { toDate?: () => Date };
+    if (v && typeof v.toDate === 'function') return v.toDate().toLocaleString();
+  } catch {
+    /* ignore */
+  }
+  return '';
+}
+
+function isOpenRequestExpired(req: TuitionRequest): boolean {
+  if ((req.orbit_status || 'Open') !== 'Open') return false;
+  const exp = req.expiresAt;
+  if (!exp || typeof exp.toMillis !== 'function') return false;
+  return exp.toMillis() < Date.now();
+}
+
+function displayStudentCount(tutor: Tutor, studentsPerTutor: Map<string, Set<string>>): number {
+  const fromAssignments = studentsPerTutor.get(tutor.userId)?.size ?? 0;
+  return Math.max(tutor.students || 0, fromAssignments);
 }
 
 interface TuitionHubProps {
@@ -102,16 +139,78 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
   );
 
   const [currentUserTutor] = useDocument(auth.currentUser ? doc(db, 'tutors', auth.currentUser.uid) : null);
+  const [currentUserProfile] = useDocument(auth.currentUser ? doc(db, 'users', auth.currentUser.uid) : null);
   const tutorStatus = currentUserTutor?.data()?.verificationStatus || 'Unregistered';
+  const studentVerificationStatus = (currentUserProfile?.data()?.studentVerificationStatus as string | undefined) || 'unverified';
+  const isStudentTuitionVerified = studentVerificationStatus === 'verified';
+  const [showStudentVerification, setShowStudentVerification] = useState(false);
   const currentUserId = auth.currentUser?.uid || '';
 
-  const tutors = value?.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tutor)) || [];
+  const ensureStudentTuitionVerified = (): boolean => {
+    if (!auth.currentUser) return false;
+    if (isStudentTuitionVerified) return true;
+    toast.error('Complete student verification to post requests, book tutors, or start tuition chat.');
+    setShowStudentVerification(true);
+    return false;
+  };
+
   const tuitionRequests = requestsValue?.docs.map(doc => ({ id: doc.id, ...doc.data() } as TuitionRequest)) || [];
+
+  const tutors = useMemo(() => {
+    return (
+      value?.docs.map((d) => {
+        const x = d.data() as Record<string, unknown>;
+        return {
+          id: d.id,
+          ...x,
+          rating: typeof x.averageRating === 'number' ? x.averageRating : Number(x.rating) || 0,
+          reviews: typeof x.reviewCount === 'number' ? x.reviewCount : Number(x.reviews) || 0,
+        } as Tutor;
+      }) || []
+    );
+  }, [value]);
+
+  const studentsPerTutor = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    for (const r of tuitionRequests) {
+      if (r.orbit_status === 'Assigned' && r.assignedTutorId && r.studentId) {
+        if (!m.has(r.assignedTutorId)) m.set(r.assignedTutorId, new Set());
+        m.get(r.assignedTutorId)!.add(r.studentId);
+      }
+    }
+    return m;
+  }, [tuitionRequests]);
+
+  const [myReviewsSnap] = useCollection(
+    isLoggedIn && tutorStatus === 'Verified' && currentUserId
+      ? query(
+          collection(db, 'reviews'),
+          where('tutorId', '==', currentUserId),
+          orderBy('createdAt', 'desc'),
+          limit(8)
+        )
+      : undefined
+  );
+
+  const [selectedTutorReviewsSnap, selectedTutorReviewsLoading] = useCollection(
+    selectedTutor
+      ? query(
+          collection(db, 'reviews'),
+          where('tutorId', '==', selectedTutor.userId),
+          orderBy('createdAt', 'desc'),
+          limit(15)
+        )
+      : undefined
+  );
 
   const tutorsByUserId = useMemo(
     () => new Map(tutors.map((tutor) => [tutor.userId, tutor])),
     [tutors]
   );
+
+  const myTutorStudentCount = studentsPerTutor.get(currentUserId)?.size ?? 0;
+  const myTutorReviews: TutorReview[] =
+    myReviewsSnap?.docs.map((d) => ({ id: d.id, ...d.data() } as TutorReview)) || [];
 
   const resetRequestForm = () => {
     setEditingRequestId(null);
@@ -149,6 +248,12 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
     if (!auth.currentUser) {
       toast.error('Please login to continue');
       navigate('/login');
+      return;
+    }
+
+    if (studentId && auth.currentUser.uid === studentId && !isStudentTuitionVerified) {
+      toast.error('Complete student verification to use tuition chat.');
+      setShowStudentVerification(true);
       return;
     }
 
@@ -225,6 +330,7 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
       toast.error('Please login to send a request');
       return;
     }
+    if (!ensureStudentTuitionVerified()) return;
     const minBudget = parseFloat(requestForm.minBudget || '0');
     const maxBudget = parseFloat(requestForm.maxBudget || '0');
 
@@ -268,7 +374,8 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
           location: { zip: requestForm.location },
           orbit_status: 'Open',
           notified_tutors: [],
-          createdAt: serverTimestamp()
+          createdAt: serverTimestamp(),
+          expiresAt: Timestamp.fromMillis(Date.now() + OPEN_TUITION_REQUEST_DAYS * 86400000),
         });
         toast.success('Request sent successfully!');
       }
@@ -337,8 +444,19 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
         return;
       }
 
+      if (isOpenRequestExpired(requestData as TuitionRequest)) {
+        toast.error('This tuition request has expired (open listing window ended).');
+        return;
+      }
+
       if (!studentId) {
         toast.success('Request accepted! 🎉');
+        return;
+      }
+
+      const studentUserSnap = await getDoc(doc(db, 'users', studentId));
+      if (studentUserSnap.data()?.studentVerificationStatus !== 'verified') {
+        toast.error('Only verified students can receive tuition. This request is not available.');
         return;
       }
 
@@ -441,6 +559,7 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
       navigate('/login');
       return;
     }
+    if (!ensureStudentTuitionVerified()) return;
     await openTuitionChat({
       targetUserId: tutor.userId,
       targetUserName: tutor.name,
@@ -486,6 +605,8 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
         id: req.id,
         subject: req.subject,
         topic: req.topic,
+        studentId: req.studentId,
+        tutorId: req.assignedTutorId || '',
         counterpartId: isStudent ? req.assignedTutorId || '' : req.studentId,
         counterpartName: isStudent ? req.assignedTutorName || assignedTutor?.name || 'Assigned Tutor' : req.studentName,
         counterpartAvatar: isStudent ? assignedTutor?.avatar || '' : '',
@@ -600,6 +721,100 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
             />
           </div>
 
+          {/* Student tuition verification */}
+          {isLoggedIn && !isStudentTuitionVerified && (
+            <div
+              className={`mt-4 p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 max-w-2xl ${
+                studentVerificationStatus === 'rejected'
+                  ? 'bg-red-500/10 border-red-500/30 text-red-900'
+                  : studentVerificationStatus === 'pending_review'
+                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-900'
+                    : 'bg-blue-500/10 border-blue-500/30 text-[#2C3E50]'
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold">Student verification required</p>
+                  <p className="text-sm opacity-90">
+                    {studentVerificationStatus === 'pending_review'
+                      ? 'Your documents are under review. You cannot submit again until an admin approves or rejects. You can still browse tutors; booking stays locked until approved.'
+                      : studentVerificationStatus === 'rejected'
+                        ? 'Your last submission was not approved. Submit again with clearer documents.'
+                        : 'Verify your school or university status to post tuition requests, book tutors, and chat.'}
+                  </p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="shrink-0 border-[#C4A672] text-[#2C3E50] hover:bg-[#C4A672]/20"
+                disabled={studentVerificationStatus === 'pending_review'}
+                onClick={() => setShowStudentVerification(true)}
+              >
+                {studentVerificationStatus === 'pending_review'
+                  ? 'Awaiting admin review'
+                  : studentVerificationStatus === 'rejected'
+                    ? 'Submit again'
+                    : 'Start verification'}
+              </Button>
+            </div>
+          )}
+
+          {isLoggedIn && tutorStatus === 'Verified' && (
+            <div className="mt-4 p-4 rounded-xl border border-[#C4A672]/40 bg-white/95 text-[#2C3E50] max-w-2xl shadow-sm">
+              <p className="font-semibold flex items-center gap-2">
+                <Users className="w-5 h-5 text-[#C4A672]" />
+                Tutor dashboard
+              </p>
+              <p className="text-xs text-gray-600 mt-1">
+                Students and ratings update from assigned requests and verified reviews.
+              </p>
+              <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                <div>
+                  <p className="text-xs text-gray-500">Students (assigned)</p>
+                  <p className="text-lg font-semibold text-[#2C3E50]">{myTutorStudentCount}</p>
+                </div>
+                <div className="sm:col-span-2">
+                  <p className="text-xs text-gray-500">Your rating</p>
+                  <p className="text-lg font-semibold text-[#2C3E50] flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1">
+                      <Star className="w-4 h-4 fill-yellow-500 text-yellow-500 shrink-0" />
+                      {(() => {
+                        const av = currentUserTutor?.data()?.averageRating ?? currentUserTutor?.data()?.rating;
+                        const rc =
+                          currentUserTutor?.data()?.reviewCount ?? currentUserTutor?.data()?.reviews ?? 0;
+                        return typeof av === 'number' ? (
+                          <>
+                            {av.toFixed(1)}
+                            <span className="text-xs font-normal text-gray-500">({rc} reviews)</span>
+                          </>
+                        ) : (
+                          <span className="text-sm font-normal text-gray-500">No ratings yet</span>
+                        );
+                      })()}
+                    </span>
+                  </p>
+                </div>
+              </div>
+              {myTutorReviews.length > 0 && (
+                <div className="mt-3 border-t border-gray-100 pt-3">
+                  <p className="text-xs font-medium text-gray-600 mb-2">Recent student feedback</p>
+                  <ul className="space-y-2 max-h-40 overflow-y-auto text-xs">
+                    {myTutorReviews.map((rev) => (
+                      <li key={rev.id} className="bg-gray-50 rounded-md p-2">
+                        <span className="text-yellow-600">{'★'.repeat(Math.min(5, Math.max(0, rev.rating)))}</span>
+                        <span className="text-gray-500 ml-2">{formatFirestoreDate(rev.createdAt)}</span>
+                        <p className="text-gray-800 mt-1">{rev.text}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Verification Status Banner */}
           {isLoggedIn && tutorStatus !== 'Unregistered' && tutorStatus !== 'Verified' && (
             <div className={`mt-4 p-4 rounded-xl border flex items-center gap-3 max-w-2xl ${tutorStatus === 'Rejected'
@@ -632,27 +847,31 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
               {activeSessions.map((session) => (
                 <div
                   key={session.id}
-                  className="min-w-0 flex flex-col sm:flex-row sm:items-center gap-4 p-4 bg-white rounded-lg border border-gray-200 overflow-hidden"
+                  className="min-w-0 flex flex-col gap-4 p-4 bg-white rounded-lg border border-gray-200"
                 >
-                  <div className="w-12 h-12 shrink-0 bg-[#C4A672] rounded-lg flex items-center justify-center">
-                    <Video className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h4 className="text-[#2C3E50] break-words">{session.subject}</h4>
-                    <p className="text-sm text-gray-600 break-words">{session.topic}</p>
-                    <p className="text-xs text-gray-500 mt-1 break-words">
-                      Connected with {session.roleLabel}: {session.counterpartName}
-                    </p>
+                  <div className="flex items-start gap-4 min-w-0">
+                    <div className="w-12 h-12 shrink-0 bg-[#C4A672] rounded-lg flex items-center justify-center">
+                      <Video className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-[#2C3E50] font-medium break-words">{session.subject}</h4>
+                      <p className="text-sm text-gray-600 break-words">{session.topic}</p>
+                      <p className="text-xs text-gray-500 mt-1 break-words">
+                        Connected with {session.roleLabel}: {session.counterpartName}
+                      </p>
+                    </div>
                   </div>
                   <Button
                     size="sm"
-                    className="bg-[#C4A672] hover:bg-[#8B7355] w-full shrink-0 sm:w-auto sm:max-w-full"
+                    className="bg-[#C4A672] hover:bg-[#8B7355] w-full shrink-0"
                     onClick={() => openTuitionChat({
                       targetUserId: session.counterpartId,
                       targetUserName: session.counterpartName,
                       targetUserAvatar: session.counterpartAvatar,
                       requestId: session.id,
-                      requestTopic: session.topic
+                      requestTopic: session.topic,
+                      studentId: session.studentId,
+                      tutorId: session.tutorId,
                     })}
                   >
                     Open Chat
@@ -790,7 +1009,9 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                       <div>
                         <div className="flex items-center justify-center gap-1 mb-0.5 text-[#C4A672]">
                           <Users className="w-3.5 h-3.5" />
-                          <span className="text-sm font-bold text-[#2C3E50]">{tutor.students || 0}</span>
+                          <span className="text-sm font-bold text-[#2C3E50]">
+                            {displayStudentCount(tutor, studentsPerTutor)}
+                          </span>
                         </div>
                         <p className="text-[10px] text-gray-500">students</p>
                       </div>
@@ -854,11 +1075,21 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
             }}>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
               <h2 className="text-[#2C3E50] text-xl font-semibold">Tuition requests ({filteredRequests.length})</h2>
-              <DialogTrigger asChild>
-                <Button className="bg-[#2C3E50] text-white hover:bg-[#1a252f] w-full sm:w-auto">
+              <div className="flex flex-wrap gap-2 shrink-0">
+                <Button
+                  className="bg-[#2C3E50] text-white hover:bg-[#1a252f]"
+                  onClick={() => {
+                    if (!isLoggedIn) {
+                      toast.error('Please login');
+                      return;
+                    }
+                    if (!ensureStudentTuitionVerified()) return;
+                    setIsPostingRequest(true);
+                  }}
+                >
                   Request Tuition
                 </Button>
-              </DialogTrigger>
+              </div>
             </div>
             {filteredRequests.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -907,6 +1138,22 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                         {req.orbit_status === 'Assigned' && req.assignedTutorName && (
                           <p><span className="text-gray-500">Assigned Tutor:</span> <span>{req.assignedTutorName}</span></p>
                         )}
+                        {(req.orbit_status || 'Open') === 'Open' && req.expiresAt && (
+                          <p className={isOpenRequestExpired(req) ? 'text-red-600 font-medium' : ''}>
+                            <span className="text-gray-500">Open until:</span>{' '}
+                            {formatFirestoreDate(req.expiresAt)}
+                            {isOpenRequestExpired(req) ? ' (expired)' : ''}
+                          </p>
+                        )}
+                        {req.orbit_status === 'Assigned' && req.tuitionAgreementDueAt && !req.tuitionAgreementAccepted && (
+                          <p className="text-amber-800">
+                            <span className="text-gray-500">Agreement deadline:</span>{' '}
+                            {formatFirestoreDate(req.tuitionAgreementDueAt)}
+                          </p>
+                        )}
+                        {req.orbit_status === 'Assigned' && req.tuitionAgreementAccepted && (
+                          <p className="text-green-700">Tuition agreement accepted.</p>
+                        )}
                       </div>
                     </div>
 
@@ -934,7 +1181,7 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                             The first verified tutor to take this request will be connected with you here.
                           </p>
                         )
-                      ) : tutorStatus === 'Verified' && req.orbit_status !== 'Assigned' ? (
+                      ) : tutorStatus === 'Verified' && req.orbit_status !== 'Assigned' && !isOpenRequestExpired(req) ? (
                         <Button
                           size="sm"
                           onClick={() => handleTakeTuition(req)}
@@ -942,6 +1189,8 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                         >
                           Take Tuition
                         </Button>
+                      ) : tutorStatus === 'Verified' && req.orbit_status !== 'Assigned' && isOpenRequestExpired(req) ? (
+                        <p className="text-xs text-center text-red-600">This request expired before it was taken.</p>
                       ) : req.orbit_status === 'Assigned' && req.assignedTutorId === auth.currentUser?.uid ? (
                         <Button
                           size="sm"
@@ -970,11 +1219,19 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                 </div>
                 <h3 className="text-xl font-semibold text-[#2C3E50] mb-2">No Tuition Requests Yet</h3>
                 <p className="text-gray-500 mb-8 max-w-sm mx-auto">Be the first to post a request or explore our available tutors to start your learning journey.</p>
-                <DialogTrigger asChild>
-                  <Button className="bg-[#C4A672] text-white hover:bg-[#8B7355]">
-                    Post a Tuition Request
-                  </Button>
-                </DialogTrigger>
+                <Button
+                  className="bg-[#C4A672] text-white hover:bg-[#8B7355]"
+                  onClick={() => {
+                    if (!isLoggedIn) {
+                      toast.error('Please login');
+                      return;
+                    }
+                    if (!ensureStudentTuitionVerified()) return;
+                    setIsPostingRequest(true);
+                  }}
+                >
+                  Post a Tuition Request
+                </Button>
               </div>
             )}
             {requestDialogContent}
@@ -1066,6 +1323,42 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
                   <p className="text-gray-500">Available Hours</p>
                   <p className="font-medium text-[#2C3E50]">{selectedTutor.availableHours || 'Flexible'}</p>
                 </div>
+                <div>
+                  <p className="text-gray-500">Students (hub)</p>
+                  <p className="font-medium text-[#2C3E50]">{displayStudentCount(selectedTutor, studentsPerTutor)}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Reviews</p>
+                  <p className="font-medium text-[#2C3E50]">{selectedTutor.reviews || 0}</p>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                  <Star className="w-4 h-4 text-yellow-500" />
+                  Student reviews
+                </h4>
+                {selectedTutorReviewsLoading ? (
+                  <p className="text-xs text-gray-500">Loading reviews…</p>
+                ) : !selectedTutorReviewsSnap || selectedTutorReviewsSnap.empty ? (
+                  <p className="text-sm text-gray-500">No reviews yet.</p>
+                ) : (
+                  <ul className="space-y-3 max-h-48 overflow-y-auto text-sm border rounded-md p-2 bg-gray-50/80">
+                    {selectedTutorReviewsSnap.docs.map((d) => {
+                      const r = d.data();
+                      const stars = Math.min(5, Math.max(0, Number(r.rating) || 0));
+                      return (
+                        <li key={d.id} className="border-b border-gray-200 pb-2 last:border-0 last:pb-0">
+                          <div className="flex justify-between gap-2">
+                            <span className="text-yellow-600 text-xs">{'★'.repeat(stars)}</span>
+                            <span className="text-xs text-gray-400">{formatFirestoreDate(r.createdAt)}</span>
+                          </div>
+                          <p className="text-gray-700 mt-1">{String(r.text || '')}</p>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
@@ -1089,6 +1382,14 @@ export function TuitionHub({ onBack, isLoggedIn }: TuitionHubProps) {
           )}
         </DialogContent>
       </Dialog>
+
+      <StudentTuitionVerification
+        open={showStudentVerification}
+        onOpenChange={setShowStudentVerification}
+        defaultTier={
+          (currentUserProfile?.data()?.studentAcademicTierPreference as 'school' | 'university' | undefined) || null
+        }
+      />
     </div>
   </div>
   );

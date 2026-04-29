@@ -6,8 +6,16 @@ import { Textarea } from '../ui/textarea';
 import { Button } from '../ui/button';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { BookOpen, Search, Upload, X, Camera } from 'lucide-react';
+import { BookOpen, Search, X, Camera, ShieldCheck, Sparkles } from 'lucide-react';
 import { BarcodeScanner } from '../BarcodeScanner';
+import { toast } from 'sonner';
+import {
+  BOOK_PHOTO_SLOT_LABELS,
+  BOOK_PHOTO_SLOT_ORDER,
+  emptyBookImageSlots,
+  validateBookPhotoFile,
+  type BookPhotoSlotKey,
+} from '../../utils/bookConditionPhotos';
 
 /** Strip separators; keep digits and X (ISBN-10 check digit). */
 function normalizeIsbnInput(raw: string): string {
@@ -150,8 +158,100 @@ interface BookDetailsStepProps {
   isExchange?: boolean;
 }
 
+interface SellImageSlotInputProps {
+  slot: BookPhotoSlotKey;
+  label: string;
+  file: File | null;
+  onPick: (file: File | null) => void;
+}
+
+function SellImageSlotInput({ slot, label, file, onPick }: SellImageSlotInputProps) {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [validating, setValidating] = useState(false);
+
+  const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = e.target.files?.[0];
+    e.target.value = '';
+    if (!picked) return;
+    setValidating(true);
+    const err = await validateBookPhotoFile(picked, label);
+    setValidating(false);
+    if (err) {
+      toast.error(err);
+      return;
+    }
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    const url = URL.createObjectURL(picked);
+    setPreviewUrl(url);
+    onPick(picked);
+  };
+
+  const handleClear = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+    onPick(null);
+  };
+
+  return (
+    <label
+      className={`relative block rounded-lg border-2 border-dashed transition-colors cursor-pointer overflow-hidden ${
+        file ? 'border-[#C4A672] bg-[#C4A672]/5' : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
+      }`}
+    >
+      <input
+        type="file"
+        accept="image/*"
+        onChange={handleChange}
+        className="sr-only"
+        aria-label={`Upload ${label}`}
+      />
+      <div className="aspect-[4/3] w-full flex items-center justify-center p-2">
+        {previewUrl ? (
+          <img src={previewUrl} alt={label} className="max-h-full max-w-full object-contain" />
+        ) : (
+          <div className="text-center px-2">
+            <Camera className="w-6 h-6 mx-auto text-gray-400 mb-1" />
+            <p className="text-xs font-medium text-gray-700">{label}</p>
+            <p className="text-[10px] text-gray-500 mt-0.5">
+              {slot === 'firstPage' || slot === 'lastPage'
+                ? 'Inside page'
+                : slot === 'pageEdges'
+                  ? 'Closed book — paper edges'
+                  : 'Cover photo'}
+            </p>
+          </div>
+        )}
+      </div>
+      <div className="absolute top-1 left-1 bg-white/90 rounded px-1.5 py-0.5 text-[10px] font-semibold text-gray-700">
+        {label}
+      </div>
+      {file && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            handleClear();
+          }}
+          title="Remove photo"
+          className="absolute top-1 right-1 p-1 bg-white/90 rounded-full text-gray-600 hover:text-red-500 hover:bg-white shadow-sm"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      )}
+      {validating && (
+        <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
+          <div className="text-xs bg-white px-2 py-1 rounded shadow">Checking…</div>
+        </div>
+      )}
+    </label>
+  );
+}
+
 export function BookDetailsStep({ initialData, onNext, onCancel, isExchange = false }: BookDetailsStepProps) {
-  const [formData, setFormData] = useState<BookFormData>(initialData);
+  const [formData, setFormData] = useState<BookFormData>(() => ({
+    ...initialData,
+    imageSlots: initialData.imageSlots ?? emptyBookImageSlots(),
+  }));
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isbnLookup, setIsbnLookup] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
@@ -272,38 +372,6 @@ export function BookDetailsStep({ initialData, onNext, onCancel, isExchange = fa
     handleISBNLookup(cleanIsbn);
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files);
-      const newImages = files.map(file => URL.createObjectURL(file));
-
-      setFormData(prev => ({
-        ...prev,
-        images: [...prev.images, ...newImages],
-        imageFiles: [...(prev.imageFiles || []), ...files]
-      }));
-      setErrors((prev) => ({ ...prev, images: '' }));
-    }
-  };
-
-  const removeImage = (index: number) => {
-    setFormData(prev => {
-      const newImages = [...prev.images];
-      const newImageFiles = [...(prev.imageFiles || [])];
-
-      newImages.splice(index, 1);
-      if (newImageFiles.length > index) {
-        newImageFiles.splice(index, 1);
-      }
-
-      return {
-        ...prev,
-        images: newImages,
-        imageFiles: newImageFiles
-      };
-    });
-  };
-
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
 
@@ -352,9 +420,13 @@ export function BookDetailsStep({ initialData, onNext, onCancel, isExchange = fa
       newErrors.pages = 'Pages must be greater than 0';
     }
 
-    const hasPhotos = (formData.imageFiles?.length ?? 0) > 0;
-    if (!hasPhotos) {
-      newErrors.images = 'Upload at least one photo of the book (cover, condition, etc.).';
+    const slots = formData.imageSlots ?? emptyBookImageSlots();
+    for (const slot of BOOK_PHOTO_SLOT_ORDER) {
+      if (!slots[slot]) {
+        newErrors.images =
+          'Upload all 5 photos: Front, Back, First Page, Last Page, and Page edges (closed book, top or bottom of the page block).';
+        break;
+      }
     }
 
     setErrors(newErrors);
@@ -553,6 +625,10 @@ export function BookDetailsStep({ initialData, onNext, onCancel, isExchange = fa
                 ))}
               </SelectContent>
             </Select>
+            <p className="text-xs text-gray-500 flex items-center gap-1">
+              <Sparkles className="w-3 h-3 text-[#C4A672]" />
+              After you submit, we verify your condition using the 4 photos below (AI check).
+            </p>
           </div>
 
           {/* Category */}
@@ -640,48 +716,51 @@ export function BookDetailsStep({ initialData, onNext, onCancel, isExchange = fa
             </p>
           </div>
 
-          {/* Image Upload */}
+          {/* Image Upload — 5 slots for AI condition + library edge check */}
           <div className="space-y-2 md:col-span-2">
-            <Label>Book Images *</Label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {formData.images.map((img, idx) => (
-                <div key={idx} className="relative aspect-[3/4] rounded-lg overflow-hidden border border-gray-200 group">
-                  <img
-                    src={img}
-                    alt={`Preview ${idx + 1}`}
-                    className="w-full h-full object-cover"
-                    {...(img.startsWith('blob:')
-                      ? {}
-                      : { crossOrigin: 'anonymous' as const, referrerPolicy: 'no-referrer' as const })}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeImage(idx)}
-                    className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-
-              <label className="aspect-[3/4] rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer hover:border-[#C4A672] hover:bg-[#C4A672]/5 transition-colors">
-                <Upload className="w-8 h-8 text-gray-400 mb-2" />
-                <span className="text-sm text-gray-500">Add Image</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  onChange={handleImageUpload}
+            <div className="flex items-center justify-between">
+              <Label>Book condition photos *</Label>
+              <span className="text-xs font-medium text-gray-500">
+                {BOOK_PHOTO_SLOT_ORDER.filter((s) => (formData.imageSlots ?? emptyBookImageSlots())[s]).length}/5
+              </span>
+            </div>
+            <div className="mb-2 p-3 rounded-lg border border-[#C4A672]/30 bg-[#C4A672]/5 flex gap-3 items-start">
+              <div className="shrink-0 w-8 h-8 rounded-full bg-white flex items-center justify-center border border-[#C4A672]/20">
+                <ShieldCheck className="w-4 h-4 text-[#C4A672]" />
+              </div>
+              <div className="text-sm">
+                <p className="font-semibold text-[#2C3E50] flex items-center gap-1">
+                  AI condition verification
+                  <Sparkles className="w-3.5 h-3.5 text-[#C4A672]" />
+                </p>
+                <p className="text-gray-700 mt-0.5">
+                  Upload five photos: <span className="font-medium">Front, Back, First Page, Last Page</span>, and{' '}
+                  <span className="font-medium">page edges</span> — the closed book shot from the top or bottom so the cut
+                  edges of the paper block are visible (library stamps often appear here). AI also flags likely library
+                  markings for review. Min 400×400 each, under 5 MB.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {BOOK_PHOTO_SLOT_ORDER.map((slot) => (
+                <SellImageSlotInput
+                  key={slot}
+                  slot={slot}
+                  label={BOOK_PHOTO_SLOT_LABELS[slot]}
+                  file={(formData.imageSlots ?? emptyBookImageSlots())[slot]}
+                  onPick={(file) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      imageSlots: { ...(prev.imageSlots ?? emptyBookImageSlots()), [slot]: file },
+                    }));
+                    setErrors((e) => ({ ...e, images: '' }));
+                  }}
                 />
-              </label>
+              ))}
             </div>
             {errors.images && (
               <p className="text-sm text-red-500">{errors.images}</p>
             )}
-            <p className="text-xs text-gray-500">
-              Required: at least one clear photo (front cover, spine, or condition). Add more if you like.
-            </p>
           </div>
         </div>
 
@@ -702,7 +781,7 @@ export function BookDetailsStep({ initialData, onNext, onCancel, isExchange = fa
             Next: Location & Delivery
           </Button>
         </div>
-      </form >
+      </form>
 
       {showScanner && (
         <BarcodeScanner

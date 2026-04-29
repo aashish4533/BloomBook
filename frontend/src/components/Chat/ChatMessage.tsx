@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Download, Reply, Smile, Edit2, Trash } from 'lucide-react';
+import { Download, Reply, Edit2, Trash } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
 
@@ -34,6 +34,7 @@ export function ChatMessage({
   onDelete,
   onReact,
   communityId,
+  currentUserId,
 }: ChatMessageProps) {
   const [reactions, setReactions] = useState<{ userId: string; emoji: string }[]>([]);
 
@@ -86,7 +87,7 @@ export function ChatMessage({
 
   return (
     <div
-      className={`flex ${message.isOwn ? 'justify-end' : 'justify-start'} mb-4`}
+      className={`flex ${message.isOwn ? 'justify-end' : 'justify-start'} mb-4 ${reactions.length > 0 ? 'pb-2' : ''}`}
     >
       <div
         className={`flex gap-2 max-w-[70%] ${
@@ -111,13 +112,14 @@ export function ChatMessage({
           {/* Message Bubble with hover actions */}
           <div className="relative group">
             {/* Action Bar */}
-            <div className={`absolute -top-3 flex gap-1 bg-white border border-gray-100 rounded-full shadow-md p-1 z-10 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity ${message.isOwn ? 'left-0' : 'right-0'}`}>
-              {onReply && <button onClick={onReply} className="p-1 hover:bg-gray-100 rounded text-gray-500" title="Reply"><Reply className="w-3.5 h-3.5" /></button>}
-              {onReact && <button onClick={() => onReact('👍')} className="p-1 hover:bg-gray-50 rounded">👍</button>}
-              {onReact && <button onClick={() => onReact('❤️')} className="p-1 hover:bg-gray-50 rounded">❤️</button>}
-              {onReact && <button onClick={() => onReact('🔥')} className="p-1 hover:bg-gray-50 rounded">🔥</button>}
-              {message.isOwn && onEdit && <button onClick={onEdit} className="p-1 hover:bg-gray-100 rounded text-gray-500" title="Edit"><Edit2 className="w-3.5 h-3.5" /></button>}
-              {onDelete && <button onClick={onDelete} className="p-1 hover:bg-gray-100 rounded text-red-500" title="Delete"><Trash className="w-3.5 h-3.5" /></button>}
+            <div className={`absolute -top-3 flex gap-0.5 bg-white border border-gray-100 rounded-full shadow-md p-1 z-10 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity ${message.isOwn ? 'left-0' : 'right-0'}`}>
+              {onReply && <button type="button" onClick={onReply} className="p-1 hover:bg-gray-100 rounded text-gray-500" title="Reply"><Reply className="w-3.5 h-3.5" /></button>}
+              {onReact && <button type="button" onClick={() => onReact('👍')} className="p-1 hover:bg-gray-50 rounded text-base leading-none" title="React 👍">👍</button>}
+              {onReact && <button type="button" onClick={() => onReact('❤️')} className="p-1 hover:bg-gray-50 rounded text-base leading-none" title="React ❤️">❤️</button>}
+              {onReact && <button type="button" onClick={() => onReact('🔥')} className="p-1 hover:bg-gray-50 rounded text-base leading-none" title="React 🔥">🔥</button>}
+              {onReact && <button type="button" onClick={() => onReact('😂')} className="p-1 hover:bg-gray-50 rounded text-base leading-none" title="React 😂">😂</button>}
+              {message.isOwn && onEdit && <button type="button" onClick={onEdit} className="p-1 hover:bg-gray-100 rounded text-gray-500" title="Edit"><Edit2 className="w-3.5 h-3.5" /></button>}
+              {onDelete && <button type="button" onClick={onDelete} className="p-1 hover:bg-gray-100 rounded text-red-500" title="Delete"><Trash className="w-3.5 h-3.5" /></button>}
             </div>
 
             <div
@@ -196,13 +198,23 @@ export function ChatMessage({
 
             {/* Reactions Overlay */}
             {reactions.length > 0 && (
-              <div className={`absolute -bottom-2 flex gap-1 bg-white border border-gray-100 rounded-full shadow-sm px-1.5 py-0.5 text-xs ${message.isOwn ? 'right-2' : 'left-2'}`}>
-                {Object.entries(aggregatedReactions).map(([emoji, count]) => (
-                  <span key={emoji} className="flex items-center gap-0.5" title={`${count} users`}>
-                    <span>{emoji}</span>
-                    {count > 1 && <span className="text-gray-500 font-medium">{count}</span>}
-                  </span>
-                ))}
+              <div className={`absolute -bottom-2 flex flex-wrap gap-1 bg-white border border-gray-100 rounded-full shadow-sm px-1.5 py-0.5 text-xs max-w-[min(100%,14rem)] ${message.isOwn ? 'right-2' : 'left-2'}`}>
+                {Object.entries(aggregatedReactions).map(([emoji, count]) => {
+                  const iReacted = !!currentUserId && reactions.some((r) => r.userId === currentUserId && r.emoji === emoji);
+                  return (
+                    <button
+                      key={emoji}
+                      type="button"
+                      disabled={!onReact}
+                      onClick={() => onReact?.(emoji)}
+                      className={`flex items-center gap-0.5 rounded-full px-1 py-0.5 hover:bg-gray-100 disabled:cursor-default ${iReacted ? 'ring-1 ring-[#C4A672] bg-amber-50/80' : ''}`}
+                      title={iReacted ? 'Tap to remove your reaction' : onReact ? 'Tap to react' : `${count} reaction(s)`}
+                    >
+                      <span>{emoji}</span>
+                      {count > 1 && <span className="text-gray-500 font-medium">{count}</span>}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>

@@ -100,8 +100,11 @@ export function NegotiationInbox() {
   }, []);
 
   const notify = async (userId: string, title: string, message: string, extra?: Record<string, unknown>) => {
+    const sourceUid = auth.currentUser?.uid;
+    if (!sourceUid) return;
     await addDoc(collection(db, 'notifications'), {
       userId,
+      sourceUid,
       type: 'system',
       title,
       message,

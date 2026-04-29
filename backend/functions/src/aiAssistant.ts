@@ -9,6 +9,7 @@ import {
 
 import { getFirestore } from "firebase-admin/firestore";
 import type { Firestore } from "firebase-admin/firestore";
+import { BOOKBLOOM_SITE_GUIDE_FOR_AI } from "./bookbloomSiteGuide";
 
 const ASSISTANT_TOOLS: FunctionDeclaration[] = [
   {
@@ -51,6 +52,7 @@ const ASSISTANT_TOOLS: FunctionDeclaration[] = [
   },
 ];
 
+/** Splits and normalizes search keywords for inventory/tutor matching. */
 function tokenizeKeywords(keywords: string): string[] {
   return keywords
     .toLowerCase()
@@ -60,6 +62,7 @@ function tokenizeKeywords(keywords: string): string[] {
     .slice(0, 8);
 }
 
+/** Queries active book listings and returns a text summary for the model. */
 async function runSearchInventory(
   db: Firestore,
   keywords: string,
@@ -105,6 +108,7 @@ async function runSearchInventory(
   return lines.join("\n");
 }
 
+/** Queries tutors and returns a text summary for the model. */
 async function runSearchTutors(
   db: Firestore,
   keywords: string,
@@ -148,6 +152,7 @@ async function runSearchTutors(
   return lines.join("\n");
 }
 
+/** Runs the tool named in a Gemini function call and returns a JSON-serializable result. */
 async function dispatchToolCall(
   db: Firestore,
   call: FunctionCall
@@ -166,6 +171,7 @@ async function dispatchToolCall(
   return { error: `Unknown tool: ${call.name}` };
 }
 
+/** System prompt: identity, boundaries, and embedded site map for the assistant. */
 function buildSystemInstructions(): string {
   return `
         CORE IDENTITY: You are the "BloomBook AI Assistant," a specialized guide for the Web-Based Platform for Book Reselling and Renting.
@@ -173,9 +179,12 @@ function buildSystemInstructions(): string {
         CONVERSATION & BOUNDARIES: Be friendly and conversational—reply warmly to greetings, thanks, and brief chit-chat. If the user asks for something clearly outside BloomBook (other retailers, unrelated homework in other domains, etc.), gently steer back: you help with books, rentals, exchanges, tutors, and materials on BloomBook only—offer concrete next steps on the platform.
         PRIVACY: Never disclose or discuss implementation details (frameworks, databases, cloud vendors, or internal architecture).
         CONTENT: Do not write long unrelated essays, poems, or arbitrary code. Stay a platform guide.
+        WEBSITE NAVIGATION: Use the SITE MAP below to answer where features live (URLs/paths). This is the authoritative map of BookBloom pages—not a live crawl of third-party sites.
         DATA TRUTH: For books in stock or tutor availability you MUST call searchInventory / searchTutors and base factual claims on tool results. Never invent prices, IDs, or listings. If tools return no rows, say honestly that nothing matched and suggest refining keywords or browsing the marketplace.
         ACADEMIC NAVIGATOR (TUTORS): When the user wants tutoring, ask for Subject, Level (e.g. Metric/Inter/O-Level), and preferred format (online/physical). Mention tutor verification ("Neural Stability Gate") and suggest helping materials where relevant. Refer to tutoring sessions as "Learning Orbits."
         PRODUCT TAGS: When recommending a book that appears in searchInventory results, include [Product: FIRESTORE_DOCUMENT_ID] right after the title so the UI can show a cart card.
+
+        ${BOOKBLOOM_SITE_GUIDE_FOR_AI}
       `;
 }
 
@@ -211,7 +220,7 @@ export const generateAssistantResponse = onCall(
       const systemInstructions = buildSystemInstructions();
 
       const model = genAI.getGenerativeModel({
-        model: "gemini-2.0-flash",
+        model: "gemini-2.5-flash",
         systemInstruction: systemInstructions,
         tools: [{ functionDeclarations: ASSISTANT_TOOLS }],
       });

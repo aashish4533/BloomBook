@@ -59,22 +59,36 @@ service firebase.storage {
       allow write: if isStorageAdmin() && isImageUnder5MB();
     }
 
-    // Community Covers
+    // Community Covers — only community admin may upload (prevents arbitrary overwrites)
     match /community_covers/{communityId} {
       allow read: if true;
-      allow write: if isAuthenticated() && isImageUnder5MB();
+      allow write: if isAuthenticated() && isImageUnder5MB()
+        && firestore.exists(/databases/(default)/documents/communities/$(communityId))
+        && firestore.get(/databases/(default)/documents/communities/$(communityId)).data.adminId == request.auth.uid;
     }
 
     // Community chat images: chat_attachments/{communityId}/{fileName} (GroupChat.tsx)
     match /chat_attachments/{communityId}/{fileName} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && isImageUnder5MB();
+      allow write: if isAuthenticated() && isImageUnder5MB()
+        && firestore.exists(/databases/(default)/documents/communities/$(communityId))
+        && (
+          firestore.get(/databases/(default)/documents/communities/$(communityId)).data.adminId == request.auth.uid
+          || firestore.exists(/databases/(default)/documents/communities/$(communityId)/members/$(request.auth.uid))
+          || request.auth.uid in firestore.get(/databases/(default)/documents/communities/$(communityId)).data.get('members', [])
+        );
     }
 
     // Post images (CreatePost.tsx): post_images/{fileName}
     match /post_images/{fileName} {
       allow read: if true;
       allow write: if isAuthenticated() && isImageUnder5MB();
+    }
+
+    // Student tuition verification (school ID, fee slip, university ID, etc.)
+    match /student_verification/{userId}/{docId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isStorageAdmin());
+      allow write: if isAuthenticated() && request.auth.uid == userId && isVerificationDocUpload();
     }
 
     // Tutor verification files (TuitionHub certificates) — plural path

@@ -19,6 +19,7 @@ export interface LibrarianRecommendation {
   bloom_score: number;
 }
 
+/** True if a book document represents an active marketplace listing. */
 function bookAvailable(data: DocumentData): boolean {
   if (data.isSold === true) return false;
   if (data.listingStatus === "sold" || data.listingStatus === "reserved") return false;
@@ -26,6 +27,7 @@ function bookAvailable(data: DocumentData): boolean {
   return true;
 }
 
+/** Loads wishlist, purchases, rentals, and sales for recommendation context. */
 async function loadUserReadingProfile(
   db: Firestore,
   uid: string
@@ -129,7 +131,8 @@ async function loadUserReadingProfile(
     const bookSnaps = await db.getAll(...refs);
     for (const snap of bookSnaps) {
       if (!snap.exists) continue;
-      const b = snap.data()!;
+      const b = snap.data();
+      if (!b) continue;
       bumpCat(b.category as string | undefined);
     }
   }
@@ -139,6 +142,7 @@ async function loadUserReadingProfile(
 
 type Candidate = { id: string; rec: Record<string, unknown> };
 
+/** Loads recent available books as recommendation candidates. */
 async function loadCandidateBooks(db: Firestore, maxCandidates: number): Promise<Candidate[]> {
   const snap = await db.collection("books").orderBy("createdAt", "desc").limit(150).get();
   const out: Candidate[] = [];
@@ -161,6 +165,7 @@ async function loadCandidateBooks(db: Firestore, maxCandidates: number): Promise
   return out;
 }
 
+/** Ranks candidates locally when Gemini is unavailable or returns nothing. */
 function fallbackFromCandidates(
   candidates: Candidate[],
   categoryCounts: Record<string, number>,
@@ -193,16 +198,16 @@ function fallbackFromCandidates(
       author: String(c.rec.author || "Unknown"),
       genre: cat,
       summary: `Listed on BookBloom — ${String(c.rec.condition || "Good")} condition. Rs. ${c.rec.price ?? "—"}.`,
-      relevance:
-        Object.keys(categoryCounts).length > 0
-          ? `Picked to match your categories and history on BookBloom.`
-          : "A fresh listing you might like on the marketplace.",
+      relevance: Object.keys(categoryCounts).length > 0 ?
+        `Picked to match your categories and history on BookBloom.` :
+        "A fresh listing you might like on the marketplace.",
       difficulty: "Intermediate",
       bloom_score: Math.min(95, 72 + (i + 1) * 4),
     };
   });
 }
 
+/** Extracts and parses JSON with a recommendations array from model output. */
 function parseGeminiJson(text: string): LibrarianRecommendation[] | null {
   const trimmed = text.trim();
   const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
@@ -243,10 +248,9 @@ export const getAntigravityRecommendations = onCall(
         profileLines = profile.profileLines;
       }
 
-      const profileText =
-        profileLines.length > 0
-          ? profileLines.join("\n")
-          : "No wishlist or transaction history yet — suggest broadly appealing listings.";
+      const profileText = profileLines.length > 0 ?
+        profileLines.join("\n") :
+        "No wishlist or transaction history yet — suggest broadly appealing listings.";
 
       const idSet = new Set(candidates.map((c) => c.id));
       const apiKey = process.env.GEMINI_API_KEY;
@@ -285,22 +289,26 @@ Rules:
               .slice(0, 5);
             if (cleaned.length > 0) {
               const byId = new Map(candidates.map((c) => [c.id, c]));
-              const merged: LibrarianRecommendation[] = cleaned.map((r) => {
-                const cand = byId.get(r.id)!;
-                return {
+              const merged: LibrarianRecommendation[] = [];
+              for (const r of cleaned) {
+                const cand = byId.get(r.id);
+                if (!cand) continue;
+                merged.push({
                   id: r.id,
                   title: String(cand.rec.title || r.title),
                   author: String(cand.rec.author || r.author),
                   genre: String(r.genre || cand.rec.category || "General"),
                   summary: String(r.summary || "").slice(0, 400),
                   relevance: String(r.relevance || "").slice(0, 200),
-                  difficulty: ["Beginner", "Intermediate", "Advanced Science"].includes(String(r.difficulty))
-                    ? String(r.difficulty)
-                    : "Intermediate",
+                  difficulty: ["Beginner", "Intermediate", "Advanced Science"].includes(String(r.difficulty)) ?
+                    String(r.difficulty) :
+                    "Intermediate",
                   bloom_score: Math.min(98, Math.max(60, Number(r.bloom_score) || 75)),
-                };
-              });
-              return { recommendations: merged };
+                });
+              }
+              if (merged.length > 0) {
+                return { recommendations: merged };
+              }
             }
           }
         } catch (e) {

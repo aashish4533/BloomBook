@@ -530,13 +530,16 @@ export function NotesHub() {
             <div className="max-w-7xl mx-auto px-4 py-6">
                 <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3 mb-6">
                     <div className="relative max-w-3xl">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <Search
+                            className="pointer-events-none absolute left-3 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-gray-400"
+                            aria-hidden
+                        />
                         <Input
                             type="search"
                             placeholder="Search requests, shared files, or categories…"
                             value={hubSearch}
                             onChange={(e) => setHubSearch(e.target.value)}
-                            className="pl-11 h-11 bg-gray-50 border-gray-200"
+                            className="h-11 w-full border-gray-200 bg-gray-50 pe-3 ps-14"
                             aria-label="Search hub"
                         />
                     </div>

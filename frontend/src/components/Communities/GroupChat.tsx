@@ -4,10 +4,12 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { ChatMessage } from '../Chat/ChatMessage';
 import { toast } from 'sonner';
-import { db, storage } from '../../firebase';
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
+import { db, storage, functions } from '../../firebase';
+import { collection, onSnapshot, query, orderBy, doc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { httpsCallable } from 'firebase/functions';
+
+const callGroupChatMessage = httpsCallable(functions, 'handleGroupChatMessage');
 import { useNeuralPrivacy } from '../../hooks/useNeuralPrivacy';
 import { Skeleton } from '../ui/skeleton';
 
@@ -194,36 +196,44 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
       }
 
       const encryptions: Record<string, { ciphertext: string; iv: string }> = {};
-      
-      if (newMessage.trim()) {
-        await Promise.all(members.map(async (m) => {
-          try {
-            const sh = await shield(newMessage.trim(), m.id);
-            if (sh) encryptions[m.id] = sh;
-          } catch (err) {
-            console.error(`[E2EE] Encryption failed for member ${m.id}:`, err);
-          }
-        }));
+      const text = newMessage.trim();
+
+      if (text) {
+        const recipientIds = [...new Set([currentUserId, ...members.map((m) => m.id)])];
+        await Promise.all(
+          recipientIds.map(async (rid) => {
+            try {
+              const sh = await shield(text, rid);
+              if (sh) encryptions[rid] = sh;
+            } catch (err) {
+              console.error(`[E2EE] Encryption failed for member ${rid}:`, err);
+            }
+          })
+        );
+        if (Object.keys(encryptions).length !== recipientIds.length) {
+          toast.error(
+            'Could not encrypt for all members. Everyone must open BookBloom once so encryption keys can sync.'
+          );
+          return;
+        }
       }
 
-        const functions = getFunctions();
-        const callChat = httpsCallable(functions, 'handleGroupChatMessage');
-
         const payload: any = {
-          action: 'create',
+          action: editingMessage ? 'edit' : 'create',
           communityId,
-          content: newMessage.trim(),
-          encryptions: Object.keys(encryptions).length > 0 ? encryptions : undefined,
           images: imageUrls.length > 0 ? imageUrls : undefined,
-          replyTo: replyingTo ? { id: replyingTo.id, senderName: replyingTo.senderName } : undefined
+          replyTo: replyingTo ? { id: replyingTo.id, senderName: replyingTo.senderName } : undefined,
         };
 
         if (editingMessage) {
-          payload.action = 'edit';
           payload.messageId = editingMessage.id;
         }
 
-        await callChat(payload);
+        if (Object.keys(encryptions).length > 0) {
+          payload.encryptions = encryptions;
+        }
+
+        await callGroupChatMessage(payload);
         if (editingMessage) setEditingMessage(null);
 
       setNewMessage('');
@@ -237,9 +247,7 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
 
   const handleDeleteMessage = async (messageId: string) => {
     try {
-      const functions = getFunctions();
-      const callChat = httpsCallable(functions, 'handleGroupChatMessage');
-      await callChat({ action: 'delete', communityId, messageId });
+      await callGroupChatMessage({ action: 'delete', communityId, messageId });
     } catch (err) {
       toast.error('Failed to delete message');
     }
@@ -247,9 +255,7 @@ export function GroupChat({ communityId, communityName, onBack, currentUserId }:
 
   const handleReactToMessage = async (messageId: string, emoji: string) => {
     try {
-      const functions = getFunctions();
-      const callChat = httpsCallable(functions, 'handleGroupChatMessage');
-      await callChat({ action: 'react', communityId, messageId, emoji });
+      await callGroupChatMessage({ action: 'react', communityId, messageId, emoji });
     } catch (err) {
       toast.error('Failed to react');
     }

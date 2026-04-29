@@ -3,11 +3,9 @@ import { RentalBook } from '../RentBookFlow';
 import { Button } from '../ui/button';
 import { Checkbox } from '../ui/checkbox';
 import { Input } from '../ui/input';
-import { Label } from '../ui/label';
 import {
   ArrowLeft,
   Calendar,
-  CreditCard,
   MapPin,
   Package,
   CheckCircle,
@@ -37,7 +35,6 @@ export function RentalConfirmation({
 }: RentalConfirmationProps) {
   const navigate = useNavigate();
   const [agreeToTerms, setAgreeToTerms] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('card');
   const [isProcessing, setIsProcessing] = useState(false);
 
   const rentalPrice = book.rentalOptions[rentalPeriod];
@@ -169,37 +166,6 @@ export function RentalConfirmation({
               </div>
             </div>
 
-            {/* Payment Method */}
-            <div className="bg-white rounded-xl shadow-sm p-6">
-              <h2 className="text-[#2C3E50] text-xl mb-4">Payment Method</h2>
-              <div className="space-y-3">
-                <button
-                  onClick={() => setPaymentMethod('card')}
-                  className={`w-full border-2 rounded-lg p-4 flex items-center gap-3 transition-colors ${paymentMethod === 'card'
-                    ? 'border-[#C4A672] bg-[#C4A672]/5'
-                    : 'border-gray-200'
-                    }`}
-                >
-                  <CreditCard className="w-5 h-5 text-[#C4A672]" />
-                  <div className="text-left flex-1">
-                    <p className="text-[#2C3E50]">Credit/Debit Card</p>
-                    <p className="text-sm text-gray-600">Visa ending in 1234</p>
-                  </div>
-                </button>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="cvv">CVV</Label>
-                    <Input id="cvv" placeholder="123" maxLength={3} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="zip">ZIP Code</Label>
-                    <Input id="zip" placeholder="94102" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* Terms & Conditions */}
             <div className="bg-white rounded-xl shadow-sm p-6">
               <h2 className="text-[#2C3E50] text-xl mb-4">Rental Agreement</h2>
@@ -263,7 +229,7 @@ export function RentalConfirmation({
                 disabled={!agreeToTerms || isProcessing}
                 className="w-full h-12 bg-[#C4A672] hover:bg-[#8B7355] text-white mb-3"
               >
-                {isProcessing ? 'Processing...' : 'Confirm & Pay'}
+                {isProcessing ? 'Processing...' : 'Confirm rental'}
               </Button>
 
               <Button
@@ -272,17 +238,6 @@ export function RentalConfirmation({
               >
                 View My Rentals
               </Button>
-
-              {/* Security Note */}
-              <div className="mt-6 bg-green-50 border border-green-200 rounded-lg p-4">
-                <div className="flex items-start gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                  <div className="text-sm text-green-900">
-                    <p className="mb-1">Secure Payment</p>
-                    <p className="text-green-700 text-xs">Your payment information is encrypted and secure</p>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </div>

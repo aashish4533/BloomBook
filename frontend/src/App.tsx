@@ -37,6 +37,7 @@ import { GroupChat } from './components/Communities/GroupChat';
 import { PrivateChat } from './components/Chat/PrivateChat';
 import { AnnouncementsPage } from './components/AnnouncementsPage';
 import { AboutPage } from './components/AboutPage';
+import { BrandKitReference } from './components/BrandKitReference';
 import { ContactPage } from './components/ContactPage';
 import { HelpPage } from './components/HelpPage';
 import { TermsPage } from './components/TermsPage';
@@ -58,10 +59,12 @@ import { UserChats } from './components/User/UserChats';
 import { UserExchanges } from './components/User/UserExchanges';
 import { NegotiationInbox } from './components/User/NegotiationInbox';
 import { UserReservations } from './components/User/UserReservations';
+import { NotificationsPage } from './components/User/NotificationsPage';
 
 // AI Integration
 import { AIChatbox } from './components/Chat/AIChatbox';
 import { AIAssistantPage } from './components/AIAssistantPage';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 
 // Admin Dashboard Sub-components
@@ -73,7 +76,7 @@ import { CommunityManagement } from './components/Admin/CommunityManagement';
 import { NotesManagement } from './components/Admin/NotesManagement';
 import { SystemSettings } from './components/Admin/SystemSettings';
 import { TuitionManagement } from './components/Admin/TuitionManagement';
-import { Button } from './components/ui/button';
+import { ExchangeManagement } from './components/Admin/ExchangeManagement';
 
 
 // Wrappers for components that need navigation or location state
@@ -282,19 +285,6 @@ function DeliveryTrackingWrapper() {
   return <DeliveryTracking />;
 }
 
-function AdminAnnouncementsWrapper() {
-  const navigate = useNavigate();
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
-      <h3 className="text-xl text-gray-700 mb-2">Announcements Management</h3>
-      <p className="text-gray-500 mb-4">Manage announcements from the main Announcements page</p>
-      <Button onClick={() => navigate('/announcements')} className="bg-[#C4A672] hover:bg-[#8B7355] text-white">
-        Go to Announcements
-      </Button>
-    </div>
-  );
-}
-
 function AppContent() {
   const { user, loading } = useUserRole();
 
@@ -324,6 +314,7 @@ function AppContent() {
           {/* Public Routes */}
           <Route path="/" element={<HomeScreen isLoggedIn={!!user} />} />
           <Route path="/about" element={<AboutPageWrapper />} />
+          <Route path="/brand-kit" element={<BrandKitReference />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/help" element={<HelpPage />} />
           <Route path="/terms" element={<TermsPage />} />
@@ -365,6 +356,7 @@ function AppContent() {
               <Route path="chats" element={<UserChats />} />
               <Route path="exchanges" element={<UserExchanges />} />
               <Route path="negotiations" element={<NegotiationInbox />} />
+              <Route path="notifications" element={<NotificationsPage />} />
             </Route>
 
             <Route path="/tutor-verification" element={<TutorVerificationForm />} />
@@ -378,12 +370,13 @@ function AppContent() {
           <Route path="/admin/dashboard" element={<AdminDashboard onLogout={handleLogout} />}>
             <Route index element={<UserManagement />} />
             <Route path="books" element={<BookInventory />} />
+            <Route path="exchanges" element={<ExchangeManagement />} />
             <Route path="rentals" element={<RentalManagement />} />
             <Route path="transactions" element={<TransactionHistory />} />
             <Route path="communities" element={<CommunityManagement />} />
             <Route path="notes" element={<NotesManagement />} />
             <Route path="tuition" element={<TuitionManagement />} />
-            <Route path="announcements" element={<AdminAnnouncementsWrapper />} />
+            <Route path="announcements" element={<AnnouncementsPage embeddedInAdmin />} />
             <Route path="settings" element={<SystemSettings />} />
           </Route>
         </Route>
@@ -398,10 +391,12 @@ function AppContent() {
 
 export default function App() {
   return (
-    <UserRoleProvider>
-      <CartProvider>
-        <AppContent />
-      </CartProvider>
-    </UserRoleProvider>
+    <ErrorBoundary>
+      <UserRoleProvider>
+        <CartProvider>
+          <AppContent />
+        </CartProvider>
+      </UserRoleProvider>
+    </ErrorBoundary>
   );
 }

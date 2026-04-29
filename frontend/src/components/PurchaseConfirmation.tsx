@@ -86,6 +86,7 @@ export function PurchaseConfirmation({ book, onClose, onBack }: PurchaseConfirma
       if (book.userId) {
         await addDoc(collection(db, 'notifications'), {
           userId: book.userId,
+          sourceUid: user.uid,
           type: 'system',
           title: 'Book reserved',
           message: `${user.displayName || 'A buyer'} reserved "${book.title}" for ${formatRs(price)}. Pickup within ${RESERVATION_DAYS} days.`,

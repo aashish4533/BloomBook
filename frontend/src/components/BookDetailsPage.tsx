@@ -511,6 +511,7 @@ function NegotiateDialog({ book, onClose }: { book: Book; onClose: () => void })
 
             await addDoc(collection(db, 'notifications'), {
                 userId: sellerId,
+                sourceUid: user.uid,
                 type: 'system',
                 title: 'New price offer',
                 message: `${user.displayName || 'A buyer'} offered Rs. ${offerNum.toLocaleString()} for "${book.title}". Open Negotiations to respond.`,

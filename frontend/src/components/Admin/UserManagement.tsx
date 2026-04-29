@@ -4,8 +4,9 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Search, Edit, Ban, Shield, Trash2 } from 'lucide-react';
 import { UserEditModal } from './UserEditModal';
-import { db } from '../../firebase';
+import { db, functions } from '../../firebase';
 import { collection, getDocs, updateDoc, doc, deleteDoc } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { toast } from 'sonner';
 
 interface User {
@@ -18,6 +19,8 @@ interface User {
   joinedDate: string;
   location: string;
   role: 'user' | 'admin';
+  studentVerificationStatus?: string;
+  studentVerificationTier?: string;
 }
 
 export function UserManagement() {
@@ -43,7 +46,9 @@ export function UserManagement() {
             totalSales: d.totalSales || 0,
             joinedDate: d.createdAt?.toDate ? d.createdAt.toDate().toISOString() : (d.joinedDate || new Date().toISOString()),
             location: d.location || 'Unknown',
-            role: d.role || 'user'
+            role: d.role || 'user',
+            studentVerificationStatus: d.studentVerificationStatus || '',
+            studentVerificationTier: d.studentVerificationTier || ''
           } as User;
         });
         setUsers(data);
@@ -78,6 +83,28 @@ export function UserManagement() {
       } catch (err) {
         toast.error('Failed to update user role');
       }
+    }
+  };
+
+  const handleReviewStudentVerification = async (id: string, approved: boolean) => {
+    try {
+      const review = httpsCallable(functions, 'reviewStudentVerification');
+      await review({
+        userId: id,
+        approved,
+        note: approved ? 'Approved' : 'Rejected by admin',
+      });
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === id
+            ? { ...u, studentVerificationStatus: approved ? 'verified' : 'rejected' }
+            : u
+        )
+      );
+      toast.success(approved ? 'Student verification approved' : 'Student verification rejected');
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to update student verification');
     }
   };
 
@@ -145,7 +172,8 @@ export function UserManagement() {
       </div>
 
       {/* Users Table */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm">
+        <div className="admin-user-table-scroll">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -156,6 +184,7 @@ export function UserManagement() {
               <th className="px-6 py-4 text-left text-sm text-gray-600">Location</th>
               <th className="px-6 py-4 text-left text-sm text-gray-600">Activity</th>
               <th className="px-6 py-4 text-left text-sm text-gray-600">Joined</th>
+              <th className="px-6 py-4 text-left text-sm text-gray-600">Tuition student</th>
               <th className="px-6 py-4 text-left text-sm text-gray-600">Actions</th>
             </tr>
           </thead>
@@ -193,6 +222,39 @@ export function UserManagement() {
                 </td>
                 <td className="px-6 py-4 text-gray-600">
                   {new Date(user.joinedDate).toLocaleDateString()}
+                </td>
+                <td className="px-6 py-4">
+                  <div className="flex flex-col gap-1 text-xs">
+                    {user.studentVerificationStatus ? (
+                      <Badge variant="outline" className="w-fit capitalize">
+                        {user.studentVerificationStatus.replace(/_/g, ' ')}
+                      </Badge>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
+                    {user.studentVerificationTier && (
+                      <span className="text-gray-500 capitalize">{user.studentVerificationTier}</span>
+                    )}
+                    {user.studentVerificationStatus === 'pending_review' && user.role !== 'admin' && (
+                      <div className="flex gap-1 mt-1">
+                        <Button
+                          size="sm"
+                          className="h-7 text-[10px] px-2 bg-green-600 hover:bg-green-700 text-white"
+                          onClick={() => void handleReviewStudentVerification(user.id, true)}
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-[10px] px-2"
+                          onClick={() => void handleReviewStudentVerification(user.id, false)}
+                        >
+                          Reject
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
@@ -248,6 +310,7 @@ export function UserManagement() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* User Edit Modal */}

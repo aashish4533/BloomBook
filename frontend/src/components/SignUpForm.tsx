@@ -24,6 +24,8 @@ export function SignUpForm({ onSignUp }: SignUpFormProps) {
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [agreeToTerms, setAgreeToTerms] = useState(false);
+  /** Used to pre-select tuition verification tier in Tuition Hub */
+  const [tuitionAcademicPath, setTuitionAcademicPath] = useState<'none' | 'school' | 'university'>('none');
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const navigate = useNavigate();
 
@@ -51,6 +53,8 @@ export function SignUpForm({ onSignUp }: SignUpFormProps) {
             phoneNumber: phoneNumber || '',
             photoURL: 'https://ui-avatars.com/api/?name=' + (fullName || email.split('@')[0]),
             role: 'user',
+            studentAcademicTierPreference: tuitionAcademicPath === 'none' ? null : tuitionAcademicPath,
+            studentVerificationStatus: 'unverified',
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
           });
@@ -64,7 +68,7 @@ export function SignUpForm({ onSignUp }: SignUpFormProps) {
       }
     };
     createUserDoc();
-  }, [userCredential, email, navigate, onSignUp]);
+  }, [userCredential, email, navigate, onSignUp, fullName, phoneNumber, tuitionAcademicPath]);
 
 
   const validateForm = () => {
@@ -151,6 +155,8 @@ export function SignUpForm({ onSignUp }: SignUpFormProps) {
           displayName: user.displayName || user.email?.split('@')[0] || 'User',
           photoURL: user.photoURL || 'https://ui-avatars.com/api/?name=User',
           role: 'user',
+          studentAcademicTierPreference: tuitionAcademicPath === 'none' ? null : tuitionAcademicPath,
+          studentVerificationStatus: 'unverified',
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         });
@@ -374,6 +380,23 @@ export function SignUpForm({ onSignUp }: SignUpFormProps) {
                 {errors.confirmPassword && (
                   <p className="text-sm text-red-500">{errors.confirmPassword}</p>
                 )}
+              </div>
+
+              {/* Tuition path (optional) — pre-fills student verification in Tuition Hub */}
+              <div className="space-y-2">
+                <label className="text-sm text-gray-700">Planning to book online tuition? (optional)</label>
+                <select
+                  className="w-full h-11 rounded-md border border-gray-200 bg-gray-50 px-3 text-sm"
+                  value={tuitionAcademicPath}
+                  onChange={(e) => setTuitionAcademicPath(e.target.value as 'none' | 'school' | 'university')}
+                >
+                  <option value="none">Not now / only browsing</option>
+                  <option value="school">School / college (grades 8–12)</option>
+                  <option value="university">University / higher education</option>
+                </select>
+                <p className="text-xs text-gray-500">
+                  You’ll complete document verification later in the Tuition Hub before booking.
+                </p>
               </div>
 
               {/* Terms & Conditions */}

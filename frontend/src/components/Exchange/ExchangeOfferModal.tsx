@@ -3,9 +3,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '../ui/button';
 import { useCollection, useDocument } from 'react-firebase-hooks/firestore';
 import { db, auth } from '../../firebase';
-import { collection, query, where, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, addDoc, serverTimestamp, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { Book } from '../BookMarketplace';
-import { Loader2, AlertTriangle, MapPin } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
+import { ImageWithFallback } from '../ImageWithFallback';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { startChatWithUser } from '../../utils/chatUtils';
@@ -42,25 +43,67 @@ export function ExchangeOfferModal({ requestedBook, onClose, isOpen }: ExchangeO
 
         setIsSubmitting(true);
         try {
-            const ownerId = requestedBook.userId || requestedBook.seller?.id;
-            if (!ownerId) {
-                toast.error('Unable to find the listing owner for this book.');
+            const [requestedSnap, offeredSnap] = await Promise.all([
+                getDoc(doc(db, 'books', requestedBook.id)),
+                getDoc(doc(db, 'books', selectedBookId)),
+            ]);
+
+            if (!requestedSnap.exists()) {
+                toast.error('This listing is no longer available.');
+                return;
+            }
+            if (!offeredSnap.exists()) {
+                toast.error('The book you selected is no longer available.');
                 return;
             }
 
-            const offered = userBooks.find((b) => b.id === selectedBookId);
+            const requestedData = requestedSnap.data();
+            const offeredData = offeredSnap.data();
+            const ownerId = String(requestedData?.userId ?? '').trim();
+            const offeredOwnerId = String(offeredData?.userId ?? '').trim();
+
+            if (!ownerId) {
+                toast.error('This listing is missing owner information.');
+                return;
+            }
+            if (offeredOwnerId !== currentUser.uid) {
+                toast.error('You can only offer books from your own listings.');
+                return;
+            }
+            if (ownerId === currentUser.uid) {
+                toast.error('You cannot propose an exchange on your own listing.');
+                return;
+            }
+
+            const offeredTitle =
+                (offeredData?.title as string) || (offeredData?.bookName as string) || 'Your book';
+            const offeredImages = (offeredData?.images as string[] | undefined) || [];
+            const reqTitle =
+                (requestedData?.title as string) ||
+                (requestedData?.bookName as string) ||
+                requestedBook.title;
+            const reqImages = (requestedData?.images as string[] | undefined) || requestedBook.images || [];
+            const ownerName =
+                (requestedData?.seller as { name?: string } | undefined)?.name ||
+                requestedBook.seller?.name ||
+                'Owner';
+            const ownerAvatar =
+                (requestedData?.seller as { avatar?: string } | undefined)?.avatar ||
+                requestedBook.seller?.avatar ||
+                '';
+
             const exchangeRef = await addDoc(collection(db, 'exchanges'), {
                 requesterId: currentUser.uid,
                 requesterName: currentUser.displayName || 'Someone',
                 requesterAvatar: currentUser.photoURL || '',
                 ownerId,
-                ownerName: requestedBook.seller?.name || 'Owner',
+                ownerName,
                 requestedBookId: requestedBook.id,
-                requestedBookTitle: requestedBook.title,
-                requestedBookImage: requestedBook.images?.[0] || '',
+                requestedBookTitle: reqTitle,
+                requestedBookImage: reqImages[0] || '',
                 offeredBookId: selectedBookId,
-                offeredBookTitle: offered?.title,
-                offeredBookImage: offered?.images?.[0] || '',
+                offeredBookTitle: offeredTitle,
+                offeredBookImage: offeredImages[0] || '',
                 status: 'pending',
                 ownerAccepted: false,
                 requesterAccepted: false,
@@ -71,30 +114,45 @@ export function ExchangeOfferModal({ requestedBook, onClose, isOpen }: ExchangeO
             notifyExchangeParty({
                 recipientUserId: ownerId,
                 title: 'New exchange offer',
-                message: `${currentUser.displayName || 'Someone'} proposed a book swap for "${requestedBook.title}". Open Dashboard → Exchanges to accept or decline.`,
+                message: `${currentUser.displayName || 'Someone'} proposed a book swap for "${reqTitle}". Open Dashboard → Exchanges to accept or decline.`,
                 exchangeId,
             });
 
-            const chatId = await startChatWithUser(
-                navigate,
-                currentUser.uid,
-                ownerId,
-                { name: requestedBook.seller?.name || 'Owner', avatar: requestedBook.seller?.avatar || '' },
-                {
-                    id: requestedBook.id,
-                    title: requestedBook.title,
-                    price: 0,
-                    image: requestedBook.images?.[0],
-                    initialChatMessage: `I've sent you an exchange offer for "${requestedBook.title}". Please open Dashboard → Exchanges to accept or decline. We can coordinate the swap here in chat.`,
-                }
-            );
-            await updateDoc(doc(db, 'exchanges', exchangeId), { chatId });
+            try {
+                const chatId = await startChatWithUser(
+                    navigate,
+                    currentUser.uid,
+                    ownerId,
+                    { name: ownerName, avatar: ownerAvatar },
+                    {
+                        id: requestedBook.id,
+                        title: reqTitle,
+                        price: 0,
+                        image: reqImages[0],
+                        initialChatMessage: `I've sent you an exchange offer for "${reqTitle}". Please open Dashboard → Exchanges to accept or decline. We can coordinate the swap here in chat.`,
+                    }
+                );
+                await updateDoc(doc(db, 'exchanges', exchangeId), { chatId });
+            } catch (chatErr) {
+                console.error('[ExchangeOfferModal] Chat setup failed:', chatErr);
+                toast.warning(
+                    'Offer sent, but starting the chat failed. Open Dashboard → Chats to message the seller.'
+                );
+            }
 
             toast.success('Exchange offer sent!');
             onClose();
-        } catch (err) {
+        } catch (err: unknown) {
             console.error(err);
-            toast.error('Failed to send exchange offer');
+            const code =
+                err && typeof err === 'object' && 'code' in err ? String((err as { code: string }).code) : '';
+            if (code === 'permission-denied') {
+                toast.error(
+                    'Could not create this offer. Both books must exist, and you must own the book you are offering.'
+                );
+            } else {
+                toast.error('Failed to send exchange offer');
+            }
         } finally {
             setIsSubmitting(false);
         }
@@ -154,7 +212,11 @@ export function ExchangeOfferModal({ requestedBook, onClose, isOpen }: ExchangeO
                                         }
                   `}
                                 >
-                                    <img src={book.images[0]} alt={book.title} className="w-16 h-24 object-cover rounded" crossOrigin="anonymous" referrerPolicy="no-referrer" />
+                                    <ImageWithFallback
+                                        src={book.images?.[0]}
+                                        alt={book.title || 'Book'}
+                                        className="w-16 h-24 object-cover rounded shrink-0"
+                                    />
                                     <div className="flex-1 min-w-0">
                                         <h4 className="font-medium text-sm text-[#2C3E50] truncate">{book.title}</h4>
                                         <p className="text-xs text-gray-500 truncate">{book.author}</p>

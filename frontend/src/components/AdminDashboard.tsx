@@ -1,16 +1,9 @@
-import { UserManagement } from './Admin/UserManagement';
-import { BookInventory } from './Admin/BookInventory';
-import { RentalManagement } from './Admin/RentalManagement';
-import TransactionHistory from './Admin/TransactionHistory';
-import { SystemSettings } from './Admin/SystemSettings';
-import { CommunityManagement } from './Admin/CommunityManagement';
-import { NotesManagement } from './Admin/NotesManagement';
-import { TuitionManagement } from './Admin/TuitionManagement';
 import { Button } from './ui/button';
-import { Users, BookOpen, Calendar, DollarSign, Settings, LogOut, BarChart3, Shield, MessageCircle, Bell, FileText, GraduationCap } from 'lucide-react';
-import { Outlet, NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Users, BookOpen, Calendar, DollarSign, Settings, LogOut, Shield, MessageCircle, Bell, FileText, GraduationCap, ArrowLeftRight } from 'lucide-react';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase';
-import { collection, getAggregateFromServer, sum, count, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { collection, getAggregateFromServer, sum, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -22,6 +15,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const currentPath = location.pathname;
+  const [adminUser] = useAuthState(auth);
   const [stats, setStats] = useState({ revenue: 0, users: 0, books: 0, activeBooks: 0, tuitionRequests: 0, rentals: 0, loading: true });
 
   useEffect(() => {
@@ -106,7 +100,8 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
 
   const tabs = [
     { id: 'users', label: 'User Management', icon: Users, path: '/admin/dashboard' },
-    { id: 'books', label: 'Book Inventory', icon: BookOpen, path: '/admin/dashboard/books' },
+    { id: 'books', label: 'Book Listings', icon: BookOpen, path: '/admin/dashboard/books' },
+    { id: 'exchanges', label: 'Exchanges', icon: ArrowLeftRight, path: '/admin/dashboard/exchanges' },
     { id: 'rentals', label: 'Rental Management', icon: Calendar, path: '/admin/dashboard/rentals' },
     { id: 'transactions', label: 'Transaction History', icon: DollarSign, path: '/admin/dashboard/transactions' },
     { id: 'notes', label: 'Notes Management', icon: FileText, path: '/admin/dashboard/notes' },
@@ -164,9 +159,11 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
             <div className="w-10 h-10 bg-[#C4A672] rounded-full flex items-center justify-center">
               <span>AD</span>
             </div>
-            <div>
-              <p className="text-sm">Admin User</p>
-              <p className="text-xs text-white/70">aashish.maheshwari65@gmail.com</p>
+            <div className="min-w-0">
+              <p className="text-sm truncate">Admin</p>
+              <p className="text-xs text-white/70 truncate" title={adminUser?.email || ''}>
+                {adminUser?.email || '—'}
+              </p>
             </div>
           </div>
           <Button

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { auth, db, functions } from '../firebase';
-import { Send, Bot, User, Loader2, Sparkles, GraduationCap, Compass, BookOpen, Menu, Trash2 } from 'lucide-react';
+import { Send, Bot, User, Loader2, Sparkles, GraduationCap, Compass, BookOpen, Menu, Trash2, Reply, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -12,6 +12,7 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle } from './ui/sheet';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { AIAssistantMessageContent } from './AI/AIChatMessage';
+import { BOOKBLOOM_SITE_GUIDE_FOR_AI } from '../utils/bookbloomSiteGuide';
 
 interface Message {
   role: 'user' | 'model';
@@ -79,16 +80,19 @@ async function generateClientGeminiReply(prompt: string, history: Message[]): Pr
         CONVERSATION & BOUNDARIES: Be friendly and conversational—reply warmly to greetings, thanks, and brief chit-chat. If the user asks for something clearly outside BloomBook (other retailers, unrelated domains, etc.), gently steer back: you help with books, rentals, exchanges, tutors, and materials on BloomBook only—offer concrete next steps.
         PRIVACY: Never disclose or discuss implementation details (frameworks, databases, or internal architecture).
         CONTENT: Do not write long unrelated essays, poems, or arbitrary code. Stay a platform guide.
+        WEBSITE NAVIGATION: Use the SITE MAP below to answer where features and pages live on BookBloom (paths users can open). This is the platform map—not a live crawl of external websites.
         DATA: Only claim a book exists or give a price if it appears in the inventory list below. If unsure, say the snapshot may be incomplete and suggest browsing the marketplace. Never invent listings.
         ACADEMIC NAVIGATOR (TUTORS): When the user wants tutoring, ask for Subject, Level (Metric/Inter/O-Level), and preferred format (online/physical). Explain the "Neural Stability Gate" (tutor verification). Refer to sessions as "Learning Orbits."
         INTERACTIVE HOOK: When recommending a book from the list below, include [Product: ID] immediately after the title for the Quick View card.
         AVAILABLE INVENTORY SNAPSHOT (recent listings; server assistant has full search tools):
         ${inventoryData || 'No books currently available.'}
+
+        ${BOOKBLOOM_SITE_GUIDE_FOR_AI}
       `;
 
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
     systemInstruction: systemInstructions,
   });
   const cleanHistory = history.filter((m) => m.parts?.[0]?.text);
@@ -104,7 +108,21 @@ export function AIAssistantPage() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>(() => loadPersistedMessages());
+  const [replyTo, setReplyTo] = useState<{ role: 'user' | 'model'; text: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const handleDeleteMessage = (index: number) => {
+    setMessages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleReplyMessage = (message: Message) => {
+    const text = message.parts?.[0]?.text ?? '';
+    setReplyTo({ role: message.role, text });
+    setTimeout(() => {
+      const el = document.getElementById('ai-assistant-input') as HTMLInputElement | null;
+      el?.focus();
+    }, 0);
+  };
 
   useEffect(() => {
     try {
@@ -126,9 +144,24 @@ export function AIAssistantPage() {
     }
   }, [messages]);
 
+  const clearAllChat = () => {
+    const hadMessages = messages.length > 0;
+    setMessages([]);
+    setReplyTo(null);
+    try {
+      localStorage.removeItem(AI_STORAGE_KEY);
+      sessionStorage.removeItem(LEGACY_SESSION_KEY);
+    } catch {
+      /* ignore */
+    }
+    if (hadMessages) {
+      toast.success('All chat messages cleared.');
+    }
+  };
+
   const handleSendMessage = async (textToSend?: string) => {
-    const messageText = textToSend || input.trim();
-    if (!messageText || isLoading) return;
+    const rawText = textToSend || input.trim();
+    if (!rawText || isLoading) return;
 
     const hasClientKey = Boolean((import.meta.env.VITE_GEMINI_API_KEY as string | undefined)?.trim());
     if (!auth.currentUser && !hasClientKey) {
@@ -136,26 +169,18 @@ export function AIAssistantPage() {
       return;
     }
 
-    // #region agent log
-    fetch('http://127.0.0.1:7923/ingest/79ac5cb1-e3a3-4310-8419-22151450dd83', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '01ac4b' },
-      body: JSON.stringify({
-        sessionId: '01ac4b',
-        runId: 'post-fix-2',
-        hypothesisId: 'H1',
-        location: 'AIAssistantPage.tsx:handleSendMessage:entry',
-        message: 'assistant request start',
-        data: { hasClientKey, isLoggedIn: Boolean(auth.currentUser) },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
+    const activeReply = !textToSend ? replyTo : null;
+    const messageText = activeReply
+      ? `> Replying to ${activeReply.role === 'user' ? 'my earlier message' : 'your earlier reply'}:\n> ${activeReply.text.replace(/\n/g, '\n> ').slice(0, 500)}\n\n${rawText}`
+      : rawText;
 
     const priorHistory = messages;
     const newUserMessage: Message = { role: 'user', parts: [{ text: messageText }] };
     setMessages(prev => [...prev, newUserMessage]);
-    if (!textToSend) setInput('');
+    if (!textToSend) {
+      setInput('');
+      setReplyTo(null);
+    }
     setIsLoading(true);
 
     try {
@@ -165,39 +190,8 @@ export function AIAssistantPage() {
       if (hasClientKey) {
         try {
           replyText = (await generateClientGeminiReply(messageText, priorHistory)).trim();
-          // #region agent log
-          fetch('http://127.0.0.1:7923/ingest/79ac5cb1-e3a3-4310-8419-22151450dd83', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '01ac4b' },
-            body: JSON.stringify({
-              sessionId: '01ac4b',
-              runId: 'post-fix-2',
-              hypothesisId: 'H2',
-              location: 'AIAssistantPage.tsx:handleSendMessage:clientFirstOk',
-              message: 'client Gemini first path success',
-              data: { replyLen: replyText?.length ?? 0 },
-              timestamp: Date.now(),
-            }),
-          }).catch(() => {});
-          // #endregion
         } catch (clientFirstErr: unknown) {
-          const ce = clientFirstErr as { message?: string };
-          // #region agent log
-          fetch('http://127.0.0.1:7923/ingest/79ac5cb1-e3a3-4310-8419-22151450dd83', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '01ac4b' },
-            body: JSON.stringify({
-              sessionId: '01ac4b',
-              runId: 'post-fix-2',
-              hypothesisId: 'H2',
-              location: 'AIAssistantPage.tsx:handleSendMessage:clientFirstErr',
-              message: 'client Gemini first path failed',
-              data: { errSnippet: String(ce?.message ?? clientFirstErr).slice(0, 220) },
-              timestamp: Date.now(),
-            }),
-          }).catch(() => {});
-          // #endregion
-          console.warn('Client Gemini (first) failed, will try cloud function if logged in:', clientFirstErr);
+          console.warn('Client Gemini failed, trying cloud function:', clientFirstErr);
         }
       }
 
@@ -213,61 +207,12 @@ export function AIAssistantPage() {
           if (result?.data?.text?.trim()) {
             replyText = result.data.text.trim();
           }
-          // #region agent log
-          fetch('http://127.0.0.1:7923/ingest/79ac5cb1-e3a3-4310-8419-22151450dd83', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '01ac4b' },
-            body: JSON.stringify({
-              sessionId: '01ac4b',
-              runId: 'post-fix-2',
-              hypothesisId: 'H3',
-              location: 'AIAssistantPage.tsx:handleSendMessage:afterCF',
-              message: 'cloud function attempt finished',
-              data: { gotReply: Boolean(replyText), replyLen: replyText?.length ?? 0 },
-              timestamp: Date.now(),
-            }),
-          }).catch(() => {});
-          // #endregion
         } catch (fnErr: unknown) {
-          const fe = fnErr as { code?: string; message?: string };
-          // #region agent log
-          fetch('http://127.0.0.1:7923/ingest/79ac5cb1-e3a3-4310-8419-22151450dd83', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '01ac4b' },
-            body: JSON.stringify({
-              sessionId: '01ac4b',
-              runId: 'post-fix-2',
-              hypothesisId: 'H1',
-              location: 'AIAssistantPage.tsx:handleSendMessage:cfError',
-              message: 'cloud function rejected',
-              data: {
-                cfCode: fe?.code ?? 'unknown',
-                cfMsgSnippet: String(fe?.message ?? '').slice(0, 220),
-              },
-              timestamp: Date.now(),
-            }),
-          }).catch(() => {});
-          // #endregion
           console.warn('Cloud function assistant failed:', fnErr);
         }
       }
 
       if (!replyText) {
-        // #region agent log
-        fetch('http://127.0.0.1:7923/ingest/79ac5cb1-e3a3-4310-8419-22151450dd83', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '01ac4b' },
-          body: JSON.stringify({
-            sessionId: '01ac4b',
-            runId: 'post-fix-2',
-            hypothesisId: 'H4',
-            location: 'AIAssistantPage.tsx:handleSendMessage:empty',
-            message: 'no reply from client or CF',
-            data: { hasClientKey, triedCf: Boolean(auth.currentUser) },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
         throw new Error('empty_response');
       }
 
@@ -304,10 +249,22 @@ export function AIAssistantPage() {
           </Link>
           <h2 className="text-[#2C3E50] font-bold text-lg">Academic Navigator</h2>
         </div>
-        <Button variant="ghost" size="icon" onClick={() => { setMessages([]); localStorage.removeItem(AI_STORAGE_KEY); sessionStorage.removeItem(LEGACY_SESSION_KEY); }} title="Clear Chat">
+        <Button variant="ghost" size="icon" onClick={clearAllChat} disabled={isLoading} title="Delete all chat">
           <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-500" />
         </Button>
       </div>
+
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="w-full text-xs mb-3 border-[#C4A672]/30 text-[#2C3E50] hover:bg-[#C4A672]/10"
+        onClick={clearAllChat}
+        disabled={isLoading}
+      >
+        <Trash2 className="w-3.5 h-3.5 mr-2" />
+        Delete all chat
+      </Button>
 
       <div className="flex-1 space-y-4">
         <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Quick Directives</div>
@@ -372,11 +329,27 @@ export function AIAssistantPage() {
                     <h3 className="text-[#2C3E50] font-bold text-sm">BloomBook AI</h3>
                     <p className="text-xs text-green-500 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />Online</p>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => { setMessages([]); localStorage.removeItem(AI_STORAGE_KEY); sessionStorage.removeItem(LEGACY_SESSION_KEY); }} title="Clear Chat">
+                <Button variant="ghost" size="icon" onClick={clearAllChat} disabled={isLoading} title="Delete all chat">
                   <Trash2 className="w-5 h-5 text-gray-400 hover:text-red-500" />
                 </Button>
             </div>
         </div>
+
+        {messages.length > 0 && (
+          <div className="flex shrink-0 items-center justify-end gap-2 px-3 sm:px-4 py-2 bg-white border-b border-[#C4A672]/20">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="text-xs"
+              onClick={clearAllChat}
+              disabled={isLoading}
+            >
+              <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+              Delete all chat
+            </Button>
+          </div>
+        )}
 
         {/* Messages list / Centered Welcome */}
         <ScrollArea className="flex-1 min-h-0 w-full">
@@ -387,7 +360,12 @@ export function AIAssistantPage() {
                  <Bot className="w-8 h-8 text-[#C4A672]" />
               </div>
               <h1 className="text-[#2C3E50] text-3xl font-bold mb-3 tracking-tight">Welcome to the Navigator Hub</h1>
-              <p className="text-gray-500 max-w-md text-sm mb-8">Ask about tutor verification, book rentals, or helping materials to accelerate your Academic Orbit.</p>
+              <p className="text-gray-500 max-w-md text-sm mb-4">Ask about tutor verification, book rentals, or helping materials to accelerate your Academic Orbit.</p>
+              <p className="text-gray-400 text-xs max-w-md mb-6">
+                <span className="md:hidden">Open the menu (☰) for quick prompts and </span>
+                <span className="hidden md:inline">Left sidebar: </span>
+                <span className="text-gray-600">Delete all chat</span> clears this conversation.
+              </p>
               
               {/* Centered Command Entry */}
               <div className="w-full max-w-2xl bg-white rounded-2xl p-4 shadow-xl border border-[#C4A672]/10 mb-8 transform transition-all hover:scale-[1.01]">
@@ -431,25 +409,57 @@ export function AIAssistantPage() {
                     );
                  })}
               </div>
+
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="mt-4 text-xs text-gray-500 hover:text-red-600"
+                onClick={clearAllChat}
+                disabled={isLoading}
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                Delete all chat (reset saved conversation)
+              </Button>
             </div>
           ) : (
             <div className="space-y-6 w-full pb-4">
               {messages.map((message: any, i: number) => (
-                <div key={i} className={`flex items-start gap-4 w-full ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                <div key={i} className={`group flex items-start gap-4 w-full ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
                   <Avatar className="w-8 h-8 md:w-9 md:h-9 border border-gray-100 flex-shrink-0 mt-1">
                     <AvatarFallback className={message.role === 'user' ? 'bg-[#2C3E50] text-white' : 'bg-[#C4A672]/10'}>
                       {message.role === 'user' ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5 text-[#C4A672]" />}
                     </AvatarFallback>
                   </Avatar>
-                  <div 
-                  className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm ${
-                    message.role === 'user' 
-                      ? 'bg-[#C4A672] text-white rounded-br-none' 
-                      : 'bg-white border border-gray-100 text-[#2C3E50] rounded-bl-none'
-                  }`}
-                >
-                  <AIAssistantMessageContent text={message.parts[0].text} />
-                </div>
+                  <div className={`flex flex-col max-w-[85%] ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
+                    <div
+                      className={`rounded-2xl px-4 py-3 shadow-sm ${
+                        message.role === 'user'
+                          ? 'bg-[#C4A672] text-white rounded-br-none'
+                          : 'bg-white border border-gray-100 text-[#2C3E50] rounded-bl-none'
+                      }`}
+                    >
+                      <AIAssistantMessageContent text={message.parts[0].text} />
+                    </div>
+                    <div className={`flex gap-1 mt-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                      <button
+                        type="button"
+                        onClick={() => handleReplyMessage(message)}
+                        title="Reply to this message"
+                        className="p-1.5 rounded-md text-gray-400 hover:text-[#C4A672] hover:bg-[#C4A672]/10 transition-colors"
+                      >
+                        <Reply className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteMessage(i)}
+                        title="Delete this message"
+                        className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ))}
               {isLoading && (
@@ -472,12 +482,32 @@ export function AIAssistantPage() {
         {messages.length > 0 && (
           <div className="p-3 md:p-4 bg-[#FAF8F3] border-t border-[#C4A672]/10 z-10 shrink-0">
             <div className="max-w-3xl lg:max-w-4xl mx-auto w-full px-2">
+              {replyTo && (
+                <div className="mb-2 flex items-start gap-2 bg-white border border-[#C4A672]/30 rounded-lg px-3 py-2 shadow-sm">
+                  <Reply className="w-3.5 h-3.5 text-[#C4A672] mt-0.5 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[11px] font-semibold text-[#C4A672] uppercase tracking-wide">
+                      Replying to {replyTo.role === 'user' ? 'yourself' : 'Bloom AI'}
+                    </div>
+                    <div className="text-xs text-gray-600 truncate">{replyTo.text}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setReplyTo(null)}
+                    title="Cancel reply"
+                    className="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
               <form 
                 onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} 
                 className="flex gap-2 md:gap-3 w-full items-center"
               >
                 <Input
-                  placeholder="Ask about books, tutors, or learning resources…"
+                  id="ai-assistant-input"
+                  placeholder={replyTo ? 'Type your reply…' : 'Ask about books, tutors, or learning resources…'}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   disabled={isLoading}

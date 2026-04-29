@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { db } from '../../firebase';
 import {
-  collection, doc, deleteDoc, updateDoc
+  collection, doc, deleteDoc, updateDoc, serverTimestamp, deleteField
 } from 'firebase/firestore';
 import { useCollection } from 'react-firebase-hooks/firestore';
 import { toast } from 'sonner';
@@ -50,6 +50,9 @@ interface TuitionRequest {
   gradeLevel: string;
   budget: string;
   createdAt?: any;
+  orbit_status?: string;
+  assignedTutorId?: string;
+  assignedTutorName?: string;
 }
 
 type ActiveTab = 'overview' | 'tutors' | 'requests';
@@ -118,6 +121,24 @@ export function TuitionManagement() {
       toast.success('Request deleted');
     } catch {
       toast.error('Failed to delete request');
+    }
+  };
+
+  const handleReopenRequest = async (req: TuitionRequest) => {
+    if (!window.confirm('Reopen this request (unassign tutor)?')) return;
+    try {
+      await updateDoc(doc(db, 'tuition_requests', req.id), {
+        orbit_status: 'Open',
+        assignedTutorId: deleteField(),
+        assignedTutorName: deleteField(),
+        status: deleteField(),
+        tuitionAgreementDueAt: deleteField(),
+        tuitionAgreementAccepted: false,
+        updatedAt: serverTimestamp(),
+      });
+      toast.success('Request reopened');
+    } catch {
+      toast.error('Failed to reopen request');
     }
   };
 
@@ -478,7 +499,23 @@ export function TuitionManagement() {
                         <span className="font-semibold text-[#C4A672]">Budget: {req.budget}</span>
                       </p>
                     )}
+                    {(req.orbit_status || 'Open') !== 'Open' && (
+                      <p className="text-xs text-gray-600">
+                        Status: {req.orbit_status}
+                        {req.assignedTutorName ? ` · ${req.assignedTutorName}` : ''}
+                      </p>
+                    )}
                   </div>
+                  {req.orbit_status === 'Assigned' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full mt-3 text-xs"
+                      onClick={() => void handleReopenRequest(req)}
+                    >
+                      Reopen / unassign tutor
+                    </Button>
+                  )}
                 </Card>
               ))}
           </div>

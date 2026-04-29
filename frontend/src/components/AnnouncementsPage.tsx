@@ -24,6 +24,8 @@ interface Announcement {
 interface AnnouncementsPageProps {
   isAdmin?: boolean; // Deprecated, use context
   onBack?: () => void;
+  /** Render inside admin dashboard outlet: compact chrome, no public “back to home”. */
+  embeddedInAdmin?: boolean;
 }
 
 const DEFAULT_ANNOUNCEMENTS = [
@@ -53,7 +55,7 @@ const DEFAULT_ANNOUNCEMENTS = [
   }
 ];
 
-export function AnnouncementsPage({ onBack }: AnnouncementsPageProps) {
+export function AnnouncementsPage({ onBack, embeddedInAdmin }: AnnouncementsPageProps) {
   const { isAdmin } = useUserRole();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -171,11 +173,23 @@ export function AnnouncementsPage({ onBack }: AnnouncementsPageProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white pb-20 md:pb-0">
+    <div
+      className={
+        embeddedInAdmin
+          ? 'min-h-0'
+          : 'min-h-screen bg-gradient-to-b from-gray-50 to-white pb-20 md:pb-0'
+      }
+    >
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white py-12 shadow-card">
+      <div
+        className={
+          embeddedInAdmin
+            ? 'rounded-xl border border-gray-200 bg-gradient-to-r from-[#2C3E50] to-[#34495e] text-white py-6 shadow-sm mb-6'
+            : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white py-12 shadow-card'
+        }
+      >
         <div className="max-w-7xl mx-auto px-4">
-          {onBack && (
+          {onBack && !embeddedInAdmin && (
             <Button
               variant="ghost"
               onClick={onBack}
@@ -185,16 +199,26 @@ export function AnnouncementsPage({ onBack }: AnnouncementsPageProps) {
               Back to Home
             </Button>
           )}
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
             <div>
-              <h1 className="text-4xl mb-2">📢 Announcements</h1>
-              <p className="text-white/90">Stay updated with the latest news and offers from Book Bloom</p>
+              <h1 className={embeddedInAdmin ? 'text-2xl mb-1' : 'text-4xl mb-2'}>
+                📢 Announcements
+              </h1>
+              <p className="text-white/90 text-sm sm:text-base">
+                {embeddedInAdmin
+                  ? 'Create, edit, publish, or remove platform announcements.'
+                  : 'Stay updated with the latest news and offers from Book Bloom'}
+              </p>
             </div>
             {isAdmin && (
               <Button
                 onClick={handleCreate}
-                size="lg"
-                className="bg-white text-blue-600 hover:bg-gray-100 transition-smooth btn-scale shadow-subtle"
+                size={embeddedInAdmin ? 'default' : 'lg'}
+                className={
+                  embeddedInAdmin
+                    ? 'shrink-0 bg-[#C4A672] text-white hover:bg-[#8B7355] shadow-sm'
+                    : 'bg-white text-blue-600 hover:bg-gray-100 transition-smooth btn-scale shadow-subtle'
+                }
               >
                 <Plus className="w-5 h-5 mr-2" />
                 Create Announcement
@@ -204,7 +228,7 @@ export function AnnouncementsPage({ onBack }: AnnouncementsPageProps) {
 
           {/* Enhanced Search & Filter */}
           <div className="flex gap-4 flex-wrap">
-            <div className="relative flex-1 min-w-[300px]">
+            <div className="relative flex-1 min-w-[200px] sm:min-w-[300px]">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <Input
                 type="text"

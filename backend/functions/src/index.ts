@@ -12,8 +12,16 @@ export * from "./verification/certificates";
 export * from "./verification/profiles";
 export * from "./verification/skillTest";
 export * from "./verification/reviews";
+export * from "./verification/bookCondition";
+export * from "./verification/studentVerification";
 export * from "./notifications";
 export * from "./tuitionMatching";
+export {
+  proposeTuitionAgreement,
+  acceptTuitionAgreement,
+  expireTuitionAgreementsSchedule,
+  onTuitionRequestAssignedAgreementTimer,
+} from "./tuitionAgreement";
 export * from "./chat";
 export * from "./corsConfig";
 

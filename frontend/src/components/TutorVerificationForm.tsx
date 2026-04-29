@@ -251,22 +251,37 @@ export const TutorVerificationForm: React.FC = () => {
       setError('Please fill in Bio and Primary Subject.');
       return;
     }
+    const uid = auth.currentUser?.uid;
+    if (!uid) {
+      setError('Please sign in to continue.');
+      return;
+    }
     setLoading(true); setError(null);
     try {
-      const { setDoc, doc } = await import('firebase/firestore');
-      await setDoc(doc(db, 'tutors', auth.currentUser!.uid), {
-        userId: auth.currentUser!.uid,
+      const { setDoc, doc, getDoc } = await import('firebase/firestore');
+      const tutorRef = doc(db, 'tutors', uid);
+      const existing = await getDoc(tutorRef);
+      const prev = existing.data();
+      const alreadyVerified =
+        prev && (prev.verified === true || prev.verificationStatus === 'Verified');
+
+      const payload: Record<string, unknown> = {
+        userId: uid,
         name: auth.currentUser!.displayName || 'Anonymous',
         avatar: auth.currentUser!.photoURL || '',
         bio: profileData.bio,
         subject: profileData.subject,
         hourlyRate: parseFloat(profileData.hourlyRate || '0'),
         specialization: profileData.specialization,
-        verificationStatus: 'Pending',
-        verified: false,
-        createdAt: new Date()
-      }, { merge: true });
-      
+        createdAt: new Date(),
+      };
+      if (!alreadyVerified) {
+        payload.verificationStatus = 'Pending';
+        payload.verified = false;
+      }
+
+      await setDoc(tutorRef, payload, { merge: true });
+
       setCurrentStep(1); // Move to Integrity Checksum
     } catch (err: any) {
       setError(err.message || 'Profile initialization failed.');

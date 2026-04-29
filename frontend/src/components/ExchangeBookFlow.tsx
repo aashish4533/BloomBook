@@ -7,10 +7,13 @@ import { LocationStep } from './SellBook/LocationStep';
 import { ReviewStep } from './SellBook/ReviewStep';
 import { SuccessStep } from './SellBook/SuccessStep';
 import { X, Plus, ArrowLeft } from 'lucide-react';
-import { db, auth, storage } from '../firebase';
+import { db, auth, storage, functions } from '../firebase';
 import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { httpsCallable } from 'firebase/functions';
 import { toast } from 'sonner';
+import type { BookConditionVerdict, BookPhotoSlotKey } from '../utils/bookConditionPhotos';
+import { BOOK_PHOTO_SLOT_ORDER, emptyBookImageSlots } from '../utils/bookConditionPhotos';
 import { BookFormData, LocationData } from './SellBookFlow'; // Reuse types
 import { Button } from './ui/button';
 import { BookCard } from './BookCard';
@@ -38,6 +41,7 @@ function ExchangeBookWizard({ onClose }: { onClose: () => void }) {
         pages: '',
         images: [],
         imageFiles: [],
+        imageSlots: emptyBookImageSlots(),
         exchangePreferences: ''
     });
 
@@ -89,27 +93,86 @@ function ExchangeBookWizard({ onClose }: { onClose: () => void }) {
             const pages = parseInt(bookData.pages);
             const publishedYear = parseInt(bookData.publishedYear);
 
-            // 3. Upload Images to Firebase Storage
-            const imageUrls: string[] = [];
-            if (bookData.imageFiles && bookData.imageFiles.length > 0) {
-                for (const file of bookData.imageFiles) {
-                    try {
-                        const uniqueFilename = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-                        const storageRef = ref(storage, `book_images/${user.uid}/${uniqueFilename}`);
-                        
-                        await uploadBytes(storageRef, file);
-                        const downloadURL = await getDownloadURL(storageRef);
-                        imageUrls.push(downloadURL);
-                    } catch (uploadErr) {
-                        console.error("Error uploading file:", file.name, uploadErr);
-                        toast.error(`Failed to upload ${file.name}`);
-                    }
+            const slots = bookData.imageSlots ?? emptyBookImageSlots();
+            for (const slot of BOOK_PHOTO_SLOT_ORDER) {
+                if (!slots[slot]) {
+                    throw new Error(
+                        'Upload all 5 photos (Front, Back, First Page, Last Page, Page edges) before submitting.'
+                    );
                 }
             }
 
-            if (imageUrls.length === 0) {
-                throw new Error('Could not upload book photos. Check your connection and try again.');
+            const verifyCall = httpsCallable<
+                { images: Record<BookPhotoSlotKey, string> },
+                BookConditionVerdict
+            >(functions, 'verifyBookCondition', { timeout: 90000 });
+
+            const slotUrls: Record<BookPhotoSlotKey, string> = {
+                front: '',
+                back: '',
+                firstPage: '',
+                lastPage: '',
+                pageEdges: '',
+            };
+            const draftId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+            for (const slot of BOOK_PHOTO_SLOT_ORDER) {
+                const file = slots[slot]!;
+                try {
+                    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const fileName = `${draftId}_${slot}.${ext || 'jpg'}`;
+                    const storageRef = ref(storage, `book_images/${user.uid}/${fileName}`);
+                    await uploadBytes(storageRef, file);
+                    slotUrls[slot] = await getDownloadURL(storageRef);
+                } catch (uploadErr) {
+                    console.error('Error uploading file:', file.name, uploadErr);
+                    throw new Error(`Failed to upload ${slot}. Check your connection and try again.`);
+                }
             }
+
+            let verdict: BookConditionVerdict | null = null;
+            const verifyToast = toast.loading('Verifying book photos with AI…');
+            try {
+                const res = await verifyCall({ images: slotUrls });
+                verdict = res.data;
+                toast.dismiss(verifyToast);
+            } catch (err: unknown) {
+                toast.dismiss(verifyToast);
+                const code = String((err as { code?: string })?.code ?? '');
+                if (code.includes('unauthenticated')) {
+                    throw new Error('Please sign in again to verify book condition.');
+                }
+                console.warn('[verifyBookCondition] failed, listing as pending:', err);
+                toast.warning('Condition check unavailable. Listing saved for admin review.');
+            }
+
+            if (verdict && (!verdict.isBook || !verdict.allSlotsMatch)) {
+                throw new Error(
+                    verdict.isBook
+                        ? `Photos do not match required slots (including page edges). ${verdict.reason || ''}`.trim()
+                        : `Photos do not look like a book. ${verdict.reason || ''}`.trim()
+                );
+            }
+
+            if (verdict && verdict.edgePhotoValid === false) {
+                throw new Error(
+                    `The page-edges photo must show the closed book’s paper block (top or bottom). ${verdict.reason || ''}`.trim()
+                );
+            }
+
+            const sellerCondition = bookData.condition;
+            const aiCondition = verdict?.condition ?? '';
+            const conditionMismatch = Boolean(verdict && aiCondition && aiCondition !== sellerCondition);
+            const lowConfidence = Boolean(verdict && verdict.confidence < 0.6);
+            const libraryReview = Boolean(
+                verdict &&
+                    (verdict.needsManualReview ||
+                        verdict.libraryRisk === 'medium' ||
+                        verdict.libraryRisk === 'high')
+            );
+            const needsReview = !verdict || lowConfidence || conditionMismatch || libraryReview;
+
+            const imageUrls = BOOK_PHOTO_SLOT_ORDER.map((s) => slotUrls[s]);
 
             const listingData = {
                 ...bookData,
@@ -126,15 +189,28 @@ function ExchangeBookWizard({ onClose }: { onClose: () => void }) {
                     avatar: user.photoURL || ''
                 },
                 images: imageUrls,
+                imageSlots: slotUrls,
+                conditionVerified: Boolean(verdict && !needsReview),
+                conditionAI: verdict?.condition ?? null,
+                conditionConfidence: verdict?.confidence ?? null,
+                damageFlags: verdict?.damageFlags ?? [],
+                conditionReason: verdict?.reason ?? null,
+                conditionMismatch,
+                edgePhotoValid: verdict?.edgePhotoValid ?? null,
+                libraryRisk: verdict?.libraryRisk ?? null,
+                librarySignals: verdict?.librarySignals ?? [],
+                libraryReviewFlag: libraryReview,
+                aiVerdictAt: serverTimestamp(),
                 type: 'exchange', // Explicitly 'exchange'
                 availableFor: ['exchange'],
-                status: 'active',
+                status: needsReview ? 'pending' : 'active',
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp()
             };
 
             // Remove imageFiles from listingData before saving to Firestore
             delete (listingData as any).imageFiles;
+            delete (listingData as any).imageSlots;
             delete (listingData as any).bookName;
 
             // 4. Submit to Firestore
@@ -238,6 +314,8 @@ function ExchangeBookWizard({ onClose }: { onClose: () => void }) {
                                     language: 'English',
                                     pages: '',
                                     images: [],
+                                    imageFiles: [],
+                                    imageSlots: emptyBookImageSlots(),
                                     exchangePreferences: ''
                                 });
                                 setLocationData({

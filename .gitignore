@@ -12,6 +12,7 @@ credentials.json
 *.log
 npm-debug.log*
 .secret.local
-
+.cursor/
+.agents/
 
 

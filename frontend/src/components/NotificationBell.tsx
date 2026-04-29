@@ -1,49 +1,21 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Bell, X, Trash2, Settings, Eye } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { db, auth } from '../firebase';
-import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, deleteDoc, writeBatch, Timestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { toast } from 'sonner';
-
-interface Notification {
-  id: string;
-  type: 'order' | 'message' | 'community' | 'system' | 'community_approved' | 'community_rejected' | string;
-  title: string;
-  message: string;
-  timestamp: any;
-  read: boolean;
-  icon?: string;
-  chatId?: string;
-  exchangeId?: string;
-  negotiationId?: string;
-  rentalId?: string;
-  purchaseId?: string;
-  bookId?: string;
-  communityId?: string;
-  postId?: string;
-}
-
-function notificationTargetPath(n: Notification): string | null {
-  if (n.chatId) return `/chat/${n.chatId}`;
-  if (n.exchangeId) return '/dashboard/exchanges';
-  if (n.negotiationId) return '/dashboard/negotiations';
-  if (n.rentalId) return `/rental/${n.rentalId}/handover`;
-  if (n.bookId) return `/book/${n.bookId}`;
-  if (n.purchaseId) return '/dashboard/purchases';
-  if (n.communityId) {
-    return n.postId
-      ? `/communities/${n.communityId}?post=${encodeURIComponent(n.postId)}`
-      : `/communities/${n.communityId}`;
-  }
-  return null;
-}
+import type { AppNotification } from '../utils/notificationsUi';
+import {
+  notificationTargetPath,
+  formatNotificationTimestamp,
+} from '../utils/notificationsUi';
 
 export function NotificationBell() {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const user = auth.currentUser;
 
@@ -60,10 +32,11 @@ export function NotificationBell() {
       const data = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      })) as Notification[];
+      })) as AppNotification[];
       setNotifications(data);
     }, (error) => {
       console.error("Error fetching notifications:", error);
+      toast.error('Could not load notifications. Check your connection or Firestore index.');
     });
 
     return () => unsubscribe();
@@ -81,26 +54,6 @@ export function NotificationBell() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  const formatTimestamp = (timestamp: any) => {
-    if (timestamp == null) return '';
-
-    const date =
-      timestamp instanceof Timestamp
-        ? timestamp.toDate()
-        : typeof timestamp?.toDate === 'function'
-          ? timestamp.toDate()
-          : new Date(timestamp);
-    if (Number.isNaN(date.getTime())) return '';
-    const now = new Date();
-    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-    if (diffInSeconds < 60) return 'Just now';
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
-    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
-    return date.toLocaleDateString();
-  };
 
   const markAsRead = async (id: string) => {
     try {
@@ -130,7 +83,7 @@ export function NotificationBell() {
     }
   };
 
-  const handleNotificationNavigate = async (notification: Notification) => {
+  const handleNotificationNavigate = async (notification: AppNotification) => {
     const path = notificationTargetPath(notification);
     if (notification.read !== true) {
       await markAsRead(notification.id);
@@ -166,31 +119,16 @@ export function NotificationBell() {
     }
   };
 
-  const getNotificationColor = (type: string) => {
-    switch (type) {
-      case 'order':
-        return 'bg-green-100 text-green-600';
-      case 'message':
-        return 'bg-blue-100 text-blue-600';
-      case 'community':
-        return 'bg-purple-100 text-purple-600';
-      case 'system':
-        return 'bg-orange-100 text-orange-600';
-      case 'community_approved':
-        return 'bg-green-100 text-green-600';
-      case 'community_rejected':
-        return 'bg-red-100 text-red-600';
-      default:
-        return 'bg-gray-100 text-gray-600';
-    }
-  };
-
   return (
     <div className="relative" ref={dropdownRef}>
       {/* Bell Button */}
       <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
         className="relative p-2 text-[#2C3E50] hover:bg-gray-100 rounded-lg transition-colors"
+        aria-expanded={isOpen}
+        aria-haspopup="true"
+        aria-label="Notifications"
       >
         <Bell className="w-6 h-6" />
         {unreadCount > 0 && (
@@ -202,11 +140,11 @@ export function NotificationBell() {
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute z-50 left-2 right-2 sm:left-auto sm:right-0 mt-2 w-auto sm:w-96 max-h-[min(32rem,75dvh)] flex flex-col min-h-0 overflow-hidden bg-white rounded-lg shadow-xl border border-gray-200 animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="absolute z-50 right-0 mt-2 w-[min(24rem,calc(100vw-1.5rem))] max-h-[min(32rem,75dvh)] flex flex-col min-h-0 overflow-hidden bg-white rounded-lg shadow-xl border border-gray-200 animate-in fade-in slide-in-from-top-2 duration-200">
           {/* Header */}
           <div className="shrink-0 flex items-center justify-between p-4 border-b border-gray-200">
             <div className="flex items-center gap-2">
-              <h3 className="text-[#2C3E50]">Notifications</h3>
+              <h3 className="text-[#2C3E50] font-semibold">Notifications</h3>
               {unreadCount > 0 && (
                 <Badge variant="default" className="bg-red-500">
                   {unreadCount} new
@@ -216,6 +154,7 @@ export function NotificationBell() {
             <div className="flex items-center gap-2">
               {unreadCount > 0 && (
                 <button
+                  type="button"
                   onClick={markAllAsRead}
                   className="text-xs text-[#C4A672] hover:underline"
                 >
@@ -223,8 +162,10 @@ export function NotificationBell() {
                 </button>
               )}
               <button
+                type="button"
                 onClick={() => setIsOpen(false)}
                 className="text-gray-400 hover:text-gray-600"
+                aria-label="Close notifications"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -270,7 +211,7 @@ export function NotificationBell() {
                             {messageText || '—'}
                           </p>
                           <div className="flex items-center justify-between">
-                            <p className="text-xs text-gray-500">{formatTimestamp(notification.timestamp)}</p>
+                            <p className="text-xs text-gray-500">{formatNotificationTimestamp(notification.timestamp)}</p>
                             <div className="flex items-center gap-1">
                               {isUnread && (
                                 <button
@@ -307,7 +248,7 @@ export function NotificationBell() {
               </div>
 
               {/* Footer */}
-              <div className="shrink-0 p-3 border-t border-gray-200 flex items-center justify-between">
+              <div className="shrink-0 p-3 border-t border-gray-200 flex items-center justify-between gap-2 flex-wrap">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -317,13 +258,11 @@ export function NotificationBell() {
                   <Trash2 className="w-4 h-4 mr-2" />
                   Clear All
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-[#C4A672] hover:text-[#8B7355]"
-                >
-                  <Settings className="w-4 h-4 mr-2" />
-                  Settings
+                <Button variant="ghost" size="sm" asChild className="text-[#C4A672] hover:text-[#8B7355]">
+                  <Link to="/dashboard/notifications" onClick={() => setIsOpen(false)}>
+                    <Settings className="w-4 h-4 mr-2" />
+                    View all
+                  </Link>
                 </Button>
               </div>
             </>
@@ -331,7 +270,12 @@ export function NotificationBell() {
             <div className="p-12 text-center">
               <Bell className="w-16 h-16 mx-auto mb-4 text-gray-300" />
               <p className="text-gray-500 mb-2">No notifications</p>
-              <p className="text-sm text-gray-400">You're all caught up!</p>
+              <p className="text-sm text-gray-400 mb-4">You&apos;re all caught up!</p>
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/dashboard/notifications" onClick={() => setIsOpen(false)}>
+                  Open notifications page
+                </Link>
+              </Button>
             </div>
           )}
         </div>

@@ -1,5 +1,5 @@
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 
 /** In-app Firestore notification for the recipient when someone sends a 1:1 chat message. */
 export function notifyChatRecipient(params: {
@@ -10,10 +10,13 @@ export function notifyChatRecipient(params: {
 }): void {
   const { recipientUserId, senderLabel, preview, chatId } = params;
   if (!recipientUserId) return;
+  const sourceUid = auth.currentUser?.uid;
+  if (!sourceUid) return;
   const safePreview =
     preview.length > 500 ? `${preview.slice(0, 497)}…` : preview;
   void addDoc(collection(db, 'notifications'), {
     userId: recipientUserId,
+    sourceUid,
     type: 'message',
     title: `Message from ${senderLabel || 'Someone'}`,
     message: safePreview,
@@ -32,9 +35,12 @@ export function notifyExchangeParty(params: {
 }): void {
   const { recipientUserId, title, message, exchangeId } = params;
   if (!recipientUserId) return;
+  const sourceUid = auth.currentUser?.uid;
+  if (!sourceUid) return;
   const safeMsg = message.length > 500 ? `${message.slice(0, 497)}…` : message;
   void addDoc(collection(db, 'notifications'), {
     userId: recipientUserId,
+    sourceUid,
     type: 'system',
     title,
     message: safeMsg,
@@ -90,8 +96,11 @@ export function notifyCommunityAdminJoinRequest(params: {
 }): void {
   const { adminUserId, communityId, communityName, requesterName } = params;
   if (!adminUserId) return;
+  const sourceUid = auth.currentUser?.uid;
+  if (!sourceUid) return;
   void addDoc(collection(db, 'notifications'), {
     userId: adminUserId,
+    sourceUid,
     type: 'community',
     title: 'New join request',
     message: `${requesterName} asked to join "${communityName}". Open the community to approve or decline.`,

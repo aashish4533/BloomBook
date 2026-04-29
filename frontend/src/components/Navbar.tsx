@@ -1,11 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
-import { Home, ShoppingBag, Calendar, DollarSign, User, LogIn, UserPlus, LogOut, ChevronDown, UserCircle2, History, Heart, Settings, Users, Search, ArrowLeftRight, BookOpen, Sprout, Menu, Info, Phone, FileText, HelpCircle, Shield, ChevronRight, GraduationCap, Bot, X, PanelLeft } from 'lucide-react';
+import { Home, ShoppingBag, Calendar, DollarSign, User, LogIn, UserPlus, LogOut, ChevronDown, UserCircle2, History, Heart, Settings, Users, Search, ArrowLeftRight, Menu, Info, Phone, FileText, HelpCircle, Shield, ChevronRight, GraduationCap, Bot, X, PanelLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import { NotificationBell } from './NotificationBell';
 import { Link, useLocation } from 'react-router-dom';
 import { auth } from '../firebase';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose, SheetDescription } from './ui/sheet';
-
 interface NavbarProps {
   isLoggedIn: boolean;
   onLogout: () => void;
@@ -80,9 +78,9 @@ export function Navbar({
     <>
       <nav className="sticky top-0 w-full bg-[#C4A672] shadow-lg z-50 relative pt-[env(safe-area-inset-top)]" ref={menuRef}>
         <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6">
-          <div className="flex items-center justify-between gap-2 py-3 sm:py-4 w-full min-w-0 min-h-[52px] lg:grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-center lg:justify-between">
+          <div className="relative flex items-center justify-between gap-2 py-3 sm:py-4 w-full min-w-0 min-h-[52px]">
             {/* LEFT: App sidebar + Hamburger + Logo */}
-            <div className="flex items-center gap-1 sm:gap-3 min-w-0 shrink-0 justify-self-start">
+            <div className="flex flex-1 min-w-0 items-center gap-1 sm:gap-3 z-10">
               {onOpenAppMenu && (
                 <button
                   type="button"
@@ -103,38 +101,42 @@ export function Navbar({
               </button>
 
               <Link to="/" onClick={() => setIsMenuOpen(false)} className="flex items-center gap-2 group min-w-0">
-                <div className="relative w-9 h-9 sm:w-10 sm:h-10 shrink-0 flex items-center justify-center bg-[#2C3E50] rounded-lg group-hover:bg-[#1a252f] transition-colors">
-                  <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-                  <Sprout className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#C4A672] absolute -top-1 -right-1 animate-bounce-slow" />
-                </div>
-                <span className="text-[#2C3E50] text-base sm:text-lg md:text-xl font-bold tracking-tight truncate">BookBloom</span>
+                <img
+                  src="/brand/navbar-golden.png"
+                  alt="BookBloom"
+                  className="h-9 sm:h-10 w-auto max-w-[min(220px,42vw)] object-contain object-left shrink-0"
+                  width={220}
+                  height={40}
+                />
               </Link>
             </div>
 
-            {/* CENTER: Desktop nav icons (middle column — avoids z-index blocking clicks) */}
-            <div className="hidden lg:flex items-center justify-center gap-0.5 xl:gap-1 justify-self-center min-w-0">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const active = isActive(item.path);
-                return (
-                  <Link
-                    key={item.id}
-                    to={item.path}
-                    title={item.label}
-                    className={`flex items-center justify-center p-2 rounded-lg transition-all duration-200 ${active
-                      ? 'bg-[#2C3E50] text-white shadow-sm'
-                      : 'text-[#2C3E50] hover:bg-[#8B7355] hover:text-white'
-                      }`}
-                  >
-                    <Icon className={`w-5 h-5 shrink-0 ${active ? 'stroke-[2.5px]' : ''}`} />
-                    <span className="sr-only">{item.label}</span>
-                  </Link>
-                );
-              })}
+            {/* CENTER: Desktop nav icons — absolutely centered in the bar */}
+            <div className="hidden lg:pointer-events-none lg:absolute lg:left-1/2 lg:top-1/2 lg:z-[5] lg:flex lg:-translate-x-1/2 lg:-translate-y-1/2 lg:items-center">
+              <div className="pointer-events-auto flex items-center gap-4">
+                {navItems.map((item) => {
+                  const Icon = item.icon;
+                  const active = isActive(item.path);
+                  return (
+                    <Link
+                      key={item.id}
+                      to={item.path}
+                      title={item.label}
+                      className={`flex items-center justify-center p-2 rounded-lg transition-all duration-200 ${active
+                        ? 'bg-[#2C3E50] text-white shadow-sm'
+                        : 'text-[#2C3E50] hover:bg-[#8B7355] hover:text-white'
+                        }`}
+                    >
+                      <Icon className={`w-5 h-5 shrink-0 ${active ? 'stroke-[2.5px]' : ''}`} />
+                      <span className="sr-only">{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
 
             {/* RIGHT: Notifications, assistant shortcut, profile / auth */}
-            <div className="flex items-center gap-1 sm:gap-2 md:gap-3 shrink-0 ml-auto justify-self-end">
+            <div className="flex flex-1 min-w-0 items-center justify-end gap-1 sm:gap-2 md:gap-3 z-10">
                 {isLoggedIn ? (
                   <>
                     <NotificationBell />

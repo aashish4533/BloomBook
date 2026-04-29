@@ -26,6 +26,9 @@ module.exports = {
         "import",
     ],
     rules: {
+        // Project uses selective comments; full @param/@returns on every helper is not enforced.
+        "require-jsdoc": "off",
+        "valid-jsdoc": "off",
         "quotes": "off",
         "import/no-unresolved": 0,
         "indent": "off",

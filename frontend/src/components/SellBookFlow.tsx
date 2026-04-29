@@ -5,10 +5,13 @@ import { LocationStep } from './SellBook/LocationStep';
 import { ReviewStep } from './SellBook/ReviewStep';
 import { SuccessStep } from './SellBook/SuccessStep';
 import { X, Plus, ArrowLeft } from 'lucide-react';
-import { db, auth, storage } from '../firebase';
+import { db, auth, storage, functions } from '../firebase';
 import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { httpsCallable } from 'firebase/functions';
 import { toast } from 'sonner';
+import type { BookConditionVerdict, BookPhotoSlotKey } from '../utils/bookConditionPhotos';
+import { BOOK_PHOTO_SLOT_ORDER, emptyBookImageSlots } from '../utils/bookConditionPhotos';
 import { Button } from './ui/button';
 import { BookCard } from './BookCard';
 import { Book } from './BookMarketplace';
@@ -26,7 +29,9 @@ export interface BookFormData {
   language: string;
   pages: string;
   images: string[];
+  /** @deprecated Legacy multi-file upload; use imageSlots */
   imageFiles?: File[];
+  imageSlots?: import('../utils/bookConditionPhotos').BookImageSlots;
   exchangePreferences?: string;
 }
 
@@ -65,6 +70,7 @@ function SellBookWizard({ onClose }: { onClose: () => void }) {
     pages: '',
     images: [],
     imageFiles: [],
+    imageSlots: emptyBookImageSlots(),
   });
 
   const [locationData, setLocationData] = useState<LocationData>({
@@ -125,43 +131,89 @@ function SellBookWizard({ onClose }: { onClose: () => void }) {
       const pages = parseInt(bookData.pages);
       const publishedYear = parseInt(bookData.publishedYear);
 
-      if (!bookData.imageFiles?.length) {
-        throw new Error('Add at least one book photo before submitting.');
-      }
-
-      // 3. Upload Images to Firebase Storage
-      const imageUrls: string[] = [];
-      if (bookData.imageFiles.length > 0) {
-        for (const file of bookData.imageFiles) {
-          try {
-            const uniqueFilename = `${Date.now()}_${file.name}`;
-            const storageRef = ref(storage, `book_images/${user.uid}/${uniqueFilename}`);
-            
-            const uploadTask = uploadBytesResumable(storageRef, file);
-
-            // Wait for upload completion to get the URL
-            const downloadURL = await new Promise<string>((resolve, reject) => {
-              uploadTask.on('state_changed', 
-                null, 
-                (error) => reject(error), 
-                async () => {
-                  const url = await getDownloadURL(uploadTask.snapshot.ref);
-                  resolve(url);
-                }
-              );
-            });
-
-            imageUrls.push(downloadURL);
-          } catch (uploadErr) {
-            console.error("Error uploading file:", file.name, uploadErr);
-            toast.error(`Failed to upload ${file.name}`);
-          }
+      const slots = bookData.imageSlots ?? emptyBookImageSlots();
+      for (const slot of BOOK_PHOTO_SLOT_ORDER) {
+        if (!slots[slot]) {
+          throw new Error(
+            'Upload all 5 photos (Front, Back, First Page, Last Page, Page edges) before submitting.'
+          );
         }
       }
 
-      if (imageUrls.length === 0) {
-        throw new Error('Could not upload book photos. Check your connection and try again.');
+      const verifyCall = httpsCallable<
+        { images: Record<BookPhotoSlotKey, string> },
+        BookConditionVerdict
+      >(functions, 'verifyBookCondition', { timeout: 90000 });
+
+      const slotUrls: Record<BookPhotoSlotKey, string> = {
+        front: '',
+        back: '',
+        firstPage: '',
+        lastPage: '',
+        pageEdges: '',
+      };
+      const draftId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+      for (const slot of BOOK_PHOTO_SLOT_ORDER) {
+        const file = slots[slot]!;
+        try {
+          const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const fileName = `${draftId}_${slot}.${ext || 'jpg'}`;
+          const storageRef = ref(storage, `book_images/${user.uid}/${fileName}`);
+          const uploadTask = uploadBytesResumable(storageRef, file);
+          await new Promise<void>((resolve, reject) => {
+            uploadTask.on('state_changed', null, reject, () => resolve());
+          });
+          slotUrls[slot] = await getDownloadURL(uploadTask.snapshot.ref);
+        } catch (uploadErr) {
+          console.error('Error uploading file:', file.name, uploadErr);
+          throw new Error(`Failed to upload ${slot}. Check your connection and try again.`);
+        }
       }
+
+      let verdict: BookConditionVerdict | null = null;
+      const verifyToast = toast.loading('Verifying book photos with AI…');
+      try {
+        const res = await verifyCall({ images: slotUrls });
+        verdict = res.data;
+        toast.dismiss(verifyToast);
+      } catch (err: unknown) {
+        toast.dismiss(verifyToast);
+        const code = String((err as { code?: string })?.code ?? '');
+        if (code.includes('unauthenticated')) {
+          throw new Error('Please sign in again to verify book condition.');
+        }
+        console.warn('[verifyBookCondition] failed, listing as pending:', err);
+        toast.warning('Condition check unavailable. Listing saved for admin review.');
+      }
+
+      if (verdict && (!verdict.isBook || !verdict.allSlotsMatch)) {
+        throw new Error(
+          verdict.isBook
+            ? `Photos do not match required slots (including page edges of the closed book). ${verdict.reason || ''}`.trim()
+            : `Photos do not look like a book. ${verdict.reason || ''}`.trim()
+        );
+      }
+
+      if (verdict && verdict.edgePhotoValid === false) {
+        throw new Error(
+          `The page-edges photo must show the closed book’s paper block (top or bottom edges), not the cover or spine only. ${verdict.reason || ''}`.trim()
+        );
+      }
+
+      const sellerCondition = bookData.condition;
+      const aiCondition = verdict?.condition ?? '';
+      const conditionMismatch = Boolean(verdict && aiCondition && aiCondition !== sellerCondition);
+      const lowConfidence = Boolean(verdict && verdict.confidence < 0.6);
+      const libraryReview = Boolean(
+        verdict &&
+          (verdict.needsManualReview ||
+            verdict.libraryRisk === 'medium' ||
+            verdict.libraryRisk === 'high')
+      );
+      const needsReview = !verdict || lowConfidence || conditionMismatch || libraryReview;
+
+      const imageUrls = BOOK_PHOTO_SLOT_ORDER.map((s) => slotUrls[s]);
 
       const listingData = {
         ...bookData,
@@ -179,14 +231,27 @@ function SellBookWizard({ onClose }: { onClose: () => void }) {
           avatar: user.photoURL || ''
         },
         images: imageUrls,
+        imageSlots: slotUrls,
+        conditionVerified: Boolean(verdict && !needsReview),
+        conditionAI: verdict?.condition ?? null,
+        conditionConfidence: verdict?.confidence ?? null,
+        damageFlags: verdict?.damageFlags ?? [],
+        conditionReason: verdict?.reason ?? null,
+        conditionMismatch,
+        edgePhotoValid: verdict?.edgePhotoValid ?? null,
+        libraryRisk: verdict?.libraryRisk ?? null,
+        librarySignals: verdict?.librarySignals ?? [],
+        libraryReviewFlag: libraryReview,
+        aiVerdictAt: serverTimestamp(),
         type: 'sell',
         availableFor: ['sale'], // Explicit availableFor
-        status: 'active',
+        status: needsReview ? 'pending' : 'active',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
 
       delete (listingData as any).imageFiles;
+      delete (listingData as any).imageSlots;
       delete (listingData as any).bookName; // Cleanup
 
       await addDoc(collection(db, 'books'), listingData);
@@ -290,6 +355,7 @@ function SellBookWizard({ onClose }: { onClose: () => void }) {
                   pages: '',
                   images: [],
                   imageFiles: [],
+                  imageSlots: emptyBookImageSlots(),
                 });
                 setLocationData({
                   method: 'pickup',

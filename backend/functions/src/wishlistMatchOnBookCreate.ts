@@ -2,6 +2,7 @@ import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import * as logger from "firebase-functions/logger";
 import { getFirestore, FieldValue, DocumentData, QueryDocumentSnapshot } from "firebase-admin/firestore";
 
+/** Normalizes title and author for wishlist key comparison. */
 function normalizeMatchKey(title: unknown, author: unknown): string {
   const norm = (s: unknown) =>
     String(s || "")
@@ -12,11 +13,13 @@ function normalizeMatchKey(title: unknown, author: unknown): string {
   return `${norm(title)}|${norm(author)}`;
 }
 
+/** Returns a normalized ISBN string or empty if too short. */
 function normalizeIsbn(isbn: unknown): string {
   const s = String(isbn || "").replace(/[\s-]/g, "").toLowerCase();
   return s.length >= 10 ? s : "";
 }
 
+/** True if a new book document should trigger wishlist match notifications. */
 function shouldNotifyNewListing(data: DocumentData): boolean {
   if (data.isSold === true) return false;
   if (data.listingStatus === "sold" || data.listingStatus === "reserved") return false;
@@ -24,6 +27,7 @@ function shouldNotifyNewListing(data: DocumentData): boolean {
   return true;
 }
 
+/** Derives wishlist mode labels (buy/rent/exchange) from listing fields. */
 function listingModeLabels(data: DocumentData): string[] {
   const af = data.availableFor as string[] | undefined;
   const modes: string[] = [];
@@ -39,6 +43,7 @@ function listingModeLabels(data: DocumentData): string[] {
   return [];
 }
 
+/** Human-readable phrase for notification body from mode list. */
 function formatModesForMessage(modes: string[]): string {
   if (modes.length === 0) return "the marketplace";
   if (modes.length === 1) {

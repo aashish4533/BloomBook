@@ -6,7 +6,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Slider } from '../ui/slider';
 import { Search, SlidersHorizontal, X, MapPin, Calendar, Image as ImageIcon } from 'lucide-react';
 import { Badge } from '../ui/badge';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  type QueryDocumentSnapshot,
+  type DocumentData,
+} from 'firebase/firestore';
 import { db } from '../../firebase';
 
 interface RentalBrowseProps {
@@ -46,13 +53,27 @@ export function RentalBrowse({ onSelectBook, onClose }: RentalBrowseProps) {
   useEffect(() => {
     const fetchBooks = async () => {
       try {
-        const q = query(
-          collection(db, 'books'),
-          where('availableFor', 'array-contains', 'rent'),
-          where('status', '==', 'active')
-        );
-        const querySnapshot = await getDocs(q);
-        const fetchedBooks: BrowseBookRow[] = querySnapshot.docs.map(doc => {
+        const qRent = query(collection(db, 'books'), where('availableFor', 'array-contains', 'rent'));
+        const qType = query(collection(db, 'books'), where('type', '==', 'rent'));
+        const [snapRent, snapType] = await Promise.all([getDocs(qRent), getDocs(qType)]);
+        const byId = new Map<string, QueryDocumentSnapshot<DocumentData>>();
+        snapRent.docs.forEach((d) => byId.set(d.id, d));
+        snapType.docs.forEach((d) => {
+          if (!byId.has(d.id)) byId.set(d.id, d);
+        });
+
+        const fetchedBooks: BrowseBookRow[] = Array.from(byId.values())
+          .filter((doc) => {
+            const data = doc.data();
+            if (data.isSold === true) return false;
+            const st = data.status || 'active';
+            if (st !== 'active') return false;
+            const forRent =
+              (Array.isArray(data.availableFor) && data.availableFor.includes('rent')) ||
+              data.type === 'rent';
+            return forRent;
+          })
+          .map((doc) => {
           const data = doc.data();
           const pricePerWeek = Number(data.pricePerWeek) || 0;
           const city = data.location?.city || '';

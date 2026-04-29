@@ -27,7 +27,11 @@ export const SkillTest: React.FC<SkillTestProps> = ({ subject, onComplete }) => 
             setQuestions(result.questions);
             setTestStarted(true);
         } catch (err: any) {
-            setError(err.message || 'Failed to start test.');
+            const raw = String(err?.message || err || 'Failed to start test.');
+            const safe = /AIza[0-9A-Za-z_-]{20,}/.test(raw)
+                ? 'Could not start the test. Please try again.'
+                : raw;
+            setError(safe);
         } finally {
             setLoading(false);
         }
@@ -44,7 +48,11 @@ export const SkillTest: React.FC<SkillTestProps> = ({ subject, onComplete }) => 
             const result: any = await apiClient.submitSkillTest({ answers });
             onComplete(result.passed, result.score);
         } catch (err: any) {
-            setError(err.message || 'Failed to submit test.');
+            const raw = String(err?.message || err || 'Failed to submit test.');
+            const safe = /AIza[0-9A-Za-z_-]{20,}/.test(raw)
+                ? 'Could not submit the test. Please try again.'
+                : raw;
+            setError(safe);
         } finally {
             setLoading(false);
         }

@@ -5,13 +5,13 @@
  * ║  and public key registration in Firestore.     ║
  * ╚════════════════════════════════════════════════╝
  *
- * Cognitive Thread: Keys are only ever generated once per browser.
- * Private keys live exclusively in IndexedDB (idb-keyval).
- * Public keys are uploaded to the Firestore `neural_vault` collection.
+ * Cognitive Thread: Keys are stored per Firebase uid so switching accounts on the
+ * same browser does not decrypt with the wrong identity. Legacy single-key storage
+ * is migrated only when its public key matches `neural_vault/{uid}`.
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { get, set } from 'idb-keyval';
+import { get, set, del } from 'idb-keyval';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import {
@@ -25,9 +25,15 @@ import {
   decryptMessage,
 } from '../services/gravitationalShield';
 
-// IndexedDB keys
-const IDB_PRIVATE_KEY = 'neural_privateKeyJwk';
-const IDB_PUBLIC_KEY  = 'neural_publicKeyB64';
+const LEGACY_IDB_PRIVATE = 'neural_privateKeyJwk';
+const LEGACY_IDB_PUBLIC = 'neural_publicKeyB64';
+
+function idbPrivateKey(uid: string) {
+  return `neural_privateKeyJwk_${uid}`;
+}
+function idbPublicKeyB64(uid: string) {
+  return `neural_publicKeyB64_${uid}`;
+}
 
 interface NeuralPrivacyState {
   initialized: boolean;
@@ -37,6 +43,12 @@ interface NeuralPrivacyState {
 
 // ─── Shared Key Cache (per-session, per-peer) ─────────────────────────────────
 const sharedKeyCache = new Map<string, CryptoKey>();
+
+/** Drop cached AES keys for a peer (e.g. after vault rotation or failed decrypt retry). */
+export function clearNeuralSharedKeyCache(peerId?: string) {
+  if (peerId) sharedKeyCache.delete(peerId);
+  else sharedKeyCache.clear();
+}
 
 export function useNeuralPrivacy(currentUserId: string) {
   const [state, setState] = useState<NeuralPrivacyState>({
@@ -49,31 +61,58 @@ export function useNeuralPrivacy(currentUserId: string) {
   useEffect(() => {
     if (!currentUserId) return;
 
+    sharedKeyCache.clear();
+
     (async () => {
       try {
         let privateKey: CryptoKey | null = null;
         let publicKeyB64: string | null = null;
 
-        const storedJwk = await get<JsonWebKey>(IDB_PRIVATE_KEY);
-        const storedPub = await get<string>(IDB_PUBLIC_KEY);
+        const idbPrivK = idbPrivateKey(currentUserId);
+        const idbPubK = idbPublicKeyB64(currentUserId);
+
+        let storedJwk = await get<JsonWebKey>(idbPrivK);
+        let storedPub = await get<string>(idbPubK);
+
+        if (!storedJwk || !storedPub) {
+          const legacyJwk = await get<JsonWebKey>(LEGACY_IDB_PRIVATE);
+          const legacyPub = await get<string>(LEGACY_IDB_PUBLIC);
+          let migrateLegacy = false;
+          if (legacyJwk && legacyPub) {
+            try {
+              const vaultSnap = await getDoc(doc(db, 'neural_vault', currentUserId));
+              const vaultPub = vaultSnap.exists() ? (vaultSnap.data().publicKey as string) : null;
+              if (vaultPub === legacyPub) {
+                migrateLegacy = true;
+              }
+            } catch {
+              /* ignore */
+            }
+          }
+          if (migrateLegacy && legacyJwk && legacyPub) {
+            storedJwk = legacyJwk;
+            storedPub = legacyPub;
+            await set(idbPrivK, storedJwk);
+            await set(idbPubK, storedPub);
+            await del(LEGACY_IDB_PRIVATE);
+            await del(LEGACY_IDB_PUBLIC);
+          }
+        }
 
         if (storedJwk && storedPub) {
-          // Restore existing identity from IndexedDB
           privateKey = await importPrivateKeyJwk(storedJwk);
           publicKeyB64 = storedPub;
         } else {
-          // Generate a brand-new Neural Identity
           const keyPair = await generateIdentityKeyPair();
           privateKey = keyPair.privateKey;
           publicKeyB64 = await exportPublicKey(keyPair.publicKey);
           const privateJwk = await exportPrivateKeyJwk(privateKey);
-
-          // Persist private key ONLY in browser IndexedDB
-          await set(IDB_PRIVATE_KEY, privateJwk);
-          await set(IDB_PUBLIC_KEY, publicKeyB64);
+          await set(idbPrivK, privateJwk);
+          await set(idbPubK, publicKeyB64);
+          await del(LEGACY_IDB_PRIVATE);
+          await del(LEGACY_IDB_PUBLIC);
         }
 
-        // Always sync public key to Firestore neural_vault (idempotent)
         await setDoc(
           doc(db, 'neural_vault', currentUserId),
           { publicKey: publicKeyB64, updatedAt: new Date().toISOString() },
@@ -133,10 +172,10 @@ export function useNeuralPrivacy(currentUserId: string) {
     [getSharedKey]
   );
 
-  // ── Decrypt a message from a specific peer ────────────────────────────────
+  // ── Decrypt using shared secret with this peer (1:1: pass the other participant’s uid) ──
   const reconstruct = useCallback(
-    async (ciphertext: string, iv: string, senderId: string): Promise<string | null> => {
-      const sharedKey = await getSharedKey(senderId);
+    async (ciphertext: string, iv: string, peerId: string): Promise<string | null> => {
+      const sharedKey = await getSharedKey(peerId);
       if (!sharedKey) return null;
       return decryptMessage(ciphertext, iv, sharedKey);
     },

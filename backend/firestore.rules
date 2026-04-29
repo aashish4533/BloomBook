@@ -42,7 +42,15 @@ service cloud.firestore {
     // --- Notifications ---
     match /notifications/{notificationId} {
       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow create: if isAuthenticated();
+      // Self-notifications OK; cross-user only if sourceUid proves the writer is the authenticated user (anti-spoof).
+      allow create: if isAuthenticated()
+        && (
+          request.resource.data.userId == request.auth.uid
+          || (
+            request.resource.data.userId != request.auth.uid
+            && request.resource.data.get('sourceUid', '') == request.auth.uid
+          )
+        );
       allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
@@ -56,8 +64,12 @@ service cloud.firestore {
     // --- Books ---
     // 1. Books: Anyone can read, only logged in users can write
     match /books/{bookId} {
-      allow read: if true; 
-      allow write: if request.auth != null;
+      allow read: if true;
+      allow create: if isAuthenticated() && (
+        request.resource.data.get('userId', '') == request.auth.uid || isAdmin()
+      );
+      allow update, delete: if isAdmin()
+        || (isAuthenticated() && resource.data.get('userId', '') == request.auth.uid);
     }
 
     // --- Communities ---
@@ -187,15 +199,15 @@ service cloud.firestore {
         && request.resource.data.requesterId == request.auth.uid
         && request.resource.data.ownerId != request.auth.uid
         && exists(/databases/$(database)/documents/books/$(request.resource.data.requestedBookId))
-        && get(/databases/$(database)/documents/books/$(request.resource.data.requestedBookId)).data.userId == request.resource.data.ownerId
+        && get(/databases/$(database)/documents/books/$(request.resource.data.requestedBookId)).data.get('userId', '') == request.resource.data.ownerId
         && exists(/databases/$(database)/documents/books/$(request.resource.data.offeredBookId))
-        && get(/databases/$(database)/documents/books/$(request.resource.data.offeredBookId)).data.userId == request.auth.uid;
+        && get(/databases/$(database)/documents/books/$(request.resource.data.offeredBookId)).data.get('userId', '') == request.auth.uid;
       allow update: if isAuthenticated() && (
         resource.data.requesterId == request.auth.uid ||
         resource.data.ownerId == request.auth.uid ||
         isAdmin()
       );
-      allow delete: if false;
+      allow delete: if isAdmin();
     }
 
     match /negotiations/{negotiationId} {
@@ -206,7 +218,10 @@ service cloud.firestore {
 
     match /transactions/{transactionId} {
       allow read: if isAuthenticated() && (resource.data.buyerId == request.auth.uid || resource.data.sellerId == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated() && (
+        request.resource.data.buyerId == request.auth.uid ||
+        request.resource.data.sellerId == request.auth.uid
+      );
       allow update: if isAdmin();
     }
 
@@ -267,9 +282,11 @@ service cloud.firestore {
       }
     }
 
-    // 3. Orders/Purchases: Users can only read their own purchase history
+    // 3. Cart / legacy orders (CartDrawer)
     match /orders/{orderId} {
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
 
     // --- Rentals ---
@@ -295,7 +312,9 @@ service cloud.firestore {
     // --- Notes (Helping Material) ---
     match /notes/{noteId} {
       allow read: if true;
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated()
+        && request.auth.token.email != null
+        && request.resource.data.get('uploadedBy', '') == request.auth.token.email;
       // Allow update/delete if user email matches uploadedBy OR if user is admin
       allow update, delete: if isAuthenticated() && (
         request.auth.token.email == resource.data.uploadedBy || 
@@ -305,7 +324,8 @@ service cloud.firestore {
       // Comments subcollection for notes
       match /comments/{commentId} {
         allow read: if true;
-        allow create: if isAuthenticated();
+        allow create: if isAuthenticated()
+          && request.resource.data.get('userId', '') == request.auth.uid;
         // Allow author to delete/edit their own comment or admin
         allow update, delete: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
       }
@@ -316,14 +336,16 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isAuthenticated()
                     && request.resource.data.requesterId == request.auth.uid;
-      allow delete: if isAuthenticated() && resource.data.requesterId == request.auth.uid;
+      allow delete: if isAuthenticated() && (resource.data.requesterId == request.auth.uid || isAdmin());
       allow update: if isAdmin();
     }
     
     // --- Wishlists ---
     match /wishlists/{wishlistId} {
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow read, update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow read, update, delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
     }
 
     // --- Verification System ---
@@ -349,13 +371,31 @@ service cloud.firestore {
         get(/databases/$(database)/documents/tutors/$(request.auth.uid)).data.verificationStatus == 'Verified';
     }
 
+    function isTuitionStudentVerified() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('studentVerificationStatus', 'unverified') == 'verified';
+    }
+
+    // Written tuition deal (proposal/accept via Cloud Functions; clients read only)
+    match /tuition_agreements/{chatId} {
+      allow read: if isAuthenticated() && (
+        resource == null ||
+        resource.data.studentId == request.auth.uid ||
+        resource.data.tutorId == request.auth.uid ||
+        isAdmin()
+      );
+      allow write: if false;
+    }
+
     // --- Tuition Requests ---
     match /tuition_requests/{requestId} {
       allow read: if true;
-      allow create: if isAuthenticated() && request.resource.data.studentId == request.auth.uid;
+      allow create: if isAuthenticated()
+                    && request.resource.data.studentId == request.auth.uid
+                    && isTuitionStudentVerified();
       // Orbital Oversight: Manual Override for Admins
       allow update: if isAdmin()
-                    || (isAuthenticated() && resource.data.studentId == request.auth.uid)
+                    || (isAuthenticated() && resource.data.studentId == request.auth.uid && isTuitionStudentVerified())
                     || (
                       isVerifiedTutor()
                       && request.resource.data.diff(resource.data).changedKeys().hasOnly([
@@ -391,9 +431,23 @@ service cloud.firestore {
       // Allow creation only as Pending
       allow create: if isAuthenticated() && (!('verificationStatus' in request.resource.data) || request.resource.data.verificationStatus == 'Pending');
       
-      // Orbital Oversight: Manual Override for Admins
-      allow update: if isAuthenticated() && (request.auth.uid == tutorId || isAdmin()) && 
-                    (!('verificationStatus' in request.resource.data) || request.resource.data.verificationStatus == resource.data.verificationStatus || isAdmin());
+      // Updates: unchanged status, admin, or tutor fixing profile while not verified (legacy docs missing verificationStatus, or Reviewing/Rejected → Pending from portal)
+      allow update: if isAuthenticated() && (request.auth.uid == tutorId || isAdmin()) && (
+        isAdmin()
+        || request.resource.data.verificationStatus == resource.data.get('verificationStatus', null)
+        || (
+          request.auth.uid == tutorId
+          && request.resource.data.verificationStatus == 'Pending'
+          && resource.data.get('verified', false) != true
+          && (
+            !('verificationStatus' in resource.data)
+            || resource.data.verificationStatus == 'Pending'
+            || resource.data.verificationStatus == 'Rejected'
+            || resource.data.verificationStatus == 'Reviewing'
+            || resource.data.verificationStatus == 'Revoked'
+          )
+        )
+      );
       allow delete: if isAdmin();
     }
 

@@ -24,6 +24,7 @@ const ADMIN_CALLABLE_OPTS = {
   invoker: "public" as const,
 };
 
+/** Resolves SMTP credentials from Firebase secrets or environment variables. */
 function resolveSmtpCreds(): { user: string; pass: string } | null {
   const fromSecretUser = adminSmtpUserSecret.value()?.trim() || "";
   const fromSecretPass = adminSmtpPassSecret.value()?.trim() || "";
@@ -37,6 +38,7 @@ function resolveSmtpCreds(): { user: string; pass: string } | null {
   return { user, pass };
 }
 
+/** Returns a Nodemailer transport when SMTP credentials are configured. */
 function getSmtpTransporter(): nodemailer.Transporter | null {
   const creds = resolveSmtpCreds();
   if (!creds) return null;
@@ -46,11 +48,13 @@ function getSmtpTransporter(): nodemailer.Transporter | null {
   });
 }
 
+/** Hashes a one-time code with a server-side pepper for storage. */
 function hashOtp(uid: string, otp: string): string {
   const pepper = process.env.ADMIN_OTP_PEPPER || "bookbloom-admin-otp-pepper";
   return crypto.createHash("sha256").update(`${pepper}|${uid}|${otp}`).digest("hex");
 }
 
+/** Throws if the user document does not have the admin role. */
 async function assertIsAdmin(uid: string): Promise<void> {
   const snap = await getFirestore().collection("users").doc(uid).get();
   if (!snap.exists || snap.data()?.role !== "admin") {
@@ -151,14 +155,18 @@ export const verifyAdminEmailOtp = onCall(ADMIN_CALLABLE_OPTS, async (request) =
     throw new HttpsError("not-found", "No code is pending. Go back and sign in again to receive a new email.");
   }
 
-  const data = snap.data()!;
+  const data = snap.data();
+  if (!data) {
+    await ref.delete();
+    throw new HttpsError("not-found", "No code is pending. Go back and sign in again to receive a new email.");
+  }
   const expiresAt = data.expiresAt as Timestamp;
   if (expiresAt.toMillis() < Date.now()) {
     await ref.delete();
     throw new HttpsError("deadline-exceeded", "That code has expired. Request a new one.");
   }
 
-  let attempts = (data.attempts as number) || 0;
+  const attempts = (data.attempts as number) || 0;
   if (attempts >= MAX_ATTEMPTS) {
     await ref.delete();
     throw new HttpsError("permission-denied", "Too many wrong attempts. Sign in again for a new code.");

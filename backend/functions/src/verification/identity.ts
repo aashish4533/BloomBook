@@ -10,6 +10,7 @@ if (!admin.apps.length) {
 
 /** Defer canvas / face-api / Vision until invocation so the Functions emulator can discover exports within its startup timeout. */
 let modelsLoaded = false;
+/** Loads face-api.js models from disk once per cold start. */
 async function loadFaceApiModels() {
   if (modelsLoaded) return;
   const [{ Canvas, Image, ImageData }, faceapi] = await Promise.all([

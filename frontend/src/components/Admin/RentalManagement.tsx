@@ -1,11 +1,12 @@
 // Updated src/components/Admin/RentalManagement.tsx
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Search, Download, Calendar, Check, X, AlertCircle } from 'lucide-react';
+import { Search, Check, X, AlertCircle, Trash2 } from 'lucide-react';
 import { db } from '../../firebase';
-import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { collection, updateDoc, doc, deleteDoc } from 'firebase/firestore';
+import { useCollection } from 'react-firebase-hooks/firestore';
 import { toast } from 'sonner';
 
 interface Rental {
@@ -22,37 +23,24 @@ interface Rental {
 export function RentalManagement() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'pending' | 'overdue' | 'returned'>('all');
-  const [rentals, setRentals] = useState<Rental[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [rentalsSnap, loading] = useCollection(collection(db, 'rentals'));
 
-  useEffect(() => {
-    const fetchRentals = async () => {
-      setLoading(true);
-      try {
-        const snapshot = await getDocs(collection(db, 'rentals'));
-        const data = snapshot.docs.map(doc => {
-          const d = doc.data();
-          return {
-            id: doc.id,
-            bookTitle: d.bookTitle || 'Unknown Book',
-            renterName: d.renterName || 'Unknown Renter',
-            renterEmail: d.renterEmail || 'No Email',
-            startDate: d.startDate || new Date().toISOString(),
-            dueDate: d.dueDate || new Date().toISOString(),
-            status: d.status || 'pending',
-            rentalPrice: d.rentalPrice || d.price || 0
-          } as Rental;
-        });
-        setRentals(data);
-      } catch (err) {
-        toast.error('Failed to fetch rentals');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchRentals();
-  }, []);
+  const rentals: Rental[] = useMemo(() => {
+    if (!rentalsSnap?.docs.length) return [];
+    return rentalsSnap.docs.map((docSnap) => {
+      const d = docSnap.data();
+      return {
+        id: docSnap.id,
+        bookTitle: d.bookTitle || 'Unknown Book',
+        renterName: d.renterName || 'Unknown Renter',
+        renterEmail: d.renterEmail || 'No Email',
+        startDate: typeof d.startDate === 'string' ? d.startDate : new Date().toISOString(),
+        dueDate: typeof d.dueDate === 'string' ? d.dueDate : new Date().toISOString(),
+        status: (d.status || 'pending') as Rental['status'],
+        rentalPrice: d.rentalPrice || d.price || 0,
+      };
+    });
+  }, [rentalsSnap]);
 
   const filteredRentals = rentals.filter(rental => {
     const matchesSearch = rental.bookTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -89,7 +77,6 @@ export function RentalManagement() {
   const handleApprove = async (id: string) => {
     try {
       await updateDoc(doc(db, 'rentals', id), { status: 'active' });
-      setRentals(prev => prev.map(r => r.id === id ? { ...r, status: 'active' } : r));
       toast.success('Rental approved');
     } catch (err) {
       toast.error('Failed to approve');
@@ -99,12 +86,22 @@ export function RentalManagement() {
   const handleDeny = async (id: string) => {
     if (confirm('Are you sure?')) {
       try {
-        await updateDoc(doc(db, 'rentals', id), { status: 'returned' });  // Or delete if needed
-        setRentals(prev => prev.map(r => r.id === id ? { ...r, status: 'returned' } : r));
+        await updateDoc(doc(db, 'rentals', id), { status: 'returned' });
         toast.success('Rental denied');
       } catch (err) {
         toast.error('Failed to deny');
       }
+    }
+  };
+
+  const handleDeleteRental = async (id: string) => {
+    if (!confirm('Permanently delete this rental record?')) return;
+    try {
+      await deleteDoc(doc(db, 'rentals', id));
+      toast.success('Rental removed');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to delete rental');
     }
   };
 
@@ -222,7 +219,7 @@ export function RentalManagement() {
                   </td>
                   <td className="px-6 py-4">
                     {rental.status === 'pending' ? (
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => handleApprove(rental.id)}>
                           <Check className="w-4 h-4 mr-1" />
                           Approve
@@ -231,16 +228,27 @@ export function RentalManagement() {
                           <X className="w-4 h-4 mr-1" />
                           Deny
                         </Button>
+                        <Button size="sm" variant="outline" onClick={() => void handleDeleteRental(rental.id)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
                     ) : rental.status === 'overdue' ? (
-                      <Button size="sm" variant="outline" className="text-orange-600" onClick={() => handleSendReminder(rental.id)}>
-                        <AlertCircle className="w-4 h-4 mr-1" />
-                        Send Reminder
-                      </Button>
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" variant="outline" className="text-orange-600" onClick={() => handleSendReminder(rental.id)}>
+                          <AlertCircle className="w-4 h-4 mr-1" />
+                          Remind
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => void handleDeleteRental(rental.id)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     ) : (
-                      <Button size="sm" variant="outline">
-                        View Details
-                      </Button>
+                      <div className="flex flex-wrap gap-1">
+                        <Button size="sm" variant="outline" className="text-red-600" onClick={() => void handleDeleteRental(rental.id)}>
+                          <Trash2 className="w-4 h-4 mr-1" />
+                          Delete
+                        </Button>
+                      </div>
                     )}
                   </td>
                 </tr>

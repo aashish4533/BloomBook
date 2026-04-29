@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db, auth, storage } from '../../firebase';
+import { db, auth, storage, functions } from '../../firebase';
 import {
   collection,
   query,
@@ -12,12 +12,15 @@ import {
   setDoc,
   deleteDoc,
 } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { ArrowLeft, Paperclip, Loader2, Download, Lock, Reply, X } from 'lucide-react';
+import { ArrowLeft, Paperclip, Loader2, Download, Lock, Reply, X, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { downloadFile } from '../../utils/fileHandler';
-import { useNeuralPrivacy } from '../../hooks/useNeuralPrivacy';
+import { useNeuralPrivacy, clearNeuralSharedKeyCache } from '../../hooks/useNeuralPrivacy';
 import { notifyChatRecipient } from '../../utils/chatNotifications';
+import { Button } from '../ui/button';
+import { Textarea } from '../ui/textarea';
 
 interface Message {
   id: string;
@@ -201,6 +204,19 @@ function PrivateChatMessageBubble({
   );
 }
 
+function formatDeadline(ts: unknown): string {
+  try {
+    const t = ts as { toDate?: () => Date };
+    if (t && typeof t.toDate === 'function') return t.toDate().toLocaleString();
+  } catch {
+    /* ignore */
+  }
+  return '';
+}
+
+const DECRYPT_FAIL_HINT =
+  '[Cannot decrypt — keys may not match. This can happen if someone changed devices, cleared site data, or a different account used this browser before.]';
+
 export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId, embedded = false }: PrivateChatProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -211,7 +227,70 @@ export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId, embedded
   const seenMessageIdsRef = useRef<Set<string>>(new Set());
   const displayByIdRef = useRef<Record<string, string>>({});
 
+  /** Other participant uid from chat doc (authoritative for E2EE); state from navigation can be wrong. */
+  const [cipherPeerId, setCipherPeerId] = useState(otherUser.id);
+
+  const [tuitionPair, setTuitionPair] = useState<{ studentId: string; tutorId: string } | null>(null);
+  const [agreementState, setAgreementState] = useState<'idle' | 'loading' | 'ready'>('idle');
+  const [agreement, setAgreement] = useState<Record<string, unknown> | null>(null);
+  const [dealDraft, setDealDraft] = useState('');
+  const [agreementBusy, setAgreementBusy] = useState(false);
+
   const { initialized, shield, reconstruct } = useNeuralPrivacy(currentUserId);
+
+  const cryptoPeerId = cipherPeerId || otherUser.id;
+
+  useEffect(() => {
+    setCipherPeerId(otherUser.id);
+  }, [otherUser.id]);
+
+  const isTuitionThread = tuitionPair !== null;
+  const agreementStatus = agreement?.status as string | undefined;
+  const messagingAllowed =
+    !isTuitionThread || (agreementState === 'ready' && agreementStatus === 'accepted');
+
+  useEffect(() => {
+    if (!chatId) return;
+    const unsub = onSnapshot(doc(db, 'chats', chatId), (snap) => {
+      if (!snap.exists()) return;
+      const d = snap.data();
+      const sid = d?.studentId;
+      const tid = d?.tutorId;
+      if (typeof sid === 'string' && typeof tid === 'string') {
+        setTuitionPair({ studentId: sid, tutorId: tid });
+      } else {
+        setTuitionPair(null);
+      }
+      if (currentUserId && Array.isArray(d?.participants)) {
+        const other = d.participants.find(
+          (p: unknown) => typeof p === 'string' && (p as string).length > 0 && p !== currentUserId
+        );
+        if (other) setCipherPeerId(other as string);
+      }
+    });
+    return () => unsub();
+  }, [chatId, currentUserId]);
+
+  useEffect(() => {
+    if (!chatId || !tuitionPair) {
+      setAgreementState('idle');
+      setAgreement(null);
+      return;
+    }
+    setAgreementState('loading');
+    const unsub = onSnapshot(
+      doc(db, 'tuition_agreements', chatId),
+      (snap) => {
+        setAgreementState('ready');
+        setAgreement(snap.exists() ? snap.data()! : null);
+      },
+      () => {
+        setAgreementState('ready');
+        setAgreement(null);
+      }
+    );
+    return () => unsub();
+  }, [chatId, tuitionPair]);
 
   useEffect(() => {
     if (!chatId || !initialized) return;
@@ -270,8 +349,41 @@ export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId, embedded
       const list = await Promise.all(
         rawList.map(async (msg) => {
           if (msg.ciphertext && msg.iv) {
-            const plain = await reconstruct(msg.ciphertext, msg.iv, otherUser.id);
-            return { ...msg, text: plain ?? '[Cannot decrypt — keys may not match]' };
+            const rawText = typeof msg.text === 'string' ? msg.text.trim() : '';
+            const preservedPlaintext =
+              rawText && !rawText.startsWith('[Cannot decrypt') ? msg.text as string : '';
+
+            const tryDecrypt = async (peerId: string) => {
+              let p = await reconstruct(msg.ciphertext!, msg.iv!, peerId);
+              if (p == null) {
+                clearNeuralSharedKeyCache(peerId);
+                p = await reconstruct(msg.ciphertext!, msg.iv!, peerId);
+              }
+              return p;
+            };
+
+            let plain: string | null = await tryDecrypt(cryptoPeerId);
+            if (
+              plain == null &&
+              msg.senderId &&
+              msg.senderId !== currentUserId &&
+              msg.senderId !== cryptoPeerId
+            ) {
+              plain = await tryDecrypt(msg.senderId);
+            }
+            if (plain != null) {
+              return { ...msg, text: plain };
+            }
+            if (preservedPlaintext) {
+              return { ...msg, text: preservedPlaintext };
+            }
+            if (rawText && rawText !== DECRYPT_FAIL_HINT) {
+              return { ...msg, text: rawText };
+            }
+            return {
+              ...msg,
+              text: DECRYPT_FAIL_HINT,
+            };
           }
           return msg;
         })
@@ -299,14 +411,52 @@ export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId, embedded
     });
 
     return () => unsubscribe();
-  }, [chatId, currentUserId, otherUser.id, otherUser.name, initialized, reconstruct]);
+  }, [chatId, currentUserId, otherUser.id, otherUser.name, cryptoPeerId, initialized, reconstruct]);
+
+  const proposeDeal = async () => {
+    const text = dealDraft.trim();
+    if (text.length < 20) {
+      toast.error('Write at least 20 characters describing the deal.');
+      return;
+    }
+    setAgreementBusy(true);
+    try {
+      const fn = httpsCallable(functions, 'proposeTuitionAgreement');
+      await fn({ chatId, agreementText: text });
+      toast.success('Agreement sent. The other party has 2 days to accept.');
+      setDealDraft('');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Could not submit agreement';
+      toast.error(msg);
+    } finally {
+      setAgreementBusy(false);
+    }
+  };
+
+  const acceptDeal = async () => {
+    setAgreementBusy(true);
+    try {
+      const fn = httpsCallable(functions, 'acceptTuitionAgreement');
+      await fn({ chatId });
+      toast.success('Agreement accepted. You can message now.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Could not accept';
+      toast.error(msg);
+    } finally {
+      setAgreementBusy(false);
+    }
+  };
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !initialized) return;
+    if (!messagingAllowed) {
+      toast.error('Finalize the tuition agreement above before messaging.');
+      return;
+    }
 
     try {
-      const enc = await shield(newMessage.trim(), otherUser.id);
+      const enc = await shield(newMessage.trim(), cryptoPeerId);
       if (!enc) {
         toast.error('Could not encrypt message', {
           description: `${otherUser.name} may need to open BookBloom once so their encryption key is registered.`,
@@ -332,7 +482,7 @@ export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId, embedded
         lastMessageTimestamp: serverTimestamp(),
       });
       notifyChatRecipient({
-        recipientUserId: otherUser.id,
+        recipientUserId: cryptoPeerId,
         senderLabel: auth.currentUser?.displayName || 'Someone',
         preview: 'Sent you an encrypted message. Open chat to read.',
         chatId,
@@ -348,6 +498,10 @@ export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId, embedded
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
+    if (!messagingAllowed) {
+      toast.error('Finalize the tuition agreement above before sending files.');
+      return;
+    }
     if (!file || !auth.currentUser?.email) {
       if (!auth.currentUser?.email) {
         alert('Your account needs an email to upload files.');
@@ -381,7 +535,7 @@ export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId, embedded
         updatedAt: serverTimestamp(),
       });
       notifyChatRecipient({
-        recipientUserId: otherUser.id,
+        recipientUserId: cryptoPeerId,
         senderLabel: auth.currentUser?.displayName || 'Someone',
         preview: `Shared a file: ${file.name}`,
         chatId,
@@ -406,11 +560,11 @@ export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId, embedded
       <div
         className={
           embedded
-            ? 'w-full bg-white flex flex-col h-[min(480px,70vh)]'
-            : 'w-full max-w-2xl bg-white rounded-lg shadow-xl overflow-hidden flex flex-col h-[calc(100dvh-2rem)] max-h-[800px]'
+            ? 'private-chat-shell private-chat-shell--embedded w-full bg-white'
+            : 'private-chat-shell w-full max-w-2xl bg-white rounded-lg shadow-xl'
         }
       >
-        <div className="bg-[#C4A672] p-4 flex items-center text-white shadow-sm gap-2">
+        <div className="private-chat-header bg-[#C4A672] p-4 flex items-center text-white shadow-sm gap-2">
           <button onClick={onBack} className="mr-2 hover:bg-white/20 p-1 rounded-full text-white shrink-0">
             <ArrowLeft className="w-6 h-6" />
           </button>
@@ -424,14 +578,80 @@ export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId, embedded
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
+        <div className="private-chat-body relative">
+          {isTuitionThread && (
+            <div className="border-b border-amber-200 bg-amber-50/90 px-4 py-3 text-sm text-[#2C3E50] space-y-3">
+              <div className="flex items-center gap-2 font-semibold">
+                <FileText className="w-4 h-4 text-[#C4A672] shrink-0" />
+                Tuition agreement (required before chat)
+              </div>
+              {agreementState === 'loading' && (
+                <p className="flex items-center gap-2 text-gray-600">
+                  <Loader2 className="w-4 h-4 animate-spin shrink-0" /> Loading deal status…
+                </p>
+              )}
+              {agreementState === 'ready' && agreementStatus === 'accepted' && (
+                <p className="text-green-800">Deal accepted. Messaging is open.</p>
+              )}
+              {agreementState === 'ready' && agreementStatus === 'pending_acceptance' && (
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-600">
+                    Accept by: {formatDeadline(agreement?.acceptDeadlineAt)}. If this is not accepted in time, both accounts
+                    can lose tuition verification (automated).
+                  </p>
+                  <div className="rounded-md bg-white border p-2 text-xs whitespace-pre-wrap max-h-32 overflow-y-auto">
+                    {String(agreement?.agreementText || '')}
+                  </div>
+                  {agreement?.proposedBy !== currentUserId && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="bg-[#C4A672] hover:bg-[#8B7355] text-white"
+                      disabled={agreementBusy}
+                      onClick={() => void acceptDeal()}
+                    >
+                      Accept this agreement
+                    </Button>
+                  )}
+                  {agreement?.proposedBy === currentUserId && (
+                    <p className="text-xs text-amber-900">Waiting for the other party to accept.</p>
+                  )}
+                </div>
+              )}
+              {agreementState === 'ready' &&
+                agreementStatus !== 'accepted' &&
+                agreementStatus !== 'pending_acceptance' && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-gray-700">
+                      Either side writes the deal; the other must accept within 2 days. Assigned tuition requests also expire
+                      after 2 days without an accepted deal.
+                    </p>
+                    <Textarea
+                      value={dealDraft}
+                      onChange={(e) => setDealDraft(e.target.value)}
+                      placeholder="e.g. Weekly 2× sessions, rate, mode (online/in-person), start date, cancellation…"
+                      className="min-h-[88px] text-sm bg-white"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="bg-[#2C3E50] text-white hover:bg-[#1a252f]"
+                      disabled={agreementBusy}
+                      onClick={() => void proposeDeal()}
+                    >
+                      Submit agreement for other party
+                    </Button>
+                  </div>
+                )}
+            </div>
+          )}
           {!initialized && (
             <div className="absolute inset-0 z-10 bg-gray-50/90 flex items-center justify-center text-sm text-gray-600 p-4">
               <Loader2 className="w-6 h-6 animate-spin mr-2 text-[#C4A672]" />
               Securing your chat…
             </div>
           )}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+          <div className="private-chat-messages-scroll p-4 space-y-4 bg-gray-50">
             {messages.map((msg) => {
               const isMe = msg.senderId === currentUserId;
               const displayText =
@@ -462,7 +682,7 @@ export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId, embedded
           </div>
 
           {replyingTo && (
-            <div className="px-4 py-2 bg-gray-100 border-t border-gray-200 flex items-center justify-between text-sm text-gray-700">
+            <div className="private-chat-reply-preview px-4 py-2 bg-gray-100 border-t border-gray-200 flex items-center justify-between text-sm text-gray-700">
               <span className="truncate">
                 Replying to <strong>{replyingTo.senderId === currentUserId ? 'yourself' : otherUser.name}</strong>
                 {replyingTo.displayText ? `: ${replyingTo.displayText.slice(0, 80)}${replyingTo.displayText.length > 80 ? '…' : ''}` : ''}
@@ -478,7 +698,7 @@ export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId, embedded
             </div>
           )}
 
-          <form onSubmit={sendMessage} className="p-4 border-t bg-white flex gap-2 shrink-0 items-center">
+          <form onSubmit={sendMessage} className="private-chat-composer p-4 border-t bg-white flex gap-2 items-center">
             <input
               ref={fileInputRef}
               type="file"
@@ -490,7 +710,7 @@ export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId, embedded
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingFile}
+              disabled={uploadingFile || !messagingAllowed}
               className="p-2 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
               title="Send material (attach file)"
             >
@@ -499,12 +719,13 @@ export const PrivateChat = ({ otherUser, currentUserId, onBack, chatId, embedded
             <input
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Type a message..."
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              placeholder={messagingAllowed ? 'Type a message…' : 'Accept the tuition agreement first…'}
+              disabled={!messagingAllowed}
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-60"
             />
             <button
               type="submit"
-              disabled={!newMessage.trim() || !initialized}
+              disabled={!newMessage.trim() || !initialized || !messagingAllowed}
               className="px-6 py-2 bg-blue-600 text-white rounded-full font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm shrink-0"
             >
               Send

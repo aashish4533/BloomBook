@@ -7,3 +7,97 @@
   min-height: 100dvh;
   overflow-x: hidden;
 }
+
+/* Shell height: arbitrary h-[…] utilities are not in prebuilt index.css — without this, the card has no flex height and the composer is clipped */
+.private-chat-shell {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+  width: 100%;
+}
+
+.private-chat-shell:not(.private-chat-shell--embedded) {
+  height: calc(100dvh - 2rem);
+  max-width: 42rem;
+}
+
+.private-chat-shell--embedded {
+  height: min(480px, 70vh);
+}
+
+.private-chat-header {
+  flex-shrink: 0;
+}
+
+/* Column between header and composer */
+.private-chat-body {
+  flex: 1 1 0%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.private-chat-composer {
+  flex-shrink: 0;
+}
+
+.private-chat-reply-preview {
+  flex-shrink: 0;
+}
+
+/* PrivateChat messages: scrollbar (prebuilt index.css has no JIT — arbitrary Tailwind variants are not emitted) */
+.private-chat-messages-scroll {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow-y: scroll;
+  overscroll-behavior: contain;
+  scrollbar-width: auto;
+  scrollbar-color: #cccccc #333333;
+}
+
+.private-chat-messages-scroll::-webkit-scrollbar {
+  width: 12px;
+}
+
+.private-chat-messages-scroll::-webkit-scrollbar-track {
+  background: #333333;
+}
+
+.private-chat-messages-scroll::-webkit-scrollbar-thumb {
+  background: #cccccc;
+  border-radius: 10px;
+}
+
+.private-chat-messages-scroll::-webkit-scrollbar-button {
+  display: block;
+}
+
+/* Admin User Management table: scroll horizontally and vertically when content is wide or long */
+.admin-user-table-scroll {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: min(70vh, 42rem);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: #c4a672 #f3f4f6;
+}
+
+.admin-user-table-scroll table {
+  min-width: 56rem;
+}
+
+.admin-user-table-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.admin-user-table-scroll::-webkit-scrollbar-track {
+  background: #f3f4f6;
+}
+
+.admin-user-table-scroll::-webkit-scrollbar-thumb {
+  background: #c4a672;
+  border-radius: 6px;
+}

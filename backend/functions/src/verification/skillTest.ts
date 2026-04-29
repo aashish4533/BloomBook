@@ -13,7 +13,7 @@ if (!admin.apps.length) {
 /**
  * Generates a skill test using OpenAI.
  */
-export const requestSkillTest = onCall({ cors: true }, async (request) => {
+export const requestSkillTest = onCall({ cors: true, secrets: [geminiApiKey] }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "User must be logged in.");
   }
@@ -28,15 +28,25 @@ export const requestSkillTest = onCall({ cors: true }, async (request) => {
       const mockQuestions = [
         {
           id: 1,
-          question: `What is a key concept in ${subject}?`,
-          options: ["A", "B", "C", "D"],
-          answer: "A",
+          question: `Which approach best reflects solid teaching practice in ${subject}?`,
+          options: [
+            "Build understanding through examples, practice, and clear explanations",
+            "Rely only on memorization without reasoning",
+            "Skip fundamentals to move faster",
+            "Avoid giving feedback on mistakes",
+          ],
+          answer: "Build understanding through examples, practice, and clear explanations",
         },
         {
           id: 2,
-          question: `Explain the importance of ${subject}.`,
-          options: ["X", "Y", "Z", "W"],
-          answer: "X",
+          question: `Why is ongoing practice important when learning ${subject}?`,
+          options: [
+            "It reinforces skills and improves retention over time",
+            "It guarantees a perfect score on every assessment",
+            "It replaces the need for instruction",
+            "It is only useful for beginners",
+          ],
+          answer: "It reinforces skills and improves retention over time",
         },
       ];
 
@@ -50,7 +60,13 @@ export const requestSkillTest = onCall({ cors: true }, async (request) => {
           status: "pending",
         });
 
-      return { questions: mockQuestions.map(({ answer, ...q }) => q) };
+      return {
+        questions: mockQuestions.map((q) => {
+          const { answer, ...rest } = q;
+          void answer;
+          return rest;
+        }),
+      };
     }
 
     const prompt = `Generate 5 multiple choice questions for a ` +
@@ -97,7 +113,8 @@ export const requestSkillTest = onCall({ cors: true }, async (request) => {
     return { questions: questionsForFrontend };
   } catch (error: unknown) {
     logger.error("Skill Test Generation Error:", error);
-    throw new HttpsError("internal", (error as Error).message);
+    // Never forward raw provider errors to the client — they may contain API key material.
+    throw new HttpsError("internal", "Could not generate the skill test. Please try again in a moment.");
   }
 });
 
@@ -188,6 +205,6 @@ export const submitSkillTest = onCall({ cors: true, secrets: [geminiApiKey] }, a
     return { success: true, score, passed, finalStatus, feedback };
   } catch (error: unknown) {
     logger.error("Test Submission Error:", error);
-    throw new HttpsError("internal", (error as Error).message);
+    throw new HttpsError("internal", "Could not submit the skill test. Please try again.");
   }
 });

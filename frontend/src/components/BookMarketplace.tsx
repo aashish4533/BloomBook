@@ -346,7 +346,7 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
 
         {/* Listing Type Tabs */}
         <div className="flex justify-center mb-6 w-full overflow-x-auto pb-1 -mx-1 px-1">
-          <div className="bg-white p-1 rounded-lg border border-gray-200 inline-flex flex-wrap justify-center gap-1 max-w-full">
+          <div className="bg-white p-1 rounded-lg border border-gray-200 inline-flex flex-wrap justify-center gap-3 max-w-full">
             {['all', 'sell', 'rent', 'exchange'].map((type) => (
               <button
                 key={type}

@@ -149,6 +149,8 @@ export function RentBookFlow({ onClose, preSelectedBook }: RentBookFlowProps) {
 
       await addDoc(collection(db, 'transactions'), {
         type: 'rent',
+        buyerId: auth.currentUser.uid,
+        sellerId: lenderId,
         bookTitle: selectedBook.title,
         user: auth.currentUser.displayName || auth.currentUser.email || 'Unknown User',
         amount: totalAtCheckout,
@@ -160,6 +162,7 @@ export function RentBookFlow({ onClose, preSelectedBook }: RentBookFlowProps) {
 
       await addDoc(collection(db, 'notifications'), {
         userId: lenderId,
+        sourceUid: auth.currentUser.uid,
         type: 'rental_reserved',
         title: 'Rental reserved',
         message: `${auth.currentUser.displayName || 'A borrower'} reserved "${selectedBook.title}" for pickup on ${pickupDate}. Open Rentals to confirm payment receipt and handover.`,
