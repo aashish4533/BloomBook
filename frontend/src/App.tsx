@@ -286,7 +286,7 @@ function DeliveryTrackingWrapper() {
 }
 
 function AppContent() {
-  const { user, loading } = useUserRole();
+  const { user, authLoading } = useUserRole();
 
   const handleLogout = () => {
     clearAdminOtpSession();
@@ -294,8 +294,17 @@ function AppContent() {
     // UserRoleContext handles state updates automatically via onAuthStateChanged
   };
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  // Only block the router on Firebase Auth — not on Firestore role fetch — so MainLayout
+  // (app-shell) mounts immediately after login while the user doc loads in the background.
+  if (authLoading) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        data-testid="app-shell"
+      >
+        Loading…
+      </div>
+    );
   }
 
   return (

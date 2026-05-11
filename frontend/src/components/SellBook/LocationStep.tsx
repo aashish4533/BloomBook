@@ -7,7 +7,7 @@ import { Label } from '../ui/label';
 import { MapPin, Package, MapPinned } from 'lucide-react';
 
 // 1. Import Leaflet and React-Leaflet components
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -36,6 +36,22 @@ function MapUpdater({ center, zoom }: { center: [number, number]; zoom: number }
   useEffect(() => {
     map.setView(center, zoom);
   }, [center, zoom, map]);
+  return null;
+}
+
+function MapClickHandler({
+  onLocationPicked,
+  disabled,
+}: {
+  onLocationPicked: (lat: number, lng: number) => void;
+  disabled?: boolean;
+}) {
+  useMapEvents({
+    click(e) {
+      if (disabled) return;
+      onLocationPicked(e.latlng.lat, e.latlng.lng);
+    },
+  });
   return null;
 }
 
@@ -150,9 +166,55 @@ async function reverseGeocodeOpenStreetMap(latitude: number, longitude: number) 
     addressdetails: '1',
   });
   const response = await fetch(
-    `https://nominatim.openstreetmap.org/reverse?${params.toString()}`
+    `https://nominatim.openstreetmap.org/reverse?${params.toString()}`,
+    {
+      headers: {
+        Accept: 'application/json',
+        'Accept-Language': 'en',
+      },
+    }
   );
+  if (!response.ok) throw new Error(`Reverse geocode failed: ${response.status}`);
   return response.json();
+}
+
+/** Parse Nominatim reverse result into LocationData fields (shared by GPS and map tap). */
+function locationFieldsFromNominatim(
+  data: { address?: Record<string, string>; display_name?: string },
+  lat: number,
+  lng: number
+): LocationData {
+  const addressParts = data.address || {};
+  const street = [addressParts.house_number, addressParts.road].filter(Boolean).join(' ').trim();
+  const city =
+    addressParts.city ||
+    addressParts.town ||
+    addressParts.village ||
+    addressParts.hamlet ||
+    addressParts.suburb ||
+    addressParts.neighbourhood ||
+    addressParts.municipality ||
+    addressParts.county ||
+    '';
+  const state =
+    addressParts.state ||
+    addressParts.region ||
+    addressParts.state_district ||
+    '';
+  const zipCode = addressParts.postcode || '';
+  const addressLine =
+    street ||
+    (typeof data.display_name === 'string' ? data.display_name.split(',').slice(0, 2).join(', ').trim() : '') ||
+    'Selected map location';
+
+  return {
+    method: 'pickup',
+    address: addressLine,
+    city,
+    state,
+    zipCode,
+    coordinates: { lat, lng },
+  };
 }
 
 export function LocationStep({ initialData, onNext, onBack }: LocationStepProps) {
@@ -168,13 +230,21 @@ export function LocationStep({ initialData, onNext, onBack }: LocationStepProps)
 
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
+    const hasCoords = Boolean(
+      formData.coordinates &&
+        Number.isFinite(formData.coordinates.lat) &&
+        Number.isFinite(formData.coordinates.lng)
+    );
 
     if (!formData.address.trim()) newErrors.address = 'Address is required';
     if (!formData.city.trim()) newErrors.city = 'City is required';
-    if (!formData.state.trim()) newErrors.state = 'State is required';
-    if (!formData.zipCode.trim()) {
-      newErrors.zipCode = 'ZIP code is required';
-    } else if (formData.zipCode.trim().length < 3) {
+    if (!formData.state.trim()) newErrors.state = 'State / province is required';
+    const zip = formData.zipCode.trim();
+    if (!zip) {
+      if (!hasCoords) {
+        newErrors.zipCode = 'Postal code is required (or pick a point on the map / use current location)';
+      }
+    } else if (zip.length < 3) {
       newErrors.zipCode = 'Please enter a valid postal code';
     }
 
@@ -209,34 +279,8 @@ export function LocationStep({ initialData, onNext, onBack }: LocationStepProps)
 
       try {
         const data = await reverseGeocodeOpenStreetMap(latitude, longitude);
-
-        const addressParts = data.address || {};
-        const street = [addressParts.house_number, addressParts.road].filter(Boolean).join(' ').trim();
-        const city =
-          addressParts.city ||
-          addressParts.town ||
-          addressParts.village ||
-          addressParts.hamlet ||
-          addressParts.suburb ||
-          addressParts.neighbourhood ||
-          addressParts.municipality ||
-          addressParts.county ||
-          '';
-        const state =
-          addressParts.state ||
-          addressParts.region ||
-          addressParts.state_district ||
-          '';
-
-        setFormData((prev) => ({
-          ...prev,
-          method: 'pickup',
-          address: street || data.display_name?.split(',').slice(0, 2).join(', ').trim() || 'Detected location',
-          city,
-          state,
-          zipCode: addressParts.postcode || '',
-          coordinates: { lat: latitude, lng: longitude },
-        }));
+        const parsed = locationFieldsFromNominatim(data, latitude, longitude);
+        setFormData((prev) => ({ ...prev, ...parsed }));
 
         setErrors({});
 
@@ -270,6 +314,26 @@ export function LocationStep({ initialData, onNext, onBack }: LocationStepProps)
         }
       }
       toast.error(errorMessage);
+    } finally {
+      setLocating(false);
+    }
+  };
+
+  const applyMapPoint = async (latitude: number, longitude: number) => {
+    setLocating(true);
+    setFormData((prev) => ({
+      ...prev,
+      coordinates: { lat: latitude, lng: longitude },
+    }));
+    try {
+      const data = await reverseGeocodeOpenStreetMap(latitude, longitude);
+      const parsed = locationFieldsFromNominatim(data, latitude, longitude);
+      setFormData((prev) => ({ ...prev, ...parsed }));
+      setErrors({});
+      toast.success('Location set from map — review the fields above.');
+    } catch (error) {
+      console.error('Reverse geocoding failed (map click)', error);
+      toast.error('Could not look up address for that point. Enter street, city, and postal code manually.');
     } finally {
       setLocating(false);
     }
@@ -378,6 +442,10 @@ export function LocationStep({ initialData, onNext, onBack }: LocationStepProps)
         </div>
       </div>
 
+      <p className="text-xs text-gray-600 -mt-2">
+        <strong>Tip:</strong> Tap anywhere on the map to drop a pickup pin — we fill the address fields when possible. You can still edit them.
+      </p>
+
       {/* REAL MAP IMPLEMENTATION */}
       <div className="h-64 rounded-lg overflow-hidden border border-gray-300 z-0 relative">
         <MapContainer
@@ -390,6 +458,7 @@ export function LocationStep({ initialData, onNext, onBack }: LocationStepProps)
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           <MapUpdater center={mapCenter} zoom={mapZoom} />
+          <MapClickHandler onLocationPicked={applyMapPoint} disabled={locating} />
           {formData.coordinates && (
             <Marker position={[formData.coordinates.lat, formData.coordinates.lng]}>
               <Popup>

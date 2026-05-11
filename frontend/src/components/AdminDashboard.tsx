@@ -116,7 +116,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   ) || tabs[0];
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50 flex" data-testid="app-shell">
       {/* Sidebar */}
       <aside className="w-64 bg-[#2C3E50] text-white flex flex-col sticky top-0 h-screen">
         {/* Logo */}

@@ -10,7 +10,14 @@ export function AdminRoute({ redirectPath = '/admin/login' }: AdminRouteProps) {
     const { userRole, loading } = useUserRole();
 
     if (loading) {
-        return <div>Loading...</div>; // Or a spinner
+        return (
+            <div
+                className="min-h-screen flex items-center justify-center"
+                data-testid="app-shell"
+            >
+                Loading…
+            </div>
+        );
     }
 
     if (userRole !== 'admin') {

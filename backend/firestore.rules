@@ -26,6 +26,24 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/communities/$(communityId)).data.adminId == request.auth.uid;
     }
 
+    // Buyer local-pickup hold: only reservation fields, seller userId unchanged, listing not sold / held by others.
+    function buyerPlacesReservationOnBook() {
+      let ownerId = resource.data.get('userId', '');
+      let prevStatus = resource.data.get('listingStatus', '');
+      let prevReservedBy = resource.data.get('reservedBy', '');
+      return isAuthenticated()
+        && ownerId != ''
+        && ownerId != request.auth.uid
+        && request.resource.data.get('userId', '') == ownerId
+        && resource.data.get('isSold', false) != true
+        && resource.data.get('listingStatus', '') != 'sold'
+        && !(prevStatus == 'reserved' && prevReservedBy != '' && prevReservedBy != request.auth.uid)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['listingStatus', 'reservedBy', 'reservedUntil', 'reservationPurchaseId', 'updatedAt'])
+        && request.resource.data.get('listingStatus', '') == 'reserved'
+        && request.resource.data.get('reservedBy', '') == request.auth.uid;
+    }
+
     // --- Users Collection ---
     match /users/{userId} {
       allow read: if true;
@@ -68,7 +86,10 @@ service cloud.firestore {
       allow create: if isAuthenticated() && (
         request.resource.data.get('userId', '') == request.auth.uid || isAdmin()
       );
-      allow update, delete: if isAdmin()
+      allow update: if isAdmin()
+        || (isAuthenticated() && resource.data.get('userId', '') == request.auth.uid)
+        || buyerPlacesReservationOnBook();
+      allow delete: if isAdmin()
         || (isAuthenticated() && resource.data.get('userId', '') == request.auth.uid);
     }
 

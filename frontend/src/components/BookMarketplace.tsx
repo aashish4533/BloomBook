@@ -370,6 +370,7 @@ export function BookMarketplace({ onBack }: BookMarketplaceProps) {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <Input
                   type="text"
+                  data-testid="search-input"
                   placeholder="Search by title or author..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}

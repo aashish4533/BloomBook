@@ -8,6 +8,10 @@ interface UserRoleContextType {
     user: User | null | undefined;
     userRole: 'user' | 'admin' | null;
     isAdmin: boolean;
+    /** True until Firebase Auth has finished its first state resolution. */
+    authLoading: boolean;
+    /** True while Firestore user role is being fetched (after auth is known). */
+    roleLoading: boolean;
     loading: boolean;
 }
 
@@ -52,6 +56,8 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
         user,
         userRole,
         isAdmin: userRole === 'admin',
+        authLoading,
+        roleLoading,
         loading: authLoading || roleLoading
     };
 

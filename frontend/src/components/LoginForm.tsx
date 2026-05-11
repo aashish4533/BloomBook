@@ -128,13 +128,13 @@ export function LoginForm({ onLogin }: LoginFormProps) {
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Email Field */}
               <div className="space-y-2">
-                <label htmlFor="email" className="text-sm text-gray-700">
+                <label htmlFor="email-input" className="text-sm text-gray-700">
                   Email Address
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <Input
-                    id="email"
+                    id="email-input"
                     type="email"
                     placeholder="Enter your email"
                     value={email}

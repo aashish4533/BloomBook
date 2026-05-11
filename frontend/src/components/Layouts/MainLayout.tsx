@@ -11,7 +11,7 @@ interface MainLayoutProps {
 
 export function MainLayout({ isLoggedIn, onLogout }: MainLayoutProps) {
     return (
-        <div className="min-h-screen flex flex-col min-w-0 overflow-x-hidden">
+        <div className="min-h-screen flex flex-col min-w-0 overflow-x-hidden" data-testid="app-shell">
             <Navbar isLoggedIn={isLoggedIn} onLogout={onLogout} />
             <main className="flex-1 relative z-0 w-full min-w-0 overflow-x-hidden">
                 <Outlet />
